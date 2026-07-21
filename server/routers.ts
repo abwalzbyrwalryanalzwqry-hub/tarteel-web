@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { exportRouter } from "./routers/export";
 import {
   createAcademicSeason,
   createBranch,
@@ -407,6 +408,9 @@ export const appRouter = router({
   auditLog: router({
     list: protectedProcedure.query(async () => getAuditLog(50)),
   }),
+
+  // ===================== EXPORT =====================
+  export: exportRouter,
 
   // ===================== TRASH =====================
   trash: router({

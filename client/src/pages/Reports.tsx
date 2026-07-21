@@ -1,12 +1,19 @@
 import { trpc } from "@/lib/trpc";
-import { BarChart3, BookOpen, Building2, ClipboardList, GraduationCap, Users } from "lucide-react";
+import { BarChart3, Building2, ClipboardList, GraduationCap, Users } from "lucide-react";
+import { ExportButtons } from "@/components/ExportButtons";
+import { useState } from "react";
 
 export default function Reports() {
+  const [selectedCircleId, setSelectedCircleId] = useState<number | null>(null);
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+
   const { data: stats } = trpc.dashboard.stats.useQuery();
   const { data: centers } = trpc.centers.list.useQuery({ orgId: undefined });
   const { data: teachers } = trpc.teachers.list.useQuery({ centerId: undefined });
   const { data: students } = trpc.students.list.useQuery({});
   const { data: sessions } = trpc.sessions.list.useQuery({ circleId: undefined, seasonId: undefined });
+  const { data: circles } = trpc.circles.list.useQuery({ branchId: undefined, seasonId: undefined });
 
   const totalPresent = 0;
   const totalAbsent = 0;
@@ -20,9 +27,87 @@ export default function Reports() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center"><BarChart3 className="w-5 h-5 text-white"/></div>
-        <div><h1 className="page-title">التقارير والإحصائيات</h1><p className="page-subtitle">نظرة شاملة على أداء المنصة</p></div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center"><BarChart3 className="w-5 h-5 text-white"/></div>
+          <div><h1 className="page-title">التقارير والإحصائيات</h1><p className="page-subtitle">نظرة شاملة على أداء المنصة</p></div>
+        </div>
+      </div>
+
+      {/* Export Section */}
+      <div className="glass-card rounded-2xl p-5">
+        <h2 className="font-display font-bold text-foreground text-lg mb-4">تصدير التقارير</h2>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">اختر الحلقة</label>
+              <select
+                value={selectedCircleId || ''}
+                onChange={(e) => setSelectedCircleId(e.target.value ? parseInt(e.target.value) : null)}
+                className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground"
+              >
+                <option value="">-- اختر حلقة --</option>
+                {circles?.map((circle) => (
+                  <option key={circle.id} value={circle.id}>
+                    {circle.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">من تاريخ</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">إلى تاريخ</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {selectedCircleId && (
+              <>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">تقرير الحفظ</p>
+                  <ExportButtons
+                    circleId={selectedCircleId}
+                    reportType="memorization"
+                    startDate={startDate}
+                    endDate={endDate}
+                    className="w-full justify-center"
+                  />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">تقرير الحضور</p>
+                  <ExportButtons
+                    circleId={selectedCircleId}
+                    reportType="attendance"
+                    startDate={startDate}
+                    endDate={endDate}
+                    className="w-full justify-center"
+                  />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">تقرير الطلاب</p>
+                  <ExportButtons
+                    circleId={selectedCircleId}
+                    reportType="students"
+                    className="w-full justify-center"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Summary Cards */}
