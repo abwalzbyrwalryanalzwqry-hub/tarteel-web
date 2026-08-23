@@ -1,8 +1,9 @@
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Bell, Building2, Moon, Settings as SettingsIcon, Sun, Users } from "lucide-react";
+import { Bell, Building2, Code2, Moon, Settings as SettingsIcon, Sun, Users } from "lucide-react";
 import { toast } from "sonner";
+import { Link } from "wouter";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -108,7 +109,7 @@ export default function Settings() {
               { label: "الإصدار", value: "1.0.0" },
               { label: "اللغة", value: "العربية" },
               { label: "الاتجاه", value: "من اليمين إلى اليسار (RTL)" },
-              { label: "المطور", value: "فريق ترتيل" },
+              { label: "المطور", value: "أ. إدريس الزوقري" },
             ].map((item) => (
               <div key={item.label} className="flex items-center justify-between p-3 rounded-xl bg-muted/20">
                 <span className="text-sm text-muted-foreground">{item.label}</span>
@@ -116,6 +117,15 @@ export default function Settings() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Developer Information */}
+        <div className="glass-card rounded-2xl p-5">
+          <h2 className="font-display font-bold text-foreground text-lg mb-4 flex items-center gap-2"><Code2 className="w-5 h-5 text-primary"/>عن المطور</h2>
+          <p className="text-sm leading-6 text-muted-foreground">بيانات التواصل والدعم الفني الخاصة بمنصة ترتيل.</p>
+          <Link href="/developer" className="mt-4 inline-flex">
+            <span className="btn-gold inline-flex min-h-10 items-center px-4 text-sm">عرض بيانات المطور</span>
+          </Link>
         </div>
       </div>
 

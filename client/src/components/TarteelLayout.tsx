@@ -55,9 +55,11 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { can, role, roleLabel } = usePermissions();
   const visibleNavItems = navItems.filter((item) => getVisibleNavigationPaths(role).includes(item.path));
-  const currentNav = navItems.find((item) =>
-    location === item.path || (item.path !== "/dashboard" && location.startsWith(`${item.path}/`))
-  );
+  const currentNav = location === "/developer"
+    ? navItems.find((item) => item.path === "/settings")
+    : navItems.find((item) =>
+      location === item.path || (item.path !== "/dashboard" && location.startsWith(`${item.path}/`))
+    );
   const mayViewCurrentRoute = !currentNav || can(currentNav.permission);
 
   const { data: unreadCount } = trpc.notifications.unreadCount.useQuery(undefined, {

@@ -22,6 +22,7 @@ import AcademicSeasons from "./pages/AcademicSeasons";
 import LoginPage from "./pages/LoginPage";
 import AIAssistant from "./pages/AIAssistant";
 import SplashScreen from "./pages/SplashScreen";
+import DeveloperInfo from "./pages/DeveloperInfo";
 
 function Router() {
   return (
@@ -40,6 +41,7 @@ function Router() {
       <Route path="/reports" component={() => <TarteelLayout><Reports /></TarteelLayout>} />
       <Route path="/notifications" component={() => <TarteelLayout><Notifications /></TarteelLayout>} />
       <Route path="/settings" component={() => <TarteelLayout><Settings /></TarteelLayout>} />
+      <Route path="/developer" component={() => <TarteelLayout><DeveloperInfo /></TarteelLayout>} />
       <Route path="/trash" component={() => <TarteelLayout><Trash /></TarteelLayout>} />
       <Route path="/audit-log" component={() => <TarteelLayout><AuditLog /></TarteelLayout>} />
       <Route path="/" component={SplashScreen} />
