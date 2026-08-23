@@ -1,7 +1,18 @@
 import { startLogin } from "@/const";
-import { BookOpen, Star } from "lucide-react";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { BookOpen, Chrome, Mail, Star } from "lucide-react";
+import { useEffect } from "react";
+import { toast } from "sonner";
+import { useLocation } from "wouter";
 
 export default function LoginPage() {
+  const { isAuthenticated, loading } = useAuth();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (!loading && isAuthenticated) navigate("/dashboard");
+  }, [isAuthenticated, loading, navigate]);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden" dir="rtl">
       {/* Background decorations */}
@@ -45,14 +56,30 @@ export default function LoginPage() {
             ))}
           </div>
 
-          {/* Login Button */}
+          {/* Email / Manus OAuth */}
           <button
             onClick={() => startLogin()}
             className="btn-gold w-full text-base py-3 flex items-center justify-center gap-2"
           >
-            <BookOpen className="w-5 h-5"/>
-            تسجيل الدخول
+            <Mail className="w-5 h-5"/>
+            الدخول أو إنشاء حساب بالبريد الإلكتروني
           </button>
+
+          <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />
+            أو
+            <span className="h-px flex-1 bg-border" />
+          </div>
+
+          <button
+            onClick={() => toast.info("تسجيل الدخول عبر Google يحتاج بيانات OAuth الآمنة قبل تفعيله.")}
+            className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted flex items-center justify-center gap-2"
+          >
+            <Chrome className="w-5 h-5 text-blue-600"/>
+            التسجيل بحساب Google
+          </button>
+
+          <p className="mt-3 text-xs text-muted-foreground">يتطلب زر Google إكمال بيانات OAuth من Google Cloud Console، ثم يُفعّل بصورة آمنة.</p>
 
           <p className="text-xs text-muted-foreground mt-4">
             بتسجيل الدخول، أنت توافق على شروط الاستخدام وسياسة الخصوصية

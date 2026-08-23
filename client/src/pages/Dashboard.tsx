@@ -14,6 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Link } from "wouter";
+import { AIGuidanceCard } from "@/components/AIGuidanceCard";
 import { SESSION_STATUS_LABELS, SESSION_TYPE_LABELS } from "../../../shared/types";
 
 function LayoutDashboard({ className }: { className?: string }) {
@@ -111,6 +112,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <AIGuidanceCard context="dashboard" />
 
       {/* Stats Grid */}
       {statsLoading ? (

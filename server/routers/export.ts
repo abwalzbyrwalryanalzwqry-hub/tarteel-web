@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { protectedProcedure, router } from '../_core/trpc';
 import { getDb } from '../db';
 import { generateMemorizationExcel, generateAttendanceExcel } from '../export/excel';
-import { generateMemorizationPDF, generateAttendancePDF } from '../export/pdf';
+import { generateMemorizationPDF, generateAttendancePDF, generateStudentsReportPDF } from '../export/pdf';
 import { eq, and, gte, lte } from 'drizzle-orm';
 import {
   sessions,
@@ -325,8 +325,9 @@ export const exportRouter = router({
 
       const formattedData = studentData.map((row) => ({
         name: row.name || 'غير معروف',
-        email: row.phone || '',
-        phone: row.guardianName || '',
+        email: '',
+        phone: row.phone || '',
+        guardianName: row.guardianName || '',
         enrollmentDate: row.enrollmentDate
           ? new Date(row.enrollmentDate).toLocaleDateString('ar-SA')
           : '',
@@ -339,11 +340,10 @@ export const exportRouter = router({
         const { generateStudentsReportExcel } = await import('../export/excel');
         buffer = generateStudentsReportExcel(formattedData, centerInfo?.name || 'المركز');
       } else {
-        buffer = await generateAttendancePDF(
-          formattedData as any,
+        buffer = await generateStudentsReportPDF(
+          formattedData,
           centerInfo?.name || 'المركز',
-          '',
-          ''
+          circle.name
         );
       }
 

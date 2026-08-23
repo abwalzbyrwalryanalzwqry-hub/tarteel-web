@@ -12,6 +12,8 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import { Link } from "wouter";
+import { AIGuidanceCard } from "@/components/AIGuidanceCard";
+import { formatHijriDate } from "../../../shared/dates";
 import {
   ATTENDANCE_LABELS as ATTENDANCE_STATUS_LABELS,
   GRADE_LABELS,
@@ -145,8 +147,9 @@ export default function SessionDetail({ sessionId }: Props) {
               <span className={`text-sm px-3 py-1 rounded-full font-medium ${statusColors[session.status]}`}>{SESSION_STATUS_LABELS[session.status]}</span>
               <span className="text-sm bg-muted text-muted-foreground px-3 py-1 rounded-full">{SESSION_TYPE_LABELS[session.type]}</span>
             </div>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
               <div className="flex items-center gap-1.5"><Clock className="w-4 h-4"/>{new Date(session.scheduledAt).toLocaleDateString("ar-SA", {weekday:"long",year:"numeric",month:"long",day:"numeric",hour:"2-digit",minute:"2-digit"})}</div>
+              <div className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">هجري: {formatHijriDate(session.scheduledAt)}</div>
               {circle && <div className="flex items-center gap-1.5"><BookOpen className="w-4 h-4"/>{circle.name}</div>}
             </div>
           </div>
@@ -161,6 +164,8 @@ export default function SessionDetail({ sessionId }: Props) {
         </div>
         {session.notes && <p className="mt-3 text-sm text-muted-foreground border-t border-border/50 pt-3">{session.notes}</p>}
       </div>
+
+      <AIGuidanceCard context="sessions" />
 
       {/* Tabs */}
       <div className="flex gap-1 bg-muted/50 p-1 rounded-xl overflow-x-auto">

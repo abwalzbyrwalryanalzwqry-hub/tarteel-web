@@ -17,6 +17,14 @@ interface AttendanceRow {
   circle: string;
 }
 
+interface StudentReportRow {
+  name: string;
+  phone?: string;
+  guardianName?: string;
+  enrollmentDate: string;
+  status: string;
+}
+
 /**
  * توليد ملف PDF لتقرير الحفظ
  */
@@ -229,6 +237,67 @@ export function generateAttendancePDF(
       currentY += rowHeight;
     });
 
+    doc.end();
+  });
+}
+
+/** توليد ملف PDF مخصص لتقرير الطلاب، بدلاً من إعادة استخدام قالب الحضور. */
+export function generateStudentsReportPDF(
+  data: StudentReportRow[],
+  centerName: string,
+  circleName: string
+): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
+    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    doc.fontSize(20).font('Helvetica-Bold').text('تقرير الطلاب', { align: 'right' });
+    doc.moveDown(0.5);
+    doc.fontSize(11).font('Helvetica');
+    doc.text(`المركز: ${centerName}`, { align: 'right' });
+    doc.text(`الحلقة: ${circleName}`, { align: 'right' });
+    doc.text(`تاريخ التقرير: ${new Date().toLocaleDateString('ar-SA')}`, { align: 'right' });
+    doc.text(`إجمالي الطلاب: ${data.length}`, { align: 'right' });
+    doc.moveDown(1);
+
+    const columns = [50, 170, 275, 390, 470];
+    const rowHeight = 25;
+    const drawHeader = (y: number) => {
+      const labels = ['اسم الطالب', 'الهاتف', 'ولي الأمر', 'التسجيل', 'الحالة'];
+      doc.fontSize(9).font('Helvetica-Bold');
+      labels.forEach((label, index) => {
+        const x = columns[index];
+        const width = (columns[index + 1] ?? 545) - x;
+        doc.rect(x, y, width, rowHeight).stroke();
+        doc.text(label, x + 4, y + 6, { width: width - 8, align: 'center' });
+      });
+    };
+
+    let currentY = doc.y;
+    drawHeader(currentY);
+    currentY += rowHeight;
+    doc.fontSize(8).font('Helvetica');
+
+    for (const row of data) {
+      if (currentY > doc.page.height - 55) {
+        doc.addPage();
+        currentY = 40;
+        drawHeader(currentY);
+        currentY += rowHeight;
+        doc.fontSize(8).font('Helvetica');
+      }
+      const values = [row.name, row.phone || '—', row.guardianName || '—', row.enrollmentDate, row.status];
+      values.forEach((value, index) => {
+        const x = columns[index];
+        const width = (columns[index + 1] ?? 545) - x;
+        doc.rect(x, currentY, width, rowHeight).stroke();
+        doc.text(value, x + 4, currentY + 7, { width: width - 8, align: 'center' });
+      });
+      currentY += rowHeight;
+    }
     doc.end();
   });
 }

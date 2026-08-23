@@ -20,12 +20,14 @@ import Trash from "./pages/Trash";
 import AuditLog from "./pages/AuditLog";
 import AcademicSeasons from "./pages/AcademicSeasons";
 import LoginPage from "./pages/LoginPage";
+import AIAssistant from "./pages/AIAssistant";
+import SplashScreen from "./pages/SplashScreen";
 
 function Router() {
   return (
     <Switch>
       <Route path="/login" component={LoginPage} />
-      <Route path="/" component={() => <TarteelLayout><Dashboard /></TarteelLayout>} />
+      <Route path="/dashboard" component={() => <TarteelLayout><Dashboard /></TarteelLayout>} />
       <Route path="/centers" component={() => <TarteelLayout><Centers /></TarteelLayout>} />
       <Route path="/branches" component={() => <TarteelLayout><Branches /></TarteelLayout>} />
       <Route path="/seasons" component={() => <TarteelLayout><AcademicSeasons /></TarteelLayout>} />
@@ -34,11 +36,13 @@ function Router() {
       <Route path="/students" component={() => <TarteelLayout><Students /></TarteelLayout>} />
       <Route path="/sessions" component={() => <TarteelLayout><Sessions /></TarteelLayout>} />
       <Route path="/sessions/:id" component={(props: any) => <TarteelLayout><SessionDetail sessionId={Number(props.params?.id)} /></TarteelLayout>} />
+      <Route path="/assistant" component={() => <TarteelLayout><AIAssistant /></TarteelLayout>} />
       <Route path="/reports" component={() => <TarteelLayout><Reports /></TarteelLayout>} />
       <Route path="/notifications" component={() => <TarteelLayout><Notifications /></TarteelLayout>} />
       <Route path="/settings" component={() => <TarteelLayout><Settings /></TarteelLayout>} />
       <Route path="/trash" component={() => <TarteelLayout><Trash /></TarteelLayout>} />
       <Route path="/audit-log" component={() => <TarteelLayout><AuditLog /></TarteelLayout>} />
+      <Route path="/" component={SplashScreen} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

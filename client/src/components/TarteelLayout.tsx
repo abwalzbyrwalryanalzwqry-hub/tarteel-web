@@ -1,6 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { startLogin } from "@/const";
 import { useTheme } from "@/contexts/ThemeContext";
+import { usePermissions } from "@/hooks/usePermissions";
+import { getVisibleNavigationPaths } from "../../../shared/permissions";
 import { trpc } from "@/lib/trpc";
 import {
   ArchiveRestore,
@@ -17,6 +18,7 @@ import {
   Menu,
   Moon,
   Settings,
+  Sparkles,
   Sun,
   Users,
   X,
@@ -25,19 +27,20 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 
 const navItems = [
-  { path: "/", label: "لوحة التحكم", icon: LayoutDashboard },
-  { path: "/centers", label: "المراكز", icon: Building2 },
-  { path: "/branches", label: "الفروع", icon: Building2 },
-  { path: "/seasons", label: "المواسم الدراسية", icon: BookText },
-  { path: "/circles", label: "الحلقات", icon: BookOpen },
-  { path: "/teachers", label: "المعلمون", icon: GraduationCap },
-  { path: "/students", label: "الطلاب", icon: Users },
-  { path: "/sessions", label: "الجلسات", icon: ClipboardList },
-  { path: "/reports", label: "التقارير", icon: BarChart3 },
-  { path: "/notifications", label: "الإشعارات", icon: Bell },
-  { path: "/settings", label: "الإعدادات", icon: Settings },
-  { path: "/trash", label: "سلة المحذوفات", icon: ArchiveRestore },
-  { path: "/audit-log", label: "سجل التدقيق", icon: ClipboardList },
+  { path: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard, permission: "dashboard:view" as const },
+  { path: "/centers", label: "المراكز", icon: Building2, permission: "centers:manage" as const },
+  { path: "/branches", label: "الفروع", icon: Building2, permission: "branches:manage" as const },
+  { path: "/seasons", label: "المواسم الدراسية", icon: BookText, permission: "seasons:manage" as const },
+  { path: "/circles", label: "الحلقات", icon: BookOpen, permission: "circles:view" as const },
+  { path: "/teachers", label: "المعلمون", icon: GraduationCap, permission: "teachers:manage" as const },
+  { path: "/students", label: "الطلاب", icon: Users, permission: "students:view" as const },
+  { path: "/sessions", label: "الجلسات", icon: ClipboardList, permission: "sessions:view" as const },
+  { path: "/reports", label: "التقارير", icon: BarChart3, permission: "reports:view" as const },
+  { path: "/assistant", label: "المرشد الذكي", icon: Sparkles, permission: "ai:use" as const },
+  { path: "/notifications", label: "الإشعارات", icon: Bell, permission: "notifications:view" as const },
+  { path: "/settings", label: "الإعدادات", icon: Settings, permission: "settings:view" as const },
+  { path: "/trash", label: "سلة المحذوفات", icon: ArchiveRestore, permission: "trash:manage" as const },
+  { path: "/audit-log", label: "سجل التدقيق", icon: ClipboardList, permission: "audit:view" as const },
 ];
 
 interface TarteelLayoutProps {
@@ -47,9 +50,15 @@ interface TarteelLayoutProps {
 export default function TarteelLayout({ children }: TarteelLayoutProps) {
   const { user, loading, isAuthenticated, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const { can, role, roleLabel } = usePermissions();
+  const visibleNavItems = navItems.filter((item) => getVisibleNavigationPaths(role).includes(item.path));
+  const currentNav = navItems.find((item) =>
+    location === item.path || (item.path !== "/dashboard" && location.startsWith(`${item.path}/`))
+  );
+  const mayViewCurrentRoute = !currentNav || can(currentNav.permission);
 
   const { data: unreadCount } = trpc.notifications.unreadCount.useQuery(undefined, {
     enabled: isAuthenticated,
@@ -58,9 +67,9 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      startLogin();
+      navigate("/login");
     }
-  }, [loading, isAuthenticated]);
+  }, [loading, isAuthenticated, navigate]);
 
   if (loading) {
     return (
@@ -85,7 +94,7 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
           </div>
           <h1 className="font-display text-3xl font-bold text-foreground mb-2">ترتيل</h1>
           <p className="text-muted-foreground mb-8 text-sm">منصة إدارة مراكز تحفيظ القرآن الكريم</p>
-          <button onClick={() => startLogin()} className="btn-gold w-full text-base">
+          <button onClick={() => navigate("/login")} className="btn-gold w-full text-base">
             تسجيل الدخول
           </button>
         </div>
@@ -135,7 +144,7 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.path;
             return (
@@ -169,7 +178,7 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-medium text-sidebar-foreground truncate">{user?.name ?? "مستخدم"}</p>
-                <p className="text-xs text-sidebar-foreground/60 truncate">{user?.email ?? ""}</p>
+                <p className="text-xs text-sidebar-foreground/60 truncate">{roleLabel}</p>
               </div>
             </div>
           )}
@@ -234,7 +243,13 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
 
         {/* Page content */}
         <main className="flex-1 overflow-auto p-4 lg:p-6">
-          {children}
+          {mayViewCurrentRoute ? children : (
+            <section className="mx-auto mt-16 max-w-md rounded-3xl border border-destructive/20 bg-destructive/5 p-8 text-center">
+              <h1 className="font-display text-2xl font-bold text-foreground">ليس لديك صلاحية لعرض هذه الصفحة</h1>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">تظهر لك الخدمات المتاحة وفق دورك داخل المركز أو الحلقة.</p>
+              <button onClick={() => navigate("/dashboard")} className="btn-gold mt-6 px-5 py-2 text-sm">العودة للوحة المعلومات</button>
+            </section>
+          )}
         </main>
       </div>
     </div>

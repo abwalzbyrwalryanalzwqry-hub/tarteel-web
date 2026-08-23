@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { BarChart3, Building2, ClipboardList, GraduationCap, Users } from "lucide-react";
 import { ExportButtons } from "@/components/ExportButtons";
+import { AIGuidanceCard } from "@/components/AIGuidanceCard";
 import { useState } from "react";
 
 export default function Reports() {
@@ -33,6 +34,8 @@ export default function Reports() {
           <div><h1 className="page-title">التقارير والإحصائيات</h1><p className="page-subtitle">نظرة شاملة على أداء المنصة</p></div>
         </div>
       </div>
+
+      <AIGuidanceCard context="reports" />
 
       {/* Export Section */}
       <div className="glass-card rounded-2xl p-5">

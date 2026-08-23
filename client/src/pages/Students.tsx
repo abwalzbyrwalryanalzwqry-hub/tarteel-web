@@ -4,6 +4,7 @@ import { BookOpen, Edit, Phone, Plus, Search, Trash2, User } from "lucide-react"
 import { useState } from "react";
 import { toast } from "sonner";
 import { QURAN_SURAHS } from "../../../shared/types";
+import { AIGuidanceCard } from "@/components/AIGuidanceCard";
 
 export default function Students() {
   const [showForm, setShowForm] = useState(false);
@@ -64,6 +65,7 @@ export default function Students() {
         </div>
         <button onClick={()=>setShowForm(true)} className="btn-gold flex items-center gap-2 text-sm"><Plus className="w-4 h-4"/>تسجيل طالب</button>
       </div>
+      <AIGuidanceCard context="students" />
       <div className="relative">
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
         <input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="بحث باسم الطالب..." className="tarteel-input pr-10"/>

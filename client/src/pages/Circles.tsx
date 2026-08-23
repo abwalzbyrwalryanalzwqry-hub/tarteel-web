@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { BookOpen, Edit, Plus, Search, Trash2, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { AIGuidanceCard } from "@/components/AIGuidanceCard";
 
 export default function Circles() {
   const [showForm, setShowForm] = useState(false);
@@ -64,6 +65,7 @@ export default function Circles() {
         </div>
         <button onClick={()=>setShowForm(true)} className="btn-gold flex items-center gap-2 text-sm"><Plus className="w-4 h-4"/>حلقة جديدة</button>
       </div>
+      <AIGuidanceCard context="circles" />
       <div className="relative">
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
         <input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="بحث في الحلقات..." className="tarteel-input pr-10"/>

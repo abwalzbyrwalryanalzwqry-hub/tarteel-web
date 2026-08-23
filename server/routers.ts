@@ -4,6 +4,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { exportRouter } from "./routers/export";
+import { aiRouter } from "./routers/ai";
 import {
   createAcademicSeason,
   createBranch,
@@ -411,6 +412,9 @@ export const appRouter = router({
 
   // ===================== EXPORT =====================
   export: exportRouter,
+
+  // ===================== AI ASSISTANT =====================
+  ai: aiRouter,
 
   // ===================== TRASH =====================
   trash: router({
