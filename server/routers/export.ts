@@ -3,6 +3,7 @@ import { protectedProcedure, router } from '../_core/trpc';
 import { getDb } from '../db';
 import { generateMemorizationExcel, generateAttendanceExcel } from '../export/excel';
 import { generateMemorizationPDF, generateAttendancePDF, generateStudentsReportPDF } from '../export/pdf';
+import { generateCsv, generateWordDocument } from '../export/text';
 import { eq, and, gte, lte } from 'drizzle-orm';
 import {
   sessions,
@@ -24,7 +25,7 @@ export const exportRouter = router({
         circleId: z.number(),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
-        format: z.enum(['excel', 'pdf']),
+        format: z.enum(['excel', 'pdf', 'csv', 'word']),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -116,21 +117,22 @@ export const exportRouter = router({
           centerInfo?.name || 'المركز',
           circle.name || 'الحلقة'
         );
-      } else {
+      } else if (input.format === 'pdf') {
         buffer = await generateMemorizationPDF(
           formattedData,
           centerInfo?.name || 'المركز',
           circle.name || 'الحلقة'
         );
+      } else if (input.format === 'csv') {
+        buffer = generateCsv(['الطالب', 'السورة', 'عدد الآيات', 'التقييم', 'التاريخ', 'ملاحظات'], formattedData.map((row) => [row.studentName, row.surahName, String(row.versesCount), row.quality, row.date, row.notes]));
+      } else {
+        buffer = generateWordDocument('تقرير الحفظ', [`المركز: ${centerInfo?.name || 'المركز'}`, `الحلقة: ${circle.name || 'الحلقة'}`], ['الطالب', 'السورة', 'عدد الآيات', 'التقييم', 'التاريخ', 'ملاحظات'], formattedData.map((row) => [row.studentName, row.surahName, String(row.versesCount), row.quality, row.date, row.notes]));
       }
 
       return {
         data: buffer.toString('base64'),
-        filename: `تقرير_الحفظ_${circle.name}_${new Date().getTime()}.${input.format === 'excel' ? 'xlsx' : 'pdf'}`,
-        contentType:
-          input.format === 'excel'
-            ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            : 'application/pdf',
+        filename: `تقرير_الحفظ_${circle.name}_${new Date().getTime()}.${input.format === 'excel' ? 'xlsx' : input.format === 'word' ? 'doc' : input.format}`,
+        contentType: input.format === 'excel' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : input.format === 'pdf' ? 'application/pdf' : input.format === 'word' ? 'application/msword' : 'text/csv;charset=utf-8',
       };
     }),
 
@@ -143,7 +145,7 @@ export const exportRouter = router({
         circleId: z.number(),
         startDate: z.string(),
         endDate: z.string(),
-        format: z.enum(['excel', 'pdf']),
+        format: z.enum(['excel', 'pdf', 'csv', 'word']),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -236,22 +238,23 @@ export const exportRouter = router({
           input.startDate,
           input.endDate
         );
-      } else {
+      } else if (input.format === 'pdf') {
         buffer = await generateAttendancePDF(
           formattedData,
           centerInfo?.name || 'المركز',
           input.startDate,
           input.endDate
         );
+      } else if (input.format === 'csv') {
+        buffer = generateCsv(['الطالب', 'تاريخ الجلسة', 'الحالة', 'نوع الجلسة', 'الحلقة'], formattedData.map((row) => [row.studentName, row.sessionDate, row.status, row.sessionType, row.circle]));
+      } else {
+        buffer = generateWordDocument('تقرير الحضور والغياب', [`المركز: ${centerInfo?.name || 'المركز'}`, `الفترة: ${input.startDate} — ${input.endDate}`], ['الطالب', 'تاريخ الجلسة', 'الحالة', 'نوع الجلسة', 'الحلقة'], formattedData.map((row) => [row.studentName, row.sessionDate, row.status, row.sessionType, row.circle]));
       }
 
       return {
         data: buffer.toString('base64'),
-        filename: `تقرير_الحضور_${circle.name}_${new Date().getTime()}.${input.format === 'excel' ? 'xlsx' : 'pdf'}`,
-        contentType:
-          input.format === 'excel'
-            ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            : 'application/pdf',
+        filename: `تقرير_الحضور_${circle.name}_${new Date().getTime()}.${input.format === 'excel' ? 'xlsx' : input.format === 'word' ? 'doc' : input.format}`,
+        contentType: input.format === 'excel' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : input.format === 'pdf' ? 'application/pdf' : input.format === 'word' ? 'application/msword' : 'text/csv;charset=utf-8',
       };
     }),
 
@@ -262,7 +265,7 @@ export const exportRouter = router({
     .input(
       z.object({
         circleId: z.number(),
-        format: z.enum(['excel', 'pdf']),
+        format: z.enum(['excel', 'pdf', 'csv', 'word']),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -339,21 +342,22 @@ export const exportRouter = router({
       if (input.format === 'excel') {
         const { generateStudentsReportExcel } = await import('../export/excel');
         buffer = generateStudentsReportExcel(formattedData, centerInfo?.name || 'المركز');
-      } else {
+      } else if (input.format === 'pdf') {
         buffer = await generateStudentsReportPDF(
           formattedData,
           centerInfo?.name || 'المركز',
           circle.name
         );
+      } else if (input.format === 'csv') {
+        buffer = generateCsv(['الطالب', 'الهاتف', 'ولي الأمر', 'تاريخ التسجيل', 'الحالة'], formattedData.map((row) => [row.name, row.phone, row.guardianName, row.enrollmentDate, row.status]));
+      } else {
+        buffer = generateWordDocument('تقرير الطلاب', [`المركز: ${centerInfo?.name || 'المركز'}`, `الحلقة: ${circle.name || 'الحلقة'}`], ['الطالب', 'الهاتف', 'ولي الأمر', 'تاريخ التسجيل', 'الحالة'], formattedData.map((row) => [row.name, row.phone, row.guardianName, row.enrollmentDate, row.status]));
       }
 
       return {
         data: buffer.toString('base64'),
-        filename: `تقرير_الطلاب_${circle.name}_${new Date().getTime()}.${input.format === 'excel' ? 'xlsx' : 'pdf'}`,
-        contentType:
-          input.format === 'excel'
-            ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            : 'application/pdf',
+        filename: `تقرير_الطلاب_${circle.name}_${new Date().getTime()}.${input.format === 'excel' ? 'xlsx' : input.format === 'word' ? 'doc' : input.format}`,
+        contentType: input.format === 'excel' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : input.format === 'pdf' ? 'application/pdf' : input.format === 'word' ? 'application/msword' : 'text/csv;charset=utf-8',
       };
     }),
 });

@@ -171,6 +171,7 @@ export type InsertTeacherInvite = typeof teacherInvites.$inferInsert;
 export const students = mysqlTable("students", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId"),
+  guardianUserId: int("guardianUserId"),
   centerId: int("centerId").notNull(),
   circleId: int("circleId"),
   name: varchar("name", { length: 255 }).notNull(),

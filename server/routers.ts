@@ -45,10 +45,13 @@ import {
   getSessionById,
   getSessions,
   getStudentById,
+  getStudentByUserId,
+  getStudentsByGuardianUserId,
   getStudents,
   getTeacherById,
   getTeacherByUserId,
   getTeacherInvites,
+  getTeacherLastActivity,
   getTeachers,
   getTrashedItems,
   getUnreadNotificationsCount,
@@ -62,6 +65,7 @@ import {
   softDeleteSession,
   softDeleteStudent,
   softDeleteTeacher,
+  transferTeacherToCircle,
   updateAcademicSeason,
   updateBranch,
   updateCenter,
@@ -98,6 +102,19 @@ async function assertSessionStudentMatch(user: { id: number; role: string }, ses
   const [session, student] = await Promise.all([getAuthorizedSession(user, sessionId), getStudentById(studentId)]);
   if (!student || student.circleId !== session.circleId) throw new TRPCError({ code: "BAD_REQUEST", message: "الطالب لا ينتمي إلى حَلَقَة هذه الجلسة" });
   return { session, student };
+}
+
+async function assertStudentReadAccess(user: { id: number; role: string }, student: Awaited<ReturnType<typeof getStudentById>>) {
+  if (!student) throw new TRPCError({ code: "NOT_FOUND", message: "الطالب غير موجود" });
+  if (user.role === "student" && student.userId !== user.id) throw new TRPCError({ code: "FORBIDDEN" });
+  if (user.role === "guardian" && student.guardianUserId !== user.id) throw new TRPCError({ code: "FORBIDDEN" });
+  await assertTeacherCircleAccess(user, student.circleId);
+  return student;
+}
+
+async function assertStudentManageAccess(user: { id: number; role: string }, circleId: number | null | undefined) {
+  if (!TEACHING_ROLES.has(user.role) && !hasTarteelPermission(user.role, "students:manage")) throw new TRPCError({ code: "FORBIDDEN" });
+  await assertTeacherCircleAccess(user, circleId);
 }
 
 export const appRouter = router({
@@ -231,8 +248,13 @@ export const appRouter = router({
 
   // ===================== CIRCLES =====================
   circles: router({
-    list: protectedProcedure.input(z.object({ branchId: z.number().optional(), seasonId: z.number().optional() })).query(async ({ input }) => getCircles(input.branchId, input.seasonId)),
-    byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => getCircleById(input.id)),
+    list: protectedProcedure.input(z.object({ branchId: z.number().optional(), seasonId: z.number().optional() })).query(async ({ ctx, input }) => {
+      const scope = await getTeacherCircleScope(ctx.user);
+      if (!scope) return getCircles(input.branchId, input.seasonId);
+      const scopedCircles = (await Promise.all(scope.map((id) => getCircleById(id)))).filter((circle): circle is NonNullable<typeof circle> => Boolean(circle));
+      return scopedCircles.filter((circle) => (!input.branchId || circle.branchId === input.branchId) && (!input.seasonId || circle.seasonId === input.seasonId));
+    }),
+    byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => { const circle = await getCircleById(input.id); await assertTeacherCircleAccess(ctx.user, circle?.id); return circle; }),
     create: protectedProcedure
       .input(z.object({
         branchId: z.number(),
@@ -244,7 +266,7 @@ export const appRouter = router({
         maxStudents: z.number().optional(),
         schedule: z.string().optional(),
       }))
-      .mutation(async ({ input }) => createCircle(input)),
+      .mutation(async ({ ctx, input }) => { if (!hasTarteelPermission(ctx.user.role, "circles:manage")) throw new TRPCError({ code: "FORBIDDEN" }); return createCircle(input); }),
     update: protectedProcedure
       .input(z.object({
         id: z.number(),
@@ -254,11 +276,13 @@ export const appRouter = router({
         schedule: z.string().optional(),
         isActive: z.boolean().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
+        const circle = await getCircleById(id);
+        await assertTeacherCircleAccess(ctx.user, circle?.id);
         await updateCircle(id, data);
       }),
-    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => softDeleteCircle(input.id)),
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => { if (!hasTarteelPermission(ctx.user.role, "circles:manage")) throw new TRPCError({ code: "FORBIDDEN" }); return softDeleteCircle(input.id); }),
   }),
 
   // ===================== TEACHERS =====================
@@ -288,6 +312,25 @@ export const appRouter = router({
         const { id, ...data } = input;
         await updateTeacher(id, data);
       }),
+    activity: protectedProcedure.query(async ({ ctx }) => {
+      if (!hasTarteelPermission(ctx.user.role, "teachers:manage")) throw new TRPCError({ code: "FORBIDDEN" });
+      const teachers = await getTeachers();
+      const activities = await Promise.all(teachers.map(async (teacher) => [teacher.id, await getTeacherLastActivity(teacher.id)] as const));
+      return Object.fromEntries(activities);
+    }),
+    transfer: protectedProcedure.input(z.object({ teacherId: z.number(), circleId: z.number(), role: z.enum(["teacher", "assistant_teacher"]) })).mutation(async ({ ctx, input }) => {
+      if (!hasTarteelPermission(ctx.user.role, "teachers:manage")) throw new TRPCError({ code: "FORBIDDEN" });
+      const [teacher, circle] = await Promise.all([getTeacherById(input.teacherId), getCircleById(input.circleId)]);
+      if (!teacher || !circle) throw new TRPCError({ code: "NOT_FOUND", message: "المعلم أو الحَلَقة غير موجودة" });
+      const branch = await getBranchById(circle.branchId);
+      if (!branch || branch.centerId !== teacher.centerId) throw new TRPCError({ code: "BAD_REQUEST", message: "لا يمكن نقل المعلم إلى حَلَقة خارج مركزه" });
+      try {
+        await transferTeacherToCircle(input.teacherId, input.circleId, input.role);
+        return { success: true } as const;
+      } catch (error) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "تعذر نقل المعلم" });
+      }
+    }),
     delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => softDeleteTeacher(input.id)),
   }),
 
@@ -327,6 +370,11 @@ export const appRouter = router({
     list: protectedProcedure
       .input(z.object({ centerId: z.number().optional(), circleId: z.number().optional(), search: z.string().optional() }))
       .query(async ({ ctx, input }) => {
+        if (ctx.user.role === "student") {
+          const student = await getStudentByUserId(ctx.user.id);
+          return student ? [student] : [];
+        }
+        if (ctx.user.role === "guardian") return getStudentsByGuardianUserId(ctx.user.id);
         const scope = await getTeacherCircleScope(ctx.user);
         if (!scope) return getStudents(input.centerId, input.circleId, input.search);
         if (input.circleId) {
@@ -337,14 +385,14 @@ export const appRouter = router({
       }),
     byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
       const student = await getStudentById(input.id);
-      if (!student) return student;
-      await assertTeacherCircleAccess(ctx.user, student.circleId);
-      return student;
+      return assertStudentReadAccess(ctx.user, student);
     }),
     create: protectedProcedure
       .input(z.object({
         centerId: z.number(),
         circleId: z.number().optional(),
+        userId: z.number().optional(),
+        guardianUserId: z.number().optional(),
         name: z.string().min(2),
         phone: z.string().optional(),
         guardianPhone: z.string().optional(),
@@ -352,13 +400,15 @@ export const appRouter = router({
         nationalId: z.string().optional(),
         birthDate: z.date().optional(),
       }))
-      .mutation(async ({ ctx, input }) => { await assertTeacherCircleAccess(ctx.user, input.circleId); return createStudent(input); }),
+      .mutation(async ({ ctx, input }) => { await assertStudentManageAccess(ctx.user, input.circleId); return createStudent(input); }),
     update: protectedProcedure
       .input(z.object({
         id: z.number(),
         name: z.string().optional(),
         phone: z.string().optional(),
         circleId: z.number().optional(),
+        userId: z.number().optional(),
+        guardianUserId: z.number().optional(),
         guardianPhone: z.string().optional(),
         isActive: z.boolean().optional(),
         lastMemorizedSurah: z.number().optional(),
@@ -367,12 +417,12 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
         const student = await getStudentById(id);
-        await assertTeacherCircleAccess(ctx.user, student?.circleId);
-        if (data.circleId) await assertTeacherCircleAccess(ctx.user, data.circleId);
+        await assertStudentManageAccess(ctx.user, student?.circleId);
+        if (data.circleId) await assertStudentManageAccess(ctx.user, data.circleId);
         await updateStudent(id, data);
       }),
-    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => { const student = await getStudentById(input.id); await assertTeacherCircleAccess(ctx.user, student?.circleId); return softDeleteStudent(input.id); }),
-    memorizationHistory: protectedProcedure.input(z.object({ studentId: z.number() })).query(async ({ ctx, input }) => { const student = await getStudentById(input.studentId); await assertTeacherCircleAccess(ctx.user, student?.circleId); return getMemorizationByStudent(input.studentId); }),
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => { const student = await getStudentById(input.id); await assertStudentManageAccess(ctx.user, student?.circleId); return softDeleteStudent(input.id); }),
+    memorizationHistory: protectedProcedure.input(z.object({ studentId: z.number() })).query(async ({ ctx, input }) => { const student = await getStudentById(input.studentId); await assertStudentReadAccess(ctx.user, student); return getMemorizationByStudent(input.studentId); }),
   }),
 
   // ===================== SESSIONS =====================
@@ -518,7 +568,10 @@ export const appRouter = router({
 
   // ===================== USERS =====================
   users: router({
-    list: protectedProcedure.query(async () => getAllUsers()),
+    list: protectedProcedure.query(async ({ ctx }) => {
+      if (!hasTarteelPermission(ctx.user.role, "students:manage")) throw new TRPCError({ code: "FORBIDDEN" });
+      return getAllUsers();
+    }),
   }),
 });
 

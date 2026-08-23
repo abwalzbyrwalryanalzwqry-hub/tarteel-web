@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, FileText, Sheet } from 'lucide-react';
+import { FileSpreadsheet, FileText, Sheet } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
 import { recordReportExport } from "../../../shared/reportHistory";
@@ -23,7 +23,7 @@ export function ExportButtons({
   const [isLoading, setIsLoading] = useState(false);
   const utils = trpc.useUtils();
 
-  const handleExport = async (format: 'excel' | 'pdf') => {
+  const handleExport = async (format: 'excel' | 'pdf' | 'csv' | 'word') => {
     try {
       setIsLoading(true);
 
@@ -109,6 +109,14 @@ export function ExportButtons({
       >
         <FileText className="w-4 h-4" />
         <span className="hidden sm:inline">PDF</span>
+      </Button>
+      <Button onClick={() => handleExport('csv')} disabled={isLoading} variant="outline" size="sm" className="gap-2" title="تصدير إلى CSV">
+        <FileSpreadsheet className="w-4 h-4" />
+        <span className="hidden lg:inline">CSV</span>
+      </Button>
+      <Button onClick={() => handleExport('word')} disabled={isLoading} variant="outline" size="sm" className="gap-2" title="تصدير إلى Word">
+        <FileText className="w-4 h-4" />
+        <span className="hidden lg:inline">Word</span>
       </Button>
     </div>
   );

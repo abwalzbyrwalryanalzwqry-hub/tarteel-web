@@ -14,6 +14,7 @@ export default function Students() {
   const { data: students, isLoading, refetch } = trpc.students.list.useQuery({ search: search || undefined });
   const { data: centers } = trpc.centers.list.useQuery({ orgId: undefined });
   const { data: circles } = trpc.circles.list.useQuery({ branchId: undefined, seasonId: undefined });
+  const { data: users } = trpc.users.list.useQuery();
 
   const createMutation = trpc.students.create.useMutation({
     onSuccess: () => { toast.success("تم تسجيل الطالب بنجاح"); setShowForm(false); refetch(); },
@@ -38,6 +39,8 @@ export default function Students() {
       phone: fd.get("phone") as string,
       guardianName: fd.get("guardianName") as string,
       guardianPhone: fd.get("guardianPhone") as string,
+      userId: fd.get("userId") ? Number(fd.get("userId")) : undefined,
+      guardianUserId: fd.get("guardianUserId") ? Number(fd.get("guardianUserId")) : undefined,
       nationalId: fd.get("nationalId") as string,
     });
   }
@@ -51,6 +54,8 @@ export default function Students() {
       phone: fd.get("phone") as string,
       guardianPhone: fd.get("guardianPhone") as string,
       circleId: fd.get("circleId") ? Number(fd.get("circleId")) : undefined,
+      userId: fd.get("userId") ? Number(fd.get("userId")) : undefined,
+      guardianUserId: fd.get("guardianUserId") ? Number(fd.get("guardianUserId")) : undefined,
     });
   }
 
@@ -113,12 +118,16 @@ export default function Students() {
         <FormInput label="رقم الهاتف" name="phone" placeholder="0500000000"/>
         <FormInput label="اسم ولي الأمر" name="guardianName" placeholder="أحمد بن محمد"/>
         <FormInput label="هاتف ولي الأمر" name="guardianPhone" placeholder="0500000000"/>
+        <div><label className="block text-sm font-medium text-foreground mb-1.5">حساب الطالب المرتبط</label><select name="userId" className="tarteel-input"><option value="">بدون حساب مرتبط</option>{users?.filter((user) => user.role === "student").map((user) => <option key={user.id} value={user.id}>{user.name || user.email || `حساب #${user.id}`}</option>)}</select></div>
+        <div><label className="block text-sm font-medium text-foreground mb-1.5">حساب ولي الأمر المرتبط</label><select name="guardianUserId" className="tarteel-input"><option value="">بدون حساب مرتبط</option>{users?.filter((user) => user.role === "guardian").map((user) => <option key={user.id} value={user.id}>{user.name || user.email || `حساب #${user.id}`}</option>)}</select><p className="mt-1 text-xs text-muted-foreground">يمنح الربط ولي الأمر قراءة إنجاز الأبناء المرتبطين بحسابه فقط.</p></div>
         <FormInput label="رقم الهوية" name="nationalId" placeholder="1234567890"/>
       </EntityForm>}
       {editItem&&<EntityForm title="تعديل بيانات الطالب" onClose={()=>setEditItem(null)} onSubmit={handleUpdate} isLoading={updateMutation.isPending} submitLabel="تحديث">
         <FormInput label="اسم الطالب" name="name" required defaultValue={editItem.name}/>
         <FormInput label="رقم الهاتف" name="phone" defaultValue={editItem.phone??""}/>
         <FormInput label="هاتف ولي الأمر" name="guardianPhone" defaultValue={editItem.guardianPhone??""}/>
+        <div><label className="block text-sm font-medium text-foreground mb-1.5">حساب الطالب المرتبط</label><select name="userId" className="tarteel-input" defaultValue={editItem.userId??""}><option value="">بدون حساب مرتبط</option>{users?.filter((user) => user.role === "student").map((user) => <option key={user.id} value={user.id}>{user.name || user.email || `حساب #${user.id}`}</option>)}</select></div>
+        <div><label className="block text-sm font-medium text-foreground mb-1.5">حساب ولي الأمر المرتبط</label><select name="guardianUserId" className="tarteel-input" defaultValue={editItem.guardianUserId??""}><option value="">بدون حساب مرتبط</option>{users?.filter((user) => user.role === "guardian").map((user) => <option key={user.id} value={user.id}>{user.name || user.email || `حساب #${user.id}`}</option>)}</select></div>
         <div><label className="block text-sm font-medium text-foreground mb-1.5">الحلقة</label>
           <select name="circleId" className="tarteel-input" defaultValue={editItem.circleId??""}>
             <option value="">بدون حلقة</option>{circles?.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}

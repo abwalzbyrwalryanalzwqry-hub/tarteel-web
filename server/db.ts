@@ -290,6 +290,32 @@ export async function updateTeacher(id: number, data: Partial<typeof teachers.$i
   await db.update(teachers).set({ ...data, updatedAt: new Date() }).where(eq(teachers.id, id));
 }
 
+export async function transferTeacherToCircle(teacherId: number, circleId: number, role: "teacher" | "assistant_teacher") {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  return db.transaction(async (tx) => {
+    const [target] = await tx.select().from(circles).where(and(eq(circles.id, circleId), isNull(circles.deletedAt))).limit(1);
+    if (!target) throw new Error("الحَلَقة المستهدفة غير متاحة");
+    const occupied = role === "teacher" ? target.teacherId : target.assistantTeacherId;
+    if (occupied && occupied !== teacherId) throw new Error("المقعد المحدد في الحَلَقة مرتبط بمعلم آخر");
+
+    if (role === "teacher") {
+      await tx.update(circles).set({ teacherId: null }).where(eq(circles.teacherId, teacherId));
+      await tx.update(circles).set({ teacherId }).where(eq(circles.id, circleId));
+    } else {
+      await tx.update(circles).set({ assistantTeacherId: null }).where(eq(circles.assistantTeacherId, teacherId));
+      await tx.update(circles).set({ assistantTeacherId: teacherId }).where(eq(circles.id, circleId));
+    }
+  });
+}
+
+export async function getTeacherLastActivity(teacherId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select({ scheduledAt: sessions.scheduledAt }).from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).where(and(or(eq(circles.teacherId, teacherId), eq(circles.assistantTeacherId, teacherId)), isNull(sessions.deletedAt), isNull(circles.deletedAt))).orderBy(desc(sessions.scheduledAt)).limit(1);
+  return result[0]?.scheduledAt ?? null;
+}
+
 export async function softDeleteTeacher(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
@@ -380,6 +406,19 @@ export async function getStudentById(id: number) {
   if (!db) return undefined;
   const result = await db.select().from(students).where(and(eq(students.id, id), isNull(students.deletedAt))).limit(1);
   return result[0];
+}
+
+export async function getStudentByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(students).where(and(eq(students.userId, userId), isNull(students.deletedAt))).limit(1);
+  return result[0];
+}
+
+export async function getStudentsByGuardianUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(students).where(and(eq(students.guardianUserId, userId), isNull(students.deletedAt))).orderBy(students.name);
 }
 
 export async function createStudent(data: typeof students.$inferInsert) {
