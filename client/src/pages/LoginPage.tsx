@@ -4,13 +4,17 @@ import { BookOpen, Chrome, Mail, Star } from "lucide-react";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { readPendingTeacherInvite } from "../../../shared/teacherInviteFlow";
 
 export default function LoginPage() {
   const { isAuthenticated, loading } = useAuth();
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    if (!loading && isAuthenticated) navigate("/dashboard");
+    if (!loading && isAuthenticated) {
+      const pendingCode = readPendingTeacherInvite();
+      navigate(pendingCode ? `/redeem-teacher-invite?code=${pendingCode}` : "/dashboard");
+    }
   }, [isAuthenticated, loading, navigate]);
 
   return (

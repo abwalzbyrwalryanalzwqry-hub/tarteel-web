@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Download, FileText, Sheet } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
+import { recordReportExport } from "../../../shared/reportHistory";
 
 interface ExportButtonsProps {
   circleId: number;
@@ -75,6 +76,7 @@ export function ExportButtons({
         window.URL.revokeObjectURL(url);
 
         toast.success(`تم تحميل التقرير بنجاح: ${result.filename}`);
+        recordReportExport({ filename: result.filename, reportType, format });
       }
     } catch (error: any) {
       console.error('Export error:', error);

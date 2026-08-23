@@ -1,10 +1,13 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
 type Theme = "light" | "dark";
+export type FontScale = "small" | "standard" | "large";
 
 interface ThemeContextType {
   theme: Theme;
   toggleTheme?: () => void;
+  fontScale: FontScale;
+  setFontScale: (scale: FontScale) => void;
   switchable: boolean;
 }
 
@@ -28,6 +31,10 @@ export function ThemeProvider({
     }
     return defaultTheme;
   });
+  const [fontScale, setFontScale] = useState<FontScale>(() => {
+    const stored = localStorage.getItem("fontScale") as FontScale | null;
+    return stored === "small" || stored === "large" || stored === "standard" ? stored : "standard";
+  });
 
   useEffect(() => {
     const root = document.documentElement;
@@ -42,6 +49,11 @@ export function ThemeProvider({
     }
   }, [theme, switchable]);
 
+  useEffect(() => {
+    document.documentElement.dataset.fontScale = fontScale;
+    localStorage.setItem("fontScale", fontScale);
+  }, [fontScale]);
+
   const toggleTheme = switchable
     ? () => {
         setTheme(prev => (prev === "light" ? "dark" : "light"));
@@ -49,7 +61,7 @@ export function ThemeProvider({
     : undefined;
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, switchable }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, switchable, fontScale, setFontScale }}>
       {children}
     </ThemeContext.Provider>
   );

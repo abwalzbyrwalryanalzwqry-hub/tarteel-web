@@ -1,14 +1,42 @@
 import { trpc } from "@/lib/trpc";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, Download, Filter, Search } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { filterAuditLogs, toCsv } from "../../../shared/activityFilters";
 
 export default function AuditLog() {
   const { data: logs, isLoading } = trpc.auditLog.list.useQuery();
+  const [search, setSearch] = useState("");
+  const [actionFilter, setActionFilter] = useState("all");
+  const [dateRange, setDateRange] = useState<"all" | "week" | "month">("all");
+
+  const filteredLogs = filterAuditLogs(logs ?? [], { search, actionFilter, dateRange });
+
+  const exportCsv = () => {
+    if (!filteredLogs.length) { toast.error("لا توجد سجلات لتصديرها"); return; }
+    const rows = [["العملية", "الكيان", "المعرف", "التاريخ"], ...filteredLogs.map((log) => [log.action, log.entity, String(log.entityId ?? ""), new Date(log.createdAt).toLocaleString("ar-SA")])];
+    const csv = toCsv(rows);
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `tarteel-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("تم تجهيز ملف سجل التدقيق");
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-slate-600 flex items-center justify-center"><ClipboardList className="w-5 h-5 text-white"/></div>
         <div><h1 className="page-title">سجل التدقيق</h1><p className="page-subtitle">سجل جميع العمليات والتغييرات في المنصة</p></div>
+      </div>
+
+      <div className="glass-card rounded-2xl p-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_180px_auto]">
+        <div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث بالعملية أو الكيان أو المعرف..." className="tarteel-input pr-10" /></div>
+        <label className="relative"><Filter className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" /><select value={actionFilter} onChange={(event) => setActionFilter(event.target.value)} className="tarteel-input pr-10"><option value="all">كل العمليات</option><option value="create">إنشاء</option><option value="update">تعديل</option><option value="delete">حذف</option></select></label>
+        <select value={dateRange} onChange={(event) => setDateRange(event.target.value as typeof dateRange)} className="tarteel-input"><option value="all">كل الفترات</option><option value="week">آخر 7 أيام</option><option value="month">آخر 30 يوماً</option></select>
+        <button onClick={exportCsv} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"><Download className="h-4 w-4 text-primary" />CSV</button>
       </div>
 
       {isLoading ? (
@@ -31,7 +59,7 @@ export default function AuditLog() {
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log) => (
+                {filteredLogs.map((log) => (
                   <tr key={log.id} className="border-t border-border/50 hover:bg-muted/20 transition-colors">
                     <td className="py-3 px-4">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -51,6 +79,7 @@ export default function AuditLog() {
               </tbody>
             </table>
           </div>
+          {filteredLogs.length === 0 && <div className="p-8 text-center text-sm text-muted-foreground">لا توجد سجلات مطابقة للفلاتر المحددة.</div>}
         </div>
       )}
     </div>

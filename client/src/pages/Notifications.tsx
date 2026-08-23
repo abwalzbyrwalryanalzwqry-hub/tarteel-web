@@ -1,6 +1,8 @@
 import { trpc } from "@/lib/trpc";
-import { Bell, BellOff, Check, CheckCheck } from "lucide-react";
+import { Bell, BellOff, Check, CheckCheck, Filter, Search } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
+import { filterNotifications } from "../../../shared/activityFilters";
 
 const typeColors: Record<string, string> = {
   info: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
@@ -18,6 +20,9 @@ const typeIcons: Record<string, string> = {
 
 export default function Notifications() {
   const { data: notifications, isLoading, refetch } = trpc.notifications.list.useQuery();
+  const [search, setSearch] = useState("");
+  const [readFilter, setReadFilter] = useState<"all" | "unread" | "read">("all");
+  const [dateRange, setDateRange] = useState<"all" | "today" | "week" | "month">("all");
 
   const markReadMutation = trpc.notifications.markRead.useMutation({
     onSuccess: () => refetch(),
@@ -28,6 +33,7 @@ export default function Notifications() {
   });
 
   const unread = notifications?.filter(n => !n.isRead) ?? [];
+  const filteredNotifications = filterNotifications(notifications ?? [], { search, readFilter, dateRange });
 
   return (
     <div className="space-y-6">
@@ -55,8 +61,14 @@ export default function Notifications() {
           <p className="text-muted-foreground">لا توجد إشعارات</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {notifications.map((notif, i) => (
+        <>
+          <div className="glass-card rounded-2xl p-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_180px]">
+            <div className="relative"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث في العنوان أو التفاصيل..." className="tarteel-input pr-10" /></div>
+            <label className="relative"><Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" /><select value={readFilter} onChange={(event) => setReadFilter(event.target.value as typeof readFilter)} className="tarteel-input pr-10"><option value="all">كل الحالات</option><option value="unread">غير مقروءة</option><option value="read">مقروءة</option></select></label>
+            <select value={dateRange} onChange={(event) => setDateRange(event.target.value as typeof dateRange)} className="tarteel-input"><option value="all">كل الفترات</option><option value="today">آخر 24 ساعة</option><option value="week">آخر 7 أيام</option><option value="month">آخر 30 يوماً</option></select>
+          </div>
+          {filteredNotifications.length === 0 ? <div className="glass-card rounded-2xl p-10 text-center text-sm text-muted-foreground">لا توجد إشعارات مطابقة للفلاتر المحددة.</div> : <div className="space-y-2">
+          {filteredNotifications.map((notif, i) => (
             <div
               key={notif.id}
               className={`glass-card rounded-2xl p-4 flex items-start gap-4 transition-all animate-fade-in-up stagger-${(i%5)+1} ${!notif.isRead ? "border-r-4 border-primary" : "opacity-70"}`}
@@ -83,6 +95,8 @@ export default function Notifications() {
             </div>
           ))}
         </div>
+          }
+        </>
       )}
     </div>
   );

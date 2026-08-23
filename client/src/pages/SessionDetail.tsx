@@ -259,6 +259,7 @@ export default function SessionDetail({ sessionId }: Props) {
                       <BookOpen className="w-4 h-4 text-primary flex-shrink-0"/>
                       <span className="font-medium text-foreground">{student?.name}</span>
                       <span className="text-sm text-muted-foreground">{getSurahName(m.surahNumber)} ({m.fromAyah}-{m.toAyah})</span>
+                      <Link href={`/quran?surah=${m.surahNumber}&ayah=${m.fromAyah}`}><span className="text-xs text-primary hover:underline cursor-pointer">فتح المرجع</span></Link>
                       {m.grade && <span className={`mr-auto text-xs px-2 py-0.5 rounded-full ${m.grade==="excellent"?"bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400":m.grade==="very_good"?"bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400":"bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"}`}>{GRADE_LABELS[m.grade]}</span>}
                     </div>
                   );
@@ -300,6 +301,7 @@ export default function SessionDetail({ sessionId }: Props) {
                       <ClipboardList className="w-4 h-4 text-purple-600 flex-shrink-0"/>
                       <span className="font-medium text-foreground">{student?.name}</span>
                       <span className="text-sm text-muted-foreground">{getSurahName(r.surahNumber)} ({r.fromAyah}-{r.toAyah})</span>
+                      <Link href={`/quran?surah=${r.surahNumber}&ayah=${r.fromAyah}`}><span className="text-xs text-primary hover:underline cursor-pointer">فتح المرجع</span></Link>
                       {r.grade && <span className={`mr-auto text-xs px-2 py-0.5 rounded-full ${r.grade==="excellent"?"bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400":"bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"}`}>{GRADE_LABELS[r.grade]}</span>}
                     </div>
                   );

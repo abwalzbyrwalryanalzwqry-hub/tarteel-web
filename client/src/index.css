@@ -125,12 +125,21 @@
   html {
     direction: rtl;
     font-family: "Tajawal", "Segoe UI", system-ui, sans-serif;
+    --tarteel-font-size: 15px;
+  }
+
+  html[data-font-scale="small"] {
+    --tarteel-font-size: 14px;
+  }
+
+  html[data-font-scale="large"] {
+    --tarteel-font-size: 17px;
   }
 
   body {
     @apply bg-background text-foreground;
     font-family: "Tajawal", "Segoe UI", system-ui, sans-serif;
-    font-size: 15px;
+    font-size: var(--tarteel-font-size);
     line-height: 1.7;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

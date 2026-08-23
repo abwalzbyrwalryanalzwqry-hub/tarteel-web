@@ -28,12 +28,14 @@ export type TarteelPermission =
   | "notifications:view"
   | "audit:view"
   | "trash:manage"
-  | "ai:use";
+  | "ai:use"
+  | "quran:view"
+  | "messages:manage";
 
 const ALL_PERMISSIONS: TarteelPermission[] = [
   "dashboard:view", "centers:manage", "branches:manage", "seasons:manage", "circles:view", "circles:manage",
   "teachers:manage", "students:view", "students:manage", "sessions:view", "sessions:manage", "reports:view",
-  "settings:view", "settings:manage", "notifications:view", "audit:view", "trash:manage", "ai:use",
+  "settings:view", "settings:manage", "notifications:view", "audit:view", "trash:manage", "ai:use", "quran:view", "messages:manage",
 ];
 
 const managementPermissions: TarteelPermission[] = ALL_PERMISSIONS.filter(
@@ -46,11 +48,11 @@ export const ROLE_PERMISSIONS: Record<TarteelRole, TarteelPermission[]> = {
   org_admin: managementPermissions,
   center_manager: managementPermissions,
   supervisor: managementPermissions,
-  teacher: ["dashboard:view", "circles:view", "students:view", "sessions:view", "sessions:manage", "reports:view", "notifications:view", "settings:view", "ai:use"],
-  assistant_teacher: ["dashboard:view", "circles:view", "students:view", "sessions:view", "sessions:manage", "notifications:view", "ai:use"],
-  student: ["dashboard:view", "settings:view", "notifications:view", "ai:use"],
-  guardian: ["dashboard:view", "settings:view", "notifications:view", "ai:use"],
-  user: ["dashboard:view", "ai:use"],
+  teacher: ["dashboard:view", "circles:view", "students:view", "sessions:view", "sessions:manage", "reports:view", "notifications:view", "settings:view", "ai:use", "quran:view", "messages:manage"],
+  assistant_teacher: ["dashboard:view", "circles:view", "students:view", "sessions:view", "sessions:manage", "notifications:view", "ai:use", "quran:view", "messages:manage"],
+  student: ["dashboard:view", "settings:view", "notifications:view", "ai:use", "quran:view"],
+  guardian: ["dashboard:view", "settings:view", "notifications:view", "ai:use", "quran:view"],
+  user: ["dashboard:view", "ai:use", "quran:view"],
 };
 
 export const ROLE_LABELS: Record<TarteelRole, string> = {
@@ -73,10 +75,13 @@ export const NAVIGATION_PERMISSION_RULES = {
   "/seasons": "seasons:manage",
   "/circles": "circles:view",
   "/teachers": "teachers:manage",
+  "/teacher-invites": "teachers:manage",
   "/students": "students:view",
   "/sessions": "sessions:view",
   "/reports": "reports:view",
   "/assistant": "ai:use",
+  "/quran": "quran:view",
+  "/parent-messages": "messages:manage",
   "/notifications": "notifications:view",
   "/settings": "settings:view",
   "/trash": "trash:manage",

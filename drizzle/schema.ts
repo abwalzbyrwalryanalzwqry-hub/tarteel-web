@@ -149,6 +149,24 @@ export const teachers = mysqlTable("teachers", {
 export type Teacher = typeof teachers.$inferSelect;
 export type InsertTeacher = typeof teachers.$inferInsert;
 
+// ===================== TEACHER INVITES =====================
+export const teacherInvites = mysqlTable("teacher_invites", {
+  id: int("id").autoincrement().primaryKey(),
+  centerId: int("centerId").notNull(),
+  circleId: int("circleId").notNull(),
+  code: varchar("code", { length: 32 }).notNull().unique(),
+  role: mysqlEnum("role", ["teacher", "assistant_teacher"]).default("teacher").notNull(),
+  expiresAt: timestamp("expiresAt"),
+  usedAt: timestamp("usedAt"),
+  usedByUserId: int("usedByUserId"),
+  isRevoked: boolean("isRevoked").default(false).notNull(),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type TeacherInvite = typeof teacherInvites.$inferSelect;
+export type InsertTeacherInvite = typeof teacherInvites.$inferInsert;
+
 // ===================== STUDENTS =====================
 export const students = mysqlTable("students", {
   id: int("id").autoincrement().primaryKey(),

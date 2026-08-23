@@ -2,6 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { BarChart3, Building2, ClipboardList, GraduationCap, Users } from "lucide-react";
 import { ExportButtons } from "@/components/ExportButtons";
 import { AIGuidanceCard } from "@/components/AIGuidanceCard";
+import { ReportExportHistory } from "@/components/ReportExportHistory";
 import { useState } from "react";
 
 export default function Reports() {
@@ -112,6 +113,8 @@ export default function Reports() {
           </div>
         </div>
       </div>
+
+      <ReportExportHistory />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -1,13 +1,13 @@
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Bell, Building2, Code2, Moon, Settings as SettingsIcon, Sun, Users } from "lucide-react";
+import { Bell, Building2, Code2, Moon, Settings as SettingsIcon, Sun, Type, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 
 export default function Settings() {
   const { user } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, toggleTheme, fontScale, setFontScale } = useTheme();
   const { data: users } = trpc.users.list.useQuery();
 
   const createNotifMutation = trpc.notifications.create.useMutation({
@@ -86,6 +86,19 @@ export default function Settings() {
                 <p className="text-xs text-muted-foreground">خلفية داكنة</p>
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Notifications Test */}
+        <div className="glass-card rounded-2xl p-5">
+          <h2 className="font-display font-bold text-foreground text-lg mb-4 flex items-center gap-2"><Type className="w-5 h-5 text-primary"/>سهولة القراءة</h2>
+          <p className="text-sm text-muted-foreground mb-4">اختر حجم الخط الذي يناسبك. يُحفظ التفضيل محلياً في هذا المتصفح.</p>
+          <div className="grid grid-cols-3 gap-2">
+            {(["small", "standard", "large"] as const).map((scale) => (
+              <button key={scale} onClick={() => setFontScale(scale)} className={`rounded-xl border-2 p-3 text-center transition-colors ${fontScale === scale ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40"}`}>
+                <span className={scale === "small" ? "text-sm" : scale === "large" ? "text-xl" : "text-base"}>{scale === "small" ? "صغير" : scale === "large" ? "كبير" : "قياسي"}</span>
+              </button>
+            ))}
           </div>
         </div>
 

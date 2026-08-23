@@ -1,5 +1,8 @@
 import { COOKIE_NAME } from "@shared/const";
 import { z } from "zod";
+import { randomBytes } from "node:crypto";
+import { TRPCError } from "@trpc/server";
+import { hasTarteelPermission } from "../shared/permissions";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -17,6 +20,8 @@ import {
   createSession,
   createStudent,
   createTeacher,
+  createTeacherInvite,
+  redeemTeacherInvite,
   getAcademicSeasons,
   getAllUsers,
   getAttendanceBySession,
@@ -26,6 +31,7 @@ import {
   getCenterById,
   getCenters,
   getCircleById,
+  getCircleIdsForTeacher,
   getCircles,
   getDashboardStats,
   getEvaluationBySession,
@@ -41,12 +47,15 @@ import {
   getStudentById,
   getStudents,
   getTeacherById,
+  getTeacherByUserId,
+  getTeacherInvites,
   getTeachers,
   getTrashedItems,
   getUnreadNotificationsCount,
   markAllNotificationsRead,
   markNotificationRead,
   restoreItem,
+  revokeTeacherInvite,
   softDeleteBranch,
   softDeleteCenter,
   softDeleteCircle,
@@ -63,6 +72,33 @@ import {
   upsertAttendance,
   upsertEvaluation,
 } from "./db";
+
+const TEACHING_ROLES = new Set(["teacher", "assistant_teacher"]);
+
+async function getTeacherCircleScope(user: { id: number; role: string }) {
+  if (!TEACHING_ROLES.has(user.role)) return null;
+  const teacher = await getTeacherByUserId(user.id);
+  if (!teacher) throw new TRPCError({ code: "FORBIDDEN", message: "لا يوجد ملف معلم مرتبط بحسابك" });
+  return getCircleIdsForTeacher(teacher.id);
+}
+
+async function assertTeacherCircleAccess(user: { id: number; role: string }, circleId: number | null | undefined) {
+  const scope = await getTeacherCircleScope(user);
+  if (scope && (!circleId || !scope.includes(circleId))) throw new TRPCError({ code: "FORBIDDEN", message: "هذه البيانات لا تنتمي إلى حَلَقَتك" });
+}
+
+async function getAuthorizedSession(user: { id: number; role: string }, sessionId: number) {
+  const session = await getSessionById(sessionId);
+  if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "الجلسة غير موجودة" });
+  await assertTeacherCircleAccess(user, session.circleId);
+  return session;
+}
+
+async function assertSessionStudentMatch(user: { id: number; role: string }, sessionId: number, studentId: number) {
+  const [session, student] = await Promise.all([getAuthorizedSession(user, sessionId), getStudentById(studentId)]);
+  if (!student || student.circleId !== session.circleId) throw new TRPCError({ code: "BAD_REQUEST", message: "الطالب لا ينتمي إلى حَلَقَة هذه الجلسة" });
+  return { session, student };
+}
 
 export const appRouter = router({
   system: systemRouter,
@@ -255,12 +291,56 @@ export const appRouter = router({
     delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => softDeleteTeacher(input.id)),
   }),
 
+  // ===================== TEACHER INVITES =====================
+  teacherInvites: router({
+    list: protectedProcedure.input(z.object({ centerId: z.number().optional() })).query(async ({ ctx, input }) => {
+      if (!hasTarteelPermission(ctx.user.role, "teachers:manage")) throw new TRPCError({ code: "FORBIDDEN" });
+      return getTeacherInvites(input.centerId);
+    }),
+    create: protectedProcedure.input(z.object({
+      centerId: z.number(),
+      circleId: z.number(),
+      role: z.enum(["teacher", "assistant_teacher"]).default("teacher"),
+      expiresAt: z.date().optional(),
+    })).mutation(async ({ ctx, input }) => {
+      if (!hasTarteelPermission(ctx.user.role, "teachers:manage")) throw new TRPCError({ code: "FORBIDDEN" });
+      const code = `TRTL-${randomBytes(4).toString("hex").toUpperCase()}`;
+      await createTeacherInvite({ ...input, code, createdBy: ctx.user.id });
+      return { code };
+    }),
+    revoke: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      if (!hasTarteelPermission(ctx.user.role, "teachers:manage")) throw new TRPCError({ code: "FORBIDDEN" });
+      await revokeTeacherInvite(input.id);
+      return { success: true } as const;
+    }),
+    redeem: protectedProcedure.input(z.object({ code: z.string().trim().toUpperCase().regex(/^TRTL-[A-F0-9]{8}$/, "صيغة رمز الدعوة غير صحيحة") })).mutation(async ({ ctx, input }) => {
+      try {
+        return await redeemTeacherInvite(input.code, ctx.user.id);
+      } catch (error) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "تعذر استرداد الدعوة" });
+      }
+    }),
+  }),
+
   // ===================== STUDENTS =====================
   students: router({
     list: protectedProcedure
       .input(z.object({ centerId: z.number().optional(), circleId: z.number().optional(), search: z.string().optional() }))
-      .query(async ({ input }) => getStudents(input.centerId, input.circleId, input.search)),
-    byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => getStudentById(input.id)),
+      .query(async ({ ctx, input }) => {
+        const scope = await getTeacherCircleScope(ctx.user);
+        if (!scope) return getStudents(input.centerId, input.circleId, input.search);
+        if (input.circleId) {
+          if (!scope.includes(input.circleId)) throw new TRPCError({ code: "FORBIDDEN" });
+          return getStudents(undefined, input.circleId, input.search);
+        }
+        return (await Promise.all(scope.map((circleId) => getStudents(undefined, circleId, input.search)))).flat();
+      }),
+    byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
+      const student = await getStudentById(input.id);
+      if (!student) return student;
+      await assertTeacherCircleAccess(ctx.user, student.circleId);
+      return student;
+    }),
     create: protectedProcedure
       .input(z.object({
         centerId: z.number(),
@@ -272,7 +352,7 @@ export const appRouter = router({
         nationalId: z.string().optional(),
         birthDate: z.date().optional(),
       }))
-      .mutation(async ({ input }) => createStudent(input)),
+      .mutation(async ({ ctx, input }) => { await assertTeacherCircleAccess(ctx.user, input.circleId); return createStudent(input); }),
     update: protectedProcedure
       .input(z.object({
         id: z.number(),
@@ -284,20 +364,31 @@ export const appRouter = router({
         lastMemorizedSurah: z.number().optional(),
         lastMemorizedAyah: z.number().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
+        const student = await getStudentById(id);
+        await assertTeacherCircleAccess(ctx.user, student?.circleId);
+        if (data.circleId) await assertTeacherCircleAccess(ctx.user, data.circleId);
         await updateStudent(id, data);
       }),
-    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => softDeleteStudent(input.id)),
-    memorizationHistory: protectedProcedure.input(z.object({ studentId: z.number() })).query(async ({ input }) => getMemorizationByStudent(input.studentId)),
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => { const student = await getStudentById(input.id); await assertTeacherCircleAccess(ctx.user, student?.circleId); return softDeleteStudent(input.id); }),
+    memorizationHistory: protectedProcedure.input(z.object({ studentId: z.number() })).query(async ({ ctx, input }) => { const student = await getStudentById(input.studentId); await assertTeacherCircleAccess(ctx.user, student?.circleId); return getMemorizationByStudent(input.studentId); }),
   }),
 
   // ===================== SESSIONS =====================
   sessions: router({
     list: protectedProcedure
       .input(z.object({ circleId: z.number().optional(), seasonId: z.number().optional() }))
-      .query(async ({ input }) => getSessions(input.circleId, input.seasonId)),
-    byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => getSessionById(input.id)),
+      .query(async ({ ctx, input }) => {
+        const scope = await getTeacherCircleScope(ctx.user);
+        if (!scope) return getSessions(input.circleId, input.seasonId);
+        if (input.circleId) {
+          if (!scope.includes(input.circleId)) throw new TRPCError({ code: "FORBIDDEN" });
+          return getSessions(input.circleId, input.seasonId);
+        }
+        return (await Promise.all(scope.map((circleId) => getSessions(circleId, input.seasonId)))).flat();
+      }),
+    byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => getAuthorizedSession(ctx.user, input.id)),
     create: protectedProcedure
       .input(z.object({
         circleId: z.number(),
@@ -308,24 +399,25 @@ export const appRouter = router({
         scheduledAt: z.date(),
         notes: z.string().optional(),
       }))
-      .mutation(async ({ input }) => createSession(input)),
+      .mutation(async ({ ctx, input }) => { await assertTeacherCircleAccess(ctx.user, input.circleId); return createSession(input); }),
     updateStatus: protectedProcedure
       .input(z.object({
         id: z.number(),
         status: z.enum(["scheduled", "open", "closed", "cancelled"]),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        await getAuthorizedSession(ctx.user, input.id);
         const updateData: Record<string, unknown> = { status: input.status };
         if (input.status === "open") updateData.startedAt = new Date();
         if (input.status === "closed") updateData.closedAt = new Date();
         await updateSession(input.id, updateData as any);
       }),
-    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => softDeleteSession(input.id)),
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => { await getAuthorizedSession(ctx.user, input.id); return softDeleteSession(input.id); }),
   }),
 
   // ===================== ATTENDANCE =====================
   attendance: router({
-    bySession: protectedProcedure.input(z.object({ sessionId: z.number() })).query(async ({ input }) => getAttendanceBySession(input.sessionId)),
+    bySession: protectedProcedure.input(z.object({ sessionId: z.number() })).query(async ({ ctx, input }) => { await getAuthorizedSession(ctx.user, input.sessionId); return getAttendanceBySession(input.sessionId); }),
     upsert: protectedProcedure
       .input(z.object({
         sessionId: z.number(),
@@ -334,12 +426,12 @@ export const appRouter = router({
         notes: z.string().optional(),
         recordedBy: z.number().optional(),
       }))
-      .mutation(async ({ input, ctx }) => upsertAttendance({ ...input, recordedBy: ctx.user.id })),
+      .mutation(async ({ input, ctx }) => { await assertSessionStudentMatch(ctx.user, input.sessionId, input.studentId); return upsertAttendance({ ...input, recordedBy: ctx.user.id }); }),
   }),
 
   // ===================== MEMORIZATION =====================
   memorization: router({
-    bySession: protectedProcedure.input(z.object({ sessionId: z.number() })).query(async ({ input }) => getMemorizationBySession(input.sessionId)),
+    bySession: protectedProcedure.input(z.object({ sessionId: z.number() })).query(async ({ ctx, input }) => { await getAuthorizedSession(ctx.user, input.sessionId); return getMemorizationBySession(input.sessionId); }),
     create: protectedProcedure
       .input(z.object({
         sessionId: z.number(),
@@ -351,12 +443,12 @@ export const appRouter = router({
         grade: z.enum(["excellent", "very_good", "good", "acceptable", "weak", "not_done"]).optional(),
         notes: z.string().optional(),
       }))
-      .mutation(async ({ input, ctx }) => createMemorization({ ...input, recordedBy: ctx.user.id })),
+      .mutation(async ({ input, ctx }) => { await assertSessionStudentMatch(ctx.user, input.sessionId, input.studentId); return createMemorization({ ...input, recordedBy: ctx.user.id }); }),
   }),
 
   // ===================== REVISION =====================
   revision: router({
-    bySession: protectedProcedure.input(z.object({ sessionId: z.number() })).query(async ({ input }) => getRevisionBySession(input.sessionId)),
+    bySession: protectedProcedure.input(z.object({ sessionId: z.number() })).query(async ({ ctx, input }) => { await getAuthorizedSession(ctx.user, input.sessionId); return getRevisionBySession(input.sessionId); }),
     create: protectedProcedure
       .input(z.object({
         sessionId: z.number(),
@@ -368,12 +460,12 @@ export const appRouter = router({
         grade: z.enum(["excellent", "very_good", "good", "acceptable", "weak", "not_done"]).optional(),
         notes: z.string().optional(),
       }))
-      .mutation(async ({ input, ctx }) => createRevision({ ...input, recordedBy: ctx.user.id })),
+      .mutation(async ({ input, ctx }) => { await assertSessionStudentMatch(ctx.user, input.sessionId, input.studentId); return createRevision({ ...input, recordedBy: ctx.user.id }); }),
   }),
 
   // ===================== EVALUATION =====================
   evaluation: router({
-    bySession: protectedProcedure.input(z.object({ sessionId: z.number() })).query(async ({ input }) => getEvaluationBySession(input.sessionId)),
+    bySession: protectedProcedure.input(z.object({ sessionId: z.number() })).query(async ({ ctx, input }) => { await getAuthorizedSession(ctx.user, input.sessionId); return getEvaluationBySession(input.sessionId); }),
     upsert: protectedProcedure
       .input(z.object({
         sessionId: z.number(),
@@ -386,7 +478,7 @@ export const appRouter = router({
         points: z.number().optional(),
         notes: z.string().optional(),
       }))
-      .mutation(async ({ input, ctx }) => upsertEvaluation({ ...input, recordedBy: ctx.user.id })),
+      .mutation(async ({ input, ctx }) => { await assertSessionStudentMatch(ctx.user, input.sessionId, input.studentId); return upsertEvaluation({ ...input, recordedBy: ctx.user.id }); }),
   }),
 
   // ===================== NOTIFICATIONS =====================

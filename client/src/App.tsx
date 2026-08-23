@@ -23,6 +23,10 @@ import LoginPage from "./pages/LoginPage";
 import AIAssistant from "./pages/AIAssistant";
 import SplashScreen from "./pages/SplashScreen";
 import DeveloperInfo from "./pages/DeveloperInfo";
+import QuranCenter from "./pages/QuranCenter";
+import ParentMessages from "./pages/ParentMessages";
+import TeacherInvites from "./pages/TeacherInvites";
+import RedeemTeacherInvite from "./pages/RedeemTeacherInvite";
 
 function Router() {
   return (
@@ -38,6 +42,10 @@ function Router() {
       <Route path="/sessions" component={() => <TarteelLayout><Sessions /></TarteelLayout>} />
       <Route path="/sessions/:id" component={(props: any) => <TarteelLayout><SessionDetail sessionId={Number(props.params?.id)} /></TarteelLayout>} />
       <Route path="/assistant" component={() => <TarteelLayout><AIAssistant /></TarteelLayout>} />
+      <Route path="/quran" component={() => <TarteelLayout><QuranCenter /></TarteelLayout>} />
+      <Route path="/parent-messages" component={() => <TarteelLayout><ParentMessages /></TarteelLayout>} />
+      <Route path="/teacher-invites" component={() => <TarteelLayout><TeacherInvites /></TarteelLayout>} />
+      <Route path="/redeem-teacher-invite" component={RedeemTeacherInvite} />
       <Route path="/reports" component={() => <TarteelLayout><Reports /></TarteelLayout>} />
       <Route path="/notifications" component={() => <TarteelLayout><Notifications /></TarteelLayout>} />
       <Route path="/settings" component={() => <TarteelLayout><Settings /></TarteelLayout>} />
