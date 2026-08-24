@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
-import { getCircleIdsForTeacher, getTeacherByUserId } from "../db";
+import { assertCirclePermission, type AccessSubject } from "../accessControl";
 import { buildUnifiedReport } from "../reports/reportBuilder";
 import { generateUnifiedReportPDF } from "../reports/unifiedPdf";
 
@@ -11,11 +11,8 @@ const reportInput = z.object({
   sections: z.object({ summary: z.boolean(), attendance: z.boolean(), memorization: z.boolean(), revision: z.boolean(), evaluations: z.boolean() }),
 });
 
-async function assertReportScope(user: { id: number; role: string }, circleId: number) {
-  if (!["teacher", "assistant_teacher"].includes(user.role)) return;
-  const teacher = await getTeacherByUserId(user.id);
-  const scope = teacher ? await getCircleIdsForTeacher(teacher.id) : [];
-  if (!scope.includes(circleId)) throw new TRPCError({ code: "FORBIDDEN", message: "لا يمكن إنشاء تقرير خارج نطاق حَلَقتك" });
+async function assertReportScope(user: AccessSubject, circleId: number) {
+  await assertCirclePermission(user, circleId, "reports.view");
 }
 
 export const reportingRouter = router({

@@ -1,11 +1,14 @@
-import { and, desc, eq, gt, gte, inArray, isNull, like, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, isNull, like, lt, lte, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
   academicSeasons,
+  accessCodeAttempts,
+  accessCodes,
   attendance,
   auditLog,
   branches,
+  centerMemberships,
   centers,
   circlePeriods,
   circles,
@@ -13,11 +16,14 @@ import {
   memorization,
   notifications,
   organizations,
+  parentStudentLinks,
+  permissionGrants,
   revision,
   sessions,
   students,
   teacherInvites,
   teachers,
+  userScopes,
   users,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
@@ -194,6 +200,13 @@ export async function getAcademicSeasons(centerId?: number) {
   const conditions = [isNull(academicSeasons.deletedAt)];
   if (centerId) conditions.push(eq(academicSeasons.centerId, centerId));
   return db.select().from(academicSeasons).where(and(...conditions)).orderBy(desc(academicSeasons.createdAt));
+}
+
+export async function getAcademicSeasonById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(academicSeasons).where(and(eq(academicSeasons.id, id), isNull(academicSeasons.deletedAt))).limit(1);
+  return result[0];
 }
 
 export async function createAcademicSeason(data: typeof academicSeasons.$inferInsert) {
@@ -404,6 +417,13 @@ export async function createTeacherInvite(data: typeof teacherInvites.$inferInse
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   await db.insert(teacherInvites).values(data);
+}
+
+export async function getTeacherInviteById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(teacherInvites).where(eq(teacherInvites.id, id)).limit(1);
+  return result[0];
 }
 
 export async function revokeTeacherInvite(id: number) {
@@ -691,6 +711,12 @@ export async function getAuditLog(limit = 50) {
   return db.select().from(auditLog).orderBy(desc(auditLog.createdAt)).limit(limit);
 }
 
+export async function getAuditLogForCenter(centerId: number, limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(auditLog).where(eq(auditLog.centerId, centerId)).orderBy(desc(auditLog.createdAt)).limit(limit);
+}
+
 // ===================== DASHBOARD STATS =====================
 export async function getDashboardStats() {
   const db = await getDb();
@@ -719,10 +745,35 @@ export async function getDashboardStats() {
   };
 }
 
+export async function getDashboardStatsForCenters(centerIds: number[]) {
+  const empty = { totalStudents: 0, totalTeachers: 0, totalCenters: 0, totalCircles: 0, totalSessions: 0, openSessions: 0, todayAttendance: 0, todayAbsence: 0 };
+  if (!centerIds.length) return empty;
+  const db = await getDb();
+  if (!db) return empty;
+  const [studentsCount, teachersCount, circlesCount, sessionsCount, openSessionsCount, presentCount, absentCount] = await Promise.all([
+    db.select({ count: sql<number>`count(*)` }).from(students).where(and(inArray(students.centerId, centerIds), isNull(students.deletedAt))),
+    db.select({ count: sql<number>`count(*)` }).from(teachers).where(and(inArray(teachers.centerId, centerIds), isNull(teachers.deletedAt))),
+    db.select({ count: sql<number>`count(*)` }).from(circles).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), isNull(circles.deletedAt))),
+    db.select({ count: sql<number>`count(*)` }).from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), isNull(sessions.deletedAt))),
+    db.select({ count: sql<number>`count(*)` }).from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), isNull(sessions.deletedAt), eq(sessions.status, "open"))),
+    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), eq(attendance.status, "present"))),
+    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), eq(attendance.status, "absent"))),
+  ]);
+  return { totalStudents: studentsCount[0]?.count ?? 0, totalTeachers: teachersCount[0]?.count ?? 0, totalCenters: centerIds.length, totalCircles: circlesCount[0]?.count ?? 0, totalSessions: sessionsCount[0]?.count ?? 0, openSessions: openSessionsCount[0]?.count ?? 0, todayAttendance: presentCount[0]?.count ?? 0, todayAbsence: absentCount[0]?.count ?? 0 };
+}
+
 export async function getRecentSessions(limit = 5) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(sessions).where(isNull(sessions.deletedAt)).orderBy(desc(sessions.createdAt)).limit(limit);
+}
+
+export async function getRecentSessionsForCenters(centerIds: number[], limit = 5) {
+  if (!centerIds.length) return [];
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.select({ session: sessions }).from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), isNull(sessions.deletedAt))).orderBy(desc(sessions.createdAt)).limit(limit);
+  return rows.map((row) => row.session);
 }
 
 // ===================== TRASH =====================
@@ -749,6 +800,32 @@ export async function getTrashedItems() {
   };
 }
 
+export async function getTrashedItemsForCenters(centerIds: number[]) {
+  if (!centerIds.length) return { centers: [], branches: [], teachers: [], students: [], circles: [], sessions: [] };
+  const db = await getDb();
+  if (!db) return { centers: [], branches: [], teachers: [], students: [], circles: [], sessions: [] };
+  const [trashedCenters, trashedBranches, trashedTeachers, trashedStudents, trashedCircles, trashedSessions] = await Promise.all([
+    db.select().from(centers).where(and(inArray(centers.id, centerIds), sql`${centers.deletedAt} IS NOT NULL`)),
+    db.select().from(branches).where(and(inArray(branches.centerId, centerIds), sql`${branches.deletedAt} IS NOT NULL`)),
+    db.select().from(teachers).where(and(inArray(teachers.centerId, centerIds), sql`${teachers.deletedAt} IS NOT NULL`)),
+    db.select().from(students).where(and(inArray(students.centerId, centerIds), sql`${students.deletedAt} IS NOT NULL`)),
+    db.select().from(circles).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), sql`${circles.deletedAt} IS NOT NULL`)),
+    db.select().from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), sql`${sessions.deletedAt} IS NOT NULL`)),
+  ]);
+  return { centers: trashedCenters, branches: trashedBranches, teachers: trashedTeachers, students: trashedStudents, circles: trashedCircles.map((row) => row.circles), sessions: trashedSessions.map((row) => row.sessions) };
+}
+
+export async function getTrashedItemCenterId(table: "centers" | "branches" | "teachers" | "students" | "circles" | "sessions", id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  if (table === "centers") return id;
+  if (table === "branches") return (await db.select({ centerId: branches.centerId }).from(branches).where(and(eq(branches.id, id), sql`${branches.deletedAt} IS NOT NULL`)).limit(1))[0]?.centerId;
+  if (table === "teachers") return (await db.select({ centerId: teachers.centerId }).from(teachers).where(and(eq(teachers.id, id), sql`${teachers.deletedAt} IS NOT NULL`)).limit(1))[0]?.centerId;
+  if (table === "students") return (await db.select({ centerId: students.centerId }).from(students).where(and(eq(students.id, id), sql`${students.deletedAt} IS NOT NULL`)).limit(1))[0]?.centerId;
+  if (table === "circles") return (await db.select({ centerId: branches.centerId }).from(circles).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(eq(circles.id, id), sql`${circles.deletedAt} IS NOT NULL`)).limit(1))[0]?.centerId;
+  return (await db.select({ centerId: branches.centerId }).from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(eq(sessions.id, id), sql`${sessions.deletedAt} IS NOT NULL`)).limit(1))[0]?.centerId;
+}
+
 export async function restoreItem(table: string, id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
@@ -766,4 +843,198 @@ export async function restoreItem(table: string, id: number) {
   if (!t) throw new Error("Invalid table");
 
   await db.update(t as typeof centers).set({ deletedAt: null, isActive: true } as any).where(eq((t as typeof centers).id, id));
+}
+
+// ===================== ACCESS CONTROL =====================
+export async function getUserCenterMemberships(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(centerMemberships).where(eq(centerMemberships.userId, userId)).orderBy(desc(centerMemberships.createdAt));
+}
+
+export async function getActiveCenterMembership(userId: number, centerId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const now = new Date();
+  const result = await db.select().from(centerMemberships).where(and(eq(centerMemberships.userId, userId), eq(centerMemberships.centerId, centerId), eq(centerMemberships.status, "active"), isNull(centerMemberships.revokedAt), or(isNull(centerMemberships.expiresAt), gt(centerMemberships.expiresAt, now)))).limit(1);
+  return result[0];
+}
+
+export async function getActivePermissionGrants(userId: number, centerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const now = new Date();
+  return db.select().from(permissionGrants).where(and(eq(permissionGrants.userId, userId), eq(permissionGrants.centerId, centerId), isNull(permissionGrants.revokedAt), or(isNull(permissionGrants.expiresAt), gt(permissionGrants.expiresAt, now))));
+}
+
+export async function getActiveUserScopes(userId: number, centerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const now = new Date();
+  return db.select().from(userScopes).where(and(eq(userScopes.userId, userId), eq(userScopes.centerId, centerId), isNull(userScopes.revokedAt), or(isNull(userScopes.expiresAt), gt(userScopes.expiresAt, now))));
+}
+
+export async function getCenterIdForCircle(circleId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select({ centerId: branches.centerId }).from(circles).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(eq(circles.id, circleId), isNull(circles.deletedAt), isNull(branches.deletedAt))).limit(1);
+  return result[0]?.centerId;
+}
+
+export async function getCenterIdForStudent(studentId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select({ centerId: students.centerId }).from(students).where(and(eq(students.id, studentId), isNull(students.deletedAt))).limit(1);
+  return result[0]?.centerId;
+}
+
+export async function getAccessCodesForCenter(centerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  await db.update(accessCodes).set({ status: "expired", updatedAt: new Date() }).where(and(eq(accessCodes.centerId, centerId), eq(accessCodes.status, "active"), lte(accessCodes.expiresAt, new Date())));
+  return db.select().from(accessCodes).where(eq(accessCodes.centerId, centerId)).orderBy(desc(accessCodes.createdAt));
+}
+
+export async function getAccessCodeByHash(codeHash: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(accessCodes).where(eq(accessCodes.codeHash, codeHash)).limit(1);
+  return result[0];
+}
+
+export async function createAccessCode(data: typeof accessCodes.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(accessCodes).values(data);
+  return Number(result[0].insertId);
+}
+
+export async function revokeAccessCode(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(accessCodes).set({ status: "revoked", revokedAt: new Date(), updatedAt: new Date() }).where(eq(accessCodes.id, id));
+}
+
+export async function getAccessCodeById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(accessCodes).where(eq(accessCodes.id, id)).limit(1);
+  return result[0];
+}
+
+export async function recordAccessCodeAttempt(data: typeof accessCodeAttempts.$inferInsert) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(accessCodeAttempts).values(data);
+}
+
+export async function getParentStudentLinks(guardianUserId: number, centerId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [eq(parentStudentLinks.guardianUserId, guardianUserId)];
+  if (centerId) conditions.push(eq(parentStudentLinks.centerId, centerId));
+  return db.select().from(parentStudentLinks).where(and(...conditions));
+}
+
+export async function getCenterMembers(centerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ membership: centerMemberships, user: users }).from(centerMemberships).innerJoin(users, eq(centerMemberships.userId, users.id)).where(eq(centerMemberships.centerId, centerId)).orderBy(desc(centerMemberships.createdAt));
+}
+
+export async function getCenterMemberById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(centerMemberships).where(eq(centerMemberships.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createCenterMembership(data: typeof centerMemberships.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(centerMemberships).values(data);
+  return Number(result[0].insertId);
+}
+
+export async function updateCenterMembership(id: number, data: Partial<typeof centerMemberships.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(centerMemberships).set({ ...data, updatedAt: new Date() }).where(eq(centerMemberships.id, id));
+}
+
+export async function revokeUserPermissionGrants(userId: number, centerId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(permissionGrants).set({ revokedAt: new Date(), updatedAt: new Date() }).where(and(eq(permissionGrants.userId, userId), eq(permissionGrants.centerId, centerId), isNull(permissionGrants.revokedAt)));
+}
+
+export async function createPermissionGrants(data: (typeof permissionGrants.$inferInsert)[]) {
+  if (!data.length) return;
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(permissionGrants).values(data);
+}
+
+export async function revokeUserScopes(userId: number, centerId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(userScopes).set({ revokedAt: new Date() }).where(and(eq(userScopes.userId, userId), eq(userScopes.centerId, centerId), isNull(userScopes.revokedAt)));
+}
+
+export async function createUserScopes(data: (typeof userScopes.$inferInsert)[]) {
+  if (!data.length) return;
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(userScopes).values(data);
+}
+
+export async function redeemAccessCodeSecure(input: { codeHash: string; userId: number; ipAddress?: string; userAgent?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً");
+  const now = new Date();
+  return db.transaction(async (tx) => {
+    const [accessCode] = await tx.select().from(accessCodes).where(eq(accessCodes.codeHash, input.codeHash)).limit(1);
+    if (!accessCode) {
+      await tx.insert(accessCodeAttempts).values({ codeFingerprint: input.codeHash, attemptedByUserId: input.userId, wasSuccessful: false, ipAddress: input.ipAddress, userAgent: input.userAgent });
+      throw new Error("رمز الدخول غير صحيح");
+    }
+    const invalidate = async (message: string, disable = false) => {
+      const attempts = accessCode.failedAttempts + 1;
+      await tx.update(accessCodes).set({ failedAttempts: attempts, lockedUntil: attempts >= 5 ? new Date(now.getTime() + 15 * 60_000) : accessCode.lockedUntil, status: disable || attempts >= 10 ? "disabled" : accessCode.status, updatedAt: now }).where(eq(accessCodes.id, accessCode.id));
+      await tx.insert(accessCodeAttempts).values({ accessCodeId: accessCode.id, codeFingerprint: input.codeHash, attemptedByUserId: input.userId, wasSuccessful: false, ipAddress: input.ipAddress, userAgent: input.userAgent });
+      throw new Error(message);
+    };
+    if (accessCode.status !== "active") await invalidate("هذا الرمز غير متاح", true);
+    if (accessCode.lockedUntil && accessCode.lockedUntil > now) await invalidate("تم تعليق محاولات هذا الرمز مؤقتاً");
+    if (accessCode.expiresAt && accessCode.expiresAt <= now) {
+      await tx.update(accessCodes).set({ status: "expired", updatedAt: now }).where(eq(accessCodes.id, accessCode.id));
+      await invalidate("انتهت صلاحية هذا الرمز", true);
+    }
+    if (accessCode.usedCount >= accessCode.maxUses) {
+      await tx.update(accessCodes).set({ status: "used", updatedAt: now }).where(eq(accessCodes.id, accessCode.id));
+      await invalidate("تم استخدام هذا الرمز بالكامل", true);
+    }
+    const nextCount = accessCode.usedCount + 1;
+    const claim = await tx.update(accessCodes).set({ usedCount: sql`${accessCodes.usedCount} + 1`, assignedUserId: input.userId, failedAttempts: 0, lockedUntil: null, lastUsedAt: now, status: nextCount >= accessCode.maxUses ? "used" : "active", updatedAt: now }).where(and(eq(accessCodes.id, accessCode.id), eq(accessCodes.status, "active"), lt(accessCodes.usedCount, accessCodes.maxUses)));
+    if (!claim[0]?.affectedRows) throw new Error("تعذر استرداد الرمز؛ حاول مجدداً");
+
+    await tx.update(users).set({ role: accessCode.role, isActive: true, accountStatus: "active", accessRevokedAt: null, lastActiveAt: now, updatedAt: now }).where(eq(users.id, input.userId));
+    await tx.insert(centerMemberships).values({ userId: input.userId, centerId: accessCode.centerId, role: accessCode.role, status: "active", isOwner: false, grantedBy: accessCode.createdBy, grantedAt: now }).onDuplicateKeyUpdate({ set: { role: accessCode.role, status: "active", revokedAt: null, expiresAt: null, updatedAt: now } });
+
+    const scopes: { scopeType: "center" | "circle" | "teacher" | "student"; scopeId?: number }[] = [];
+    if (accessCode.circleId) scopes.push({ scopeType: "circle", scopeId: accessCode.circleId });
+    if (accessCode.teacherId) scopes.push({ scopeType: "teacher", scopeId: accessCode.teacherId });
+    if (accessCode.studentId) scopes.push({ scopeType: "student", scopeId: accessCode.studentId });
+    try {
+      const embedded = accessCode.scopeJson ? JSON.parse(accessCode.scopeJson) : [];
+      if (Array.isArray(embedded)) for (const scope of embedded) if (["center", "circle", "teacher", "student"].includes(scope?.scopeType)) scopes.push({ scopeType: scope.scopeType, scopeId: scope.scopeId });
+    } catch { /* مخطط النطاق غير صالح؛ يظل الرمز بنطاقه الصريح فقط. */ }
+    if (scopes.length) await tx.insert(userScopes).values(scopes.map((scope) => ({ userId: input.userId, centerId: accessCode.centerId, scopeType: scope.scopeType, scopeId: scope.scopeId ?? null, grantedBy: accessCode.createdBy })));
+    if (accessCode.teacherId && (accessCode.role === "teacher" || accessCode.role === "assistant_teacher")) await tx.update(teachers).set({ userId: input.userId, isActive: true, updatedAt: now }).where(and(eq(teachers.id, accessCode.teacherId), eq(teachers.centerId, accessCode.centerId)));
+    if (accessCode.studentId && accessCode.role === "student") await tx.update(students).set({ userId: input.userId, isActive: true, updatedAt: now }).where(and(eq(students.id, accessCode.studentId), eq(students.centerId, accessCode.centerId)));
+    if (accessCode.studentId && accessCode.role === "guardian") await tx.insert(parentStudentLinks).values({ guardianUserId: input.userId, studentId: accessCode.studentId, centerId: accessCode.centerId, linkedBy: accessCode.createdBy }).onDuplicateKeyUpdate({ set: { centerId: accessCode.centerId } });
+    await tx.insert(notifications).values({ userId: input.userId, title: "تم تفعيل الوصول", message: "تم تفعيل حسابك بالدور والنطاق الممنوحين من المركز.", type: "success", relatedId: accessCode.id, relatedType: "access_code" });
+    await tx.insert(accessCodeAttempts).values({ accessCodeId: accessCode.id, codeFingerprint: input.codeHash, attemptedByUserId: input.userId, wasSuccessful: true, ipAddress: input.ipAddress, userAgent: input.userAgent });
+    return { centerId: accessCode.centerId, role: accessCode.role, status: nextCount >= accessCode.maxUses ? "used" : "active" };
+  });
 }

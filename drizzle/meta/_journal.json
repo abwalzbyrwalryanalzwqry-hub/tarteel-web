@@ -43,6 +43,13 @@
       "when": 1787530437947,
       "tag": "0005_secret_typhoid_mary",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1787604299431,
+      "tag": "0006_secret_fixer",
+      "breakpoints": true
     }
   ]
 }

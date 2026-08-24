@@ -3,6 +3,7 @@ export type TarteelRole =
   | "org_admin"
   | "center_manager"
   | "supervisor"
+  | "guide"
   | "teacher"
   | "assistant_teacher"
   | "student"
@@ -32,6 +33,20 @@ export type TarteelPermission =
   | "quran:view"
   | "messages:manage";
 
+/** مفردات الصلاحيات التفصيلية المحفوظة في قاعدة البيانات؛ تبقى مفاتيح التنقل القديمة متوافقة. */
+export const GRANULAR_PERMISSIONS = [
+  "center.view", "center.edit", "users.view", "users.create", "users.edit", "users.delete",
+  "supervisors.view", "supervisors.create", "supervisors.edit", "supervisors.delete",
+  "teachers.view", "teachers.create", "teachers.edit", "teachers.delete",
+  "guides.view", "guides.create", "guides.edit", "guides.delete",
+  "circles.view", "circles.create", "circles.edit", "circles.delete", "circles.assign_teacher",
+  "students.view", "students.create", "students.edit", "students.delete", "students.transfer",
+  "parents.view", "parents.create", "parents.edit", "parents.delete", "parents.link_children",
+  "attendance.view", "attendance.create", "attendance.edit", "reports.view", "reports.export",
+  "access_codes.view", "access_codes.create", "access_codes.revoke", "settings.view", "settings.edit", "audit_logs.view",
+] as const;
+export type GranularPermission = (typeof GRANULAR_PERMISSIONS)[number];
+
 const ALL_PERMISSIONS: TarteelPermission[] = [
   "dashboard:view", "centers:manage", "branches:manage", "seasons:manage", "circles:view", "circles:manage",
   "teachers:manage", "students:view", "students:manage", "sessions:view", "sessions:manage", "reports:view",
@@ -48,6 +63,7 @@ export const ROLE_PERMISSIONS: Record<TarteelRole, TarteelPermission[]> = {
   org_admin: managementPermissions,
   center_manager: managementPermissions,
   supervisor: managementPermissions,
+  guide: ["dashboard:view", "circles:view", "students:view", "sessions:view", "reports:view", "notifications:view", "settings:view", "ai:use", "quran:view"],
   teacher: ["dashboard:view", "circles:view", "students:view", "sessions:view", "sessions:manage", "reports:view", "notifications:view", "settings:view", "ai:use", "quran:view", "messages:manage"],
   assistant_teacher: ["dashboard:view", "circles:view", "students:view", "sessions:view", "sessions:manage", "notifications:view", "ai:use", "quran:view", "messages:manage"],
   student: ["dashboard:view", "settings:view", "notifications:view", "ai:use", "quran:view"],
@@ -61,6 +77,7 @@ export const ROLE_LABELS: Record<TarteelRole, string> = {
   org_admin: "مدير الجهة",
   center_manager: "مدير المركز",
   supervisor: "مشرف المركز",
+  guide: "الموجه",
   teacher: "معلم",
   assistant_teacher: "معلم مساعد",
   student: "طالب",
@@ -76,6 +93,8 @@ export const NAVIGATION_PERMISSION_RULES = {
   "/circles": "circles:view",
   "/teachers": "teachers:manage",
   "/teacher-invites": "teachers:manage",
+  "/guide": "circles:view",
+  "/access-management": "settings:manage",
   "/students": "students:view",
   "/sessions": "sessions:view",
   "/reports": "reports:view",

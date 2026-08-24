@@ -17,7 +17,7 @@ export default function Trash() {
     { key: "students", label: "الطلاب", items: trashed?.students ?? [] },
     { key: "circles", label: "الحلقات", items: trashed?.circles ?? [] },
     { key: "sessions", label: "الجلسات", items: trashed?.sessions ?? [] },
-  ];
+  ] as const;
 
   const totalItems = sections.reduce((sum, s) => sum + s.items.length, 0);
 

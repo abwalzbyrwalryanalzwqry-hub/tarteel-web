@@ -24,6 +24,7 @@ import {
   Sparkles,
   Sun,
   Users,
+  UserCog,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -37,6 +38,8 @@ const navItems = [
   { path: "/circles", label: "الحلقات", icon: BookOpen, permission: "circles:view" as const },
   { path: "/teachers", label: "المعلمون", icon: GraduationCap, permission: "teachers:manage" as const },
   { path: "/teacher-invites", label: "دعوات المعلمين", icon: KeyRound, permission: "teachers:manage" as const },
+  { path: "/guide", label: "لوحة الموجه", icon: UserCog, permission: "circles:view" as const },
+  { path: "/access-management", label: "المستخدمون والصلاحيات", icon: UserCog, permission: "settings:manage" as const },
   { path: "/students", label: "الطلاب", icon: Users, permission: "students:view" as const },
   { path: "/sessions", label: "الجلسات", icon: ClipboardList, permission: "sessions:view" as const },
   { path: "/quran", label: "مركز القرآن", icon: BookOpenText, permission: "quran:view" as const },

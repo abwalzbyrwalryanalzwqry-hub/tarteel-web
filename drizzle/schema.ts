@@ -8,6 +8,8 @@ import {
   boolean,
   decimal,
   tinyint,
+  index,
+  uniqueIndex,
 } from "drizzle-orm/mysql-core";
 
 // ===================== USERS =====================
@@ -17,10 +19,13 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["super_admin", "org_admin", "center_manager", "supervisor", "teacher", "assistant_teacher", "student", "guardian", "user", "admin"]).default("user").notNull(),
+  role: mysqlEnum("role", ["super_admin", "org_admin", "center_manager", "supervisor", "guide", "teacher", "assistant_teacher", "student", "guardian", "user", "admin"]).default("user").notNull(),
   phone: varchar("phone", { length: 32 }),
   avatar: text("avatar"),
   isActive: boolean("isActive").default(true).notNull(),
+  accountStatus: mysqlEnum("accountStatus", ["pending", "active", "suspended", "disabled", "archived"]).default("active").notNull(),
+  accessRevokedAt: timestamp("accessRevokedAt"),
+  lastActiveAt: timestamp("lastActiveAt"),
   deletedAt: timestamp("deletedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -72,6 +77,48 @@ export const centers = mysqlTable("centers", {
 
 export type Center = typeof centers.$inferSelect;
 export type InsertCenter = typeof centers.$inferInsert;
+
+// ===================== ACCESS CONTROL =====================
+// تفصل العضوية هوية الحساب العامة عن دوره وحالته داخل كل مركز.
+export const centerMemberships = mysqlTable("center_memberships", {
+  id: int("id").autoincrement().primaryKey(), userId: int("userId").notNull(), centerId: int("centerId").notNull(),
+  role: mysqlEnum("role", ["center_manager", "supervisor", "guide", "teacher", "assistant_teacher", "student", "guardian"]).notNull(),
+  status: mysqlEnum("status", ["pending", "active", "suspended", "disabled", "archived"]).default("pending").notNull(),
+  isOwner: boolean("isOwner").default(false).notNull(), grantedBy: int("grantedBy"), grantedAt: timestamp("grantedAt").defaultNow().notNull(), expiresAt: timestamp("expiresAt"), revokedAt: timestamp("revokedAt"), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [uniqueIndex("center_memberships_user_center_unique").on(table.userId, table.centerId), index("center_memberships_center_idx").on(table.centerId, table.status)]);
+export type CenterMembership = typeof centerMemberships.$inferSelect;
+export type InsertCenterMembership = typeof centerMemberships.$inferInsert;
+
+// منح تفصيلي قابل للانتهاء والسحب، مع مرجع للمفوض لمنع التصعيد.
+export const permissionGrants = mysqlTable("permission_grants", {
+  id: int("id").autoincrement().primaryKey(), userId: int("userId").notNull(), centerId: int("centerId").notNull(), permission: varchar("permission", { length: 96 }).notNull(), effect: mysqlEnum("effect", ["allow", "deny"]).default("allow").notNull(), grantedBy: int("grantedBy").notNull(), expiresAt: timestamp("expiresAt"), revokedAt: timestamp("revokedAt"), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [index("permission_grants_lookup_idx").on(table.userId, table.centerId, table.permission), index("permission_grants_center_idx").on(table.centerId, table.revokedAt)]);
+export type PermissionGrant = typeof permissionGrants.$inferSelect;
+export type InsertPermissionGrant = typeof permissionGrants.$inferInsert;
+
+// نطاقات مستقلة لتدعم أكثر من حلقة أو معلم أو طالب للمستخدم الواحد.
+export const userScopes = mysqlTable("user_scopes", {
+  id: int("id").autoincrement().primaryKey(), userId: int("userId").notNull(), centerId: int("centerId").notNull(), scopeType: mysqlEnum("scopeType", ["center", "circle", "teacher", "student"]).notNull(), scopeId: int("scopeId"), grantedBy: int("grantedBy"), expiresAt: timestamp("expiresAt"), revokedAt: timestamp("revokedAt"), createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [index("user_scopes_lookup_idx").on(table.userId, table.centerId, table.scopeType), index("user_scopes_resource_idx").on(table.centerId, table.scopeType, table.scopeId)]);
+export type UserScope = typeof userScopes.$inferSelect;
+export type InsertUserScope = typeof userScopes.$inferInsert;
+
+// لا تخزن الأكواد نفسها؛ يحتفظ النظام بالـ hash والتلميح فقط بعد الإنشاء.
+export const accessCodes = mysqlTable("access_codes", {
+  id: int("id").autoincrement().primaryKey(), centerId: int("centerId").notNull(), codeHash: varchar("codeHash", { length: 128 }).notNull(), codeHint: varchar("codeHint", { length: 24 }).notNull(),
+  role: mysqlEnum("role", ["center_manager", "supervisor", "guide", "teacher", "assistant_teacher", "student", "guardian"]).notNull(), scopeJson: text("scopeJson"), circleId: int("circleId"), teacherId: int("teacherId"), studentId: int("studentId"), guardianUserId: int("guardianUserId"), createdBy: int("createdBy").notNull(), assignedUserId: int("assignedUserId"),
+  status: mysqlEnum("status", ["active", "used", "expired", "revoked", "disabled"]).default("active").notNull(), expiresAt: timestamp("expiresAt"), maxUses: int("maxUses").default(1).notNull(), usedCount: int("usedCount").default(0).notNull(), failedAttempts: int("failedAttempts").default(0).notNull(), lockedUntil: timestamp("lockedUntil"), lastUsedAt: timestamp("lastUsedAt"), revokedAt: timestamp("revokedAt"), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [uniqueIndex("access_codes_hash_unique").on(table.codeHash), index("access_codes_center_status_idx").on(table.centerId, table.status), index("access_codes_subject_idx").on(table.studentId, table.guardianUserId)]);
+export type AccessCode = typeof accessCodes.$inferSelect;
+export type InsertAccessCode = typeof accessCodes.$inferInsert;
+
+export const accessCodeAttempts = mysqlTable("access_code_attempts", {
+  id: int("id").autoincrement().primaryKey(), accessCodeId: int("accessCodeId"), attemptedByUserId: int("attemptedByUserId"), codeFingerprint: varchar("codeFingerprint", { length: 64 }).notNull(), wasSuccessful: boolean("wasSuccessful").default(false).notNull(), ipAddress: varchar("ipAddress", { length: 64 }), userAgent: varchar("userAgent", { length: 512 }), createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [index("access_code_attempts_code_idx").on(table.accessCodeId, table.createdAt), index("access_code_attempts_fingerprint_idx").on(table.codeFingerprint, table.createdAt)]);
+
+export const parentStudentLinks = mysqlTable("parent_student_links", {
+  id: int("id").autoincrement().primaryKey(), guardianUserId: int("guardianUserId").notNull(), studentId: int("studentId").notNull(), centerId: int("centerId").notNull(), linkedBy: int("linkedBy"), createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [uniqueIndex("parent_student_links_guardian_student_unique").on(table.guardianUserId, table.studentId), index("parent_student_links_guardian_center_idx").on(table.guardianUserId, table.centerId)]);
 
 // ===================== BRANCHES =====================
 export const branches = mysqlTable("branches", {
@@ -330,12 +377,14 @@ export type InsertNotification = typeof notifications.$inferInsert;
 export const auditLog = mysqlTable("audit_log", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId"),
+  centerId: int("centerId"),
   action: varchar("action", { length: 64 }).notNull(),
   entity: varchar("entity", { length: 64 }).notNull(),
   entityId: int("entityId"),
   oldData: text("oldData"),
   newData: text("newData"),
   ipAddress: varchar("ipAddress", { length: 64 }),
+  userAgent: varchar("userAgent", { length: 512 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

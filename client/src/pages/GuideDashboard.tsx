@@ -1,0 +1,19 @@
+import { BadgeCheck, BookOpen, GraduationCap, UsersRound } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+
+export default function GuideDashboard() {
+  const { data: memberships } = trpc.access.mine.useQuery();
+  const { data: circles, isLoading: circlesLoading } = trpc.circles.list.useQuery({ branchId: undefined, seasonId: undefined });
+  const { data: teachers } = trpc.teachers.list.useQuery({ centerId: undefined });
+  const { data: students } = trpc.students.list.useQuery({ centerId: undefined, circleId: undefined, search: undefined });
+  const activeScopes = memberships?.filter((membership) => membership.role === "guide" && membership.status === "active") ?? [];
+
+  return <div className="mx-auto max-w-7xl space-y-6" dir="rtl">
+    <section className="rounded-3xl border border-primary/15 bg-gradient-to-l from-primary/10 via-card to-emerald-500/10 p-6 lg:p-8"><div className="flex gap-4"><span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl gold-gradient shadow-lg"><BadgeCheck className="h-7 w-7 text-white" /></span><div><h1 className="font-display text-3xl font-bold text-foreground">لوحة الموجه</h1><p className="mt-1 text-sm leading-7 text-muted-foreground">عرض إشرافي للبيانات المصرح بها فقط. لا تظهر أدوات التعديل أو بيانات الحلقات خارج نطاق التفويض.</p></div></div></section>
+    <div className="grid gap-4 sm:grid-cols-3"><Metric icon={<BookOpen className="h-5 w-5" />} label="الحلقات ضمن النطاق" value={circles?.length ?? 0} /><Metric icon={<GraduationCap className="h-5 w-5" />} label="المعلمون المتاحون" value={teachers?.length ?? 0} /><Metric icon={<UsersRound className="h-5 w-5" />} label="الطلاب المرئيون" value={students?.length ?? 0} /></div>
+    <section className="glass-card rounded-3xl p-5 sm:p-6"><h2 className="font-display text-xl font-bold">نطاق الإشراف</h2><p className="mt-1 text-sm text-muted-foreground">تطبق الحدود في الخادم قبل إرسال أي صف من هذه البيانات.</p><div className="mt-4 flex flex-wrap gap-2">{activeScopes.length ? activeScopes.map((membership) => <span key={membership.id} className="rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">مركز #{membership.centerId} · {membership.expiresAt ? `حتى ${new Date(membership.expiresAt).toLocaleDateString("ar-SA")}` : "تفويض نشط"}</span>) : <span className="text-sm text-muted-foreground">لا يوجد نطاق إشراف نشط حالياً.</span>}</div></section>
+    <section className="glass-card overflow-hidden rounded-3xl"><div className="border-b border-border px-5 py-4"><h2 className="font-display text-xl font-bold">الحلقات ضمن نطاقك</h2><p className="mt-1 text-sm text-muted-foreground">للمتابعة وقراءة مستوى الإنجاز والتقارير وفق التفويض.</p></div>{circlesLoading ? <div className="p-10 text-center text-sm text-muted-foreground">جارٍ تحميل الحلقات…</div> : !circles?.length ? <div className="p-10 text-center text-sm text-muted-foreground">لا توجد حلقات ضمن نطاقك الحالي.</div> : <div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">{circles.map((circle) => <article key={circle.id} className="rounded-2xl border border-border bg-background/60 p-4"><BookOpen className="h-5 w-5 text-primary" /><h3 className="mt-3 font-display text-lg font-bold text-foreground">{circle.name}</h3><p className="mt-1 text-sm leading-6 text-muted-foreground">{circle.description || "حلقة ضمن نطاق الإشراف"}</p><p className="mt-3 text-xs text-muted-foreground">السعة: {circle.maxStudents ?? "—"} طالباً</p></article>)}</div>}</section>
+  </div>;
+}
+
+function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) { return <div className="glass-card flex items-center gap-3 rounded-2xl p-4"><span className="rounded-xl bg-primary/10 p-2 text-primary">{icon}</span><div><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-bold text-foreground">{value}</p></div></div>; }

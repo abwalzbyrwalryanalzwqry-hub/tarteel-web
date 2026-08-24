@@ -29,6 +29,9 @@ import QuranCenter from "./pages/QuranCenter";
 import ParentMessages from "./pages/ParentMessages";
 import TeacherInvites from "./pages/TeacherInvites";
 import RedeemTeacherInvite from "./pages/RedeemTeacherInvite";
+import AccessManagement from "./pages/AccessManagement";
+import RedeemAccessCode from "./pages/RedeemAccessCode";
+import GuideDashboard from "./pages/GuideDashboard";
 
 function Router() {
   return (
@@ -49,7 +52,10 @@ function Router() {
       <Route path="/quran" component={() => <TarteelLayout><QuranCenter /></TarteelLayout>} />
       <Route path="/parent-messages" component={() => <TarteelLayout><ParentMessages /></TarteelLayout>} />
       <Route path="/teacher-invites" component={() => <TarteelLayout><TeacherInvites /></TarteelLayout>} />
+      <Route path="/access-management" component={() => <TarteelLayout><AccessManagement /></TarteelLayout>} />
+      <Route path="/guide" component={() => <TarteelLayout><GuideDashboard /></TarteelLayout>} />
       <Route path="/redeem-teacher-invite" component={RedeemTeacherInvite} />
+      <Route path="/redeem-access-code" component={RedeemAccessCode} />
       <Route path="/reports" component={() => <TarteelLayout><Reports /></TarteelLayout>} />
       <Route path="/notifications" component={() => <TarteelLayout><Notifications /></TarteelLayout>} />
       <Route path="/settings" component={() => <TarteelLayout><Settings /></TarteelLayout>} />
