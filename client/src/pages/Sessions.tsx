@@ -6,10 +6,17 @@ import { toast } from "sonner";
 import { Link } from "wouter";
 import { SESSION_STATUS_LABELS, SESSION_TYPE_LABELS } from "../../../shared/types";
 import { Calendar } from "@/components/ui/calendar";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export default function Sessions() {
+  const { user } = useAuth();
+  const { can, role } = usePermissions();
+  const isTeachingRole = role === "teacher" || role === "assistant_teacher";
+  const canManageSessions = can("sessions:manage");
   const [showForm, setShowForm] = useState(false);
+  const [editItem, setEditItem] = useState<any>(null);
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -33,6 +40,11 @@ export default function Sessions() {
     onSuccess: () => { toast.success("تم حذف الجلسة"); refetch(); },
     onError: (e) => toast.error(e.message),
   });
+  const updateMutation = trpc.sessions.update.useMutation({
+    onSuccess: () => { toast.success("تم تحديث الجلسة"); setEditItem(null); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const teacherOptions = isTeachingRole ? teachers?.filter((teacher) => teacher.userId === user?.id) : teachers;
 
   const filtered = useMemo(() => (sessions?.filter((s) => {
     const matchesSearch = (s.title ?? "").includes(search) || String(s.id).includes(search);
@@ -47,13 +59,19 @@ export default function Sessions() {
     const fd = new FormData(e.currentTarget);
     createMutation.mutate({
       circleId: Number(fd.get("circleId")),
-      teacherId: Number(fd.get("teacherId")),
-      seasonId: Number(fd.get("seasonId")),
+      teacherId: fd.get("teacherId") ? Number(fd.get("teacherId")) : undefined,
+      seasonId: fd.get("seasonId") ? Number(fd.get("seasonId")) : undefined,
       title: fd.get("title") as string,
       type: (fd.get("type") as any) || "regular",
       scheduledAt: new Date(fd.get("scheduledAt") as string),
       notes: fd.get("notes") as string,
     });
+  }
+
+  function handleUpdate(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    updateMutation.mutate({ id: editItem.id, title: String(fd.get("title") || "") || null, type: fd.get("type") as any, scheduledAt: new Date(String(fd.get("scheduledAt"))), notes: String(fd.get("notes") || "") || null, status: fd.get("status") as any });
   }
 
   const statusColors: Record<string, string> = {
@@ -70,7 +88,7 @@ export default function Sessions() {
           <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center"><ClipboardList className="w-5 h-5 text-white"/></div>
           <div><h1 className="page-title">الجلسات</h1><p className="page-subtitle">إدارة جلسات التحفيظ والحضور</p></div>
         </div>
-        <div className="flex items-center gap-2"><Popover open={calendarOpen} onOpenChange={setCalendarOpen}><PopoverTrigger asChild><button className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${selectedDate ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-background/70 text-foreground hover:bg-muted"}`}><CalendarDays className="ml-1 inline h-4 w-4" />{selectedDate ? selectedDate.toLocaleDateString("ar-SA", { month: "short", day: "numeric" }) : "التقويم"}</button></PopoverTrigger><PopoverContent align="end" className="w-auto p-0" dir="rtl"><Calendar mode="single" selected={selectedDate} onSelect={(date) => { setSelectedDate(date); setCalendarOpen(false); }} modifiers={{ hasSession: sessionDays }} modifiersClassNames={{ hasSession: "bg-primary/10 font-bold text-primary" }} footer={<p className="border-t border-border px-3 py-2 text-center text-xs text-muted-foreground">الأيام المظللة تحتوي جلسات. {selectedDate && <button onClick={() => setSelectedDate(undefined)} className="mr-2 text-primary hover:underline">إزالة التصفية</button>}</p>} /></PopoverContent></Popover><button onClick={()=>setShowForm(true)} className="btn-gold flex items-center gap-2 text-sm"><Plus className="w-4 h-4"/>جلسة جديدة</button></div>
+          <div className="flex items-center gap-2"><Popover open={calendarOpen} onOpenChange={setCalendarOpen}><PopoverTrigger asChild><button className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${selectedDate ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-background/70 text-foreground hover:bg-muted"}`}><CalendarDays className="ml-1 inline h-4 w-4" />{selectedDate ? selectedDate.toLocaleDateString("ar-SA", { month: "short", day: "numeric" }) : "التقويم"}</button></PopoverTrigger><PopoverContent align="end" className="w-auto p-0" dir="rtl"><Calendar mode="single" selected={selectedDate} onSelect={(date) => { setSelectedDate(date); setCalendarOpen(false); }} modifiers={{ hasSession: sessionDays }} modifiersClassNames={{ hasSession: "bg-primary/10 font-bold text-primary" }} footer={<p className="border-t border-border px-3 py-2 text-center text-xs text-muted-foreground">الأيام المظللة تحتوي جلسات. {selectedDate && <button onClick={() => setSelectedDate(undefined)} className="mr-2 text-primary hover:underline">إزالة التصفية</button>}</p>} /></PopoverContent></Popover>{canManageSessions && <button onClick={()=>setShowForm(true)} className="btn-gold flex items-center gap-2 text-sm"><Plus className="w-4 h-4"/>جلسة جديدة</button>}</div>
       </div>
       <div className="relative">
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
@@ -79,7 +97,7 @@ export default function Sessions() {
       {isLoading ? (
         <div className="space-y-3">{[1,2,3,4].map(i=><div key={i} className="glass-card rounded-2xl p-4"><div className="skeleton h-5 w-48 mb-2"/><div className="skeleton h-4 w-32"/></div>)}</div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16"><ClipboardList className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4"/><p className="text-muted-foreground">لا توجد جلسات</p><button onClick={()=>setShowForm(true)} className="mt-4 btn-gold text-sm px-4 py-2">إنشاء أول جلسة</button></div>
+        <div className="text-center py-16"><ClipboardList className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4"/><p className="text-muted-foreground">لا توجد جلسات</p>{canManageSessions && <button onClick={()=>setShowForm(true)} className="mt-4 btn-gold text-sm px-4 py-2">إنشاء أول جلسة</button>}</div>
       ) : (
         <div className="space-y-3">
           {filtered.map((session, i) => (
@@ -101,6 +119,7 @@ export default function Sessions() {
                   {session.status === "open" && (
                     <button onClick={()=>updateStatusMutation.mutate({id:session.id,status:"closed"})} className="text-xs px-3 py-1.5 rounded-lg bg-gray-600 text-white hover:bg-gray-700 transition-colors">إغلاق</button>
                   )}
+                  {canManageSessions && <button onClick={() => setEditItem(session)} className="text-xs px-3 py-1.5 rounded-lg border border-primary/25 text-primary hover:bg-primary/5 transition-colors"><Edit className="ml-1 inline w-3 h-3"/>تعديل</button>}
                   <Link href={`/sessions/${session.id}`}>
                     <button className="text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors flex items-center gap-1">
                       <Edit className="w-3 h-3"/>تفاصيل
@@ -116,12 +135,11 @@ export default function Sessions() {
         <div><label className="block text-sm font-medium text-foreground mb-1.5">الحلقة <span className="text-destructive">*</span></label>
           <select name="circleId" required className="tarteel-input"><option value="">اختر الحلقة</option>{circles?.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
         </div>
-        <div><label className="block text-sm font-medium text-foreground mb-1.5">المعلم <span className="text-destructive">*</span></label>
-          <select name="teacherId" required className="tarteel-input"><option value="">اختر المعلم</option>{teachers?.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>
-        </div>
-        <div><label className="block text-sm font-medium text-foreground mb-1.5">الموسم الدراسي <span className="text-destructive">*</span></label>
+        {!isTeachingRole && <><div><label className="block text-sm font-medium text-foreground mb-1.5">المعلم <span className="text-destructive">*</span></label>
+          <select name="teacherId" required className="tarteel-input"><option value="">اختر المعلم</option>{teacherOptions?.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>
+        </div><div><label className="block text-sm font-medium text-foreground mb-1.5">الموسم الدراسي <span className="text-destructive">*</span></label>
           <select name="seasonId" required className="tarteel-input"><option value="">اختر الموسم</option>{seasons?.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>
-        </div>
+        </div></>}
         <FormInput label="عنوان الجلسة" name="title" placeholder="جلسة الأسبوع الأول"/>
         <div><label className="block text-sm font-medium text-foreground mb-1.5">نوع الجلسة</label>
           <select name="type" className="tarteel-input">
@@ -132,6 +150,7 @@ export default function Sessions() {
         <div><label className="block text-sm font-medium text-foreground mb-1.5">ملاحظات</label>
           <textarea name="notes" rows={2} className="tarteel-input resize-none" placeholder="ملاحظات إضافية..."/></div>
       </EntityForm>}
+      {editItem&&<EntityForm title="تعديل الجلسة" onClose={()=>setEditItem(null)} onSubmit={handleUpdate} isLoading={updateMutation.isPending} submitLabel="حفظ التعديلات"><FormInput label="عنوان الجلسة" name="title" defaultValue={editItem.title??""}/><div><label className="block text-sm font-medium text-foreground mb-1.5">نوع الجلسة</label><select name="type" defaultValue={editItem.type} className="tarteel-input">{Object.entries(SESSION_TYPE_LABELS).map(([key, value])=><option key={key} value={key}>{value}</option>)}</select></div><FormInput label="موعد الجلسة" name="scheduledAt" type="datetime-local" required defaultValue={new Date(editItem.scheduledAt).toISOString().slice(0,16)}/><div><label className="block text-sm font-medium text-foreground mb-1.5">الحالة</label><select name="status" defaultValue={editItem.status} className="tarteel-input">{Object.entries(SESSION_STATUS_LABELS).map(([key, value])=><option key={key} value={key}>{value}</option>)}</select></div><div><label className="block text-sm font-medium text-foreground mb-1.5">ملاحظات</label><textarea name="notes" defaultValue={editItem.notes??""} rows={2} className="tarteel-input resize-none"/></div></EntityForm>}
     </div>
   );
 }

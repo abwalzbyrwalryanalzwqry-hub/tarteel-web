@@ -155,8 +155,24 @@ async function assertStudentReadAccess(user: AccessSubject, student: Awaited<Ret
 
 async function assertStudentManageAccess(user: AccessSubject, circleId: number | null | undefined, permission: "students.create" | "students.edit" | "students.delete", centerId?: number) {
   if (circleId) return assertCirclePermission(user, circleId, permission);
+  if (TEACHING_ROLES.has(user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "يلزم ربط الطالب بحلقة المعلم عند الإنشاء أو الإدارة" });
   if (!centerId) throw new TRPCError({ code: "FORBIDDEN", message: "يلزم تحديد المركز أو الحلقة" });
   return assertPermission(user, centerId, permission);
+}
+
+async function resolveSessionCreateInput(user: AccessSubject, input: { circleId: number; teacherId?: number; seasonId?: number; title?: string; type: "regular" | "exam" | "review" | "special"; scheduledAt: Date; notes?: string }) {
+  const circle = await getCircleById(input.circleId);
+  if (!circle) throw new TRPCError({ code: "NOT_FOUND", message: "الحلقة غير موجودة" });
+  await assertCirclePermission(user, circle.id, "attendance.create");
+  if (TEACHING_ROLES.has(user.role)) {
+    const teacher = await getTeacherByUserId(user.id);
+    if (!teacher || (circle.teacherId !== teacher.id && circle.assistantTeacherId !== teacher.id)) throw new TRPCError({ code: "FORBIDDEN", message: "لا يمكنك إنشاء جلسة إلا في حلقتك المرتبطة بحسابك" });
+    if (input.teacherId != null && input.teacherId !== teacher.id) throw new TRPCError({ code: "FORBIDDEN", message: "لا يمكنك تعيين معلم آخر لجلسة حلقتك" });
+    if (input.seasonId != null && input.seasonId !== circle.seasonId) throw new TRPCError({ code: "BAD_REQUEST", message: "الموسم المحدد لا يطابق موسم الحلقة" });
+    return { ...input, teacherId: teacher.id, seasonId: circle.seasonId };
+  }
+  if (!input.teacherId || !input.seasonId) throw new TRPCError({ code: "BAD_REQUEST", message: "يلزم اختيار المعلم والموسم الدراسي" });
+  return input as Required<Pick<typeof input, "teacherId" | "seasonId">> & typeof input;
 }
 
 function assertQuranRange(input: { surahNumber: number; toSurahNumber?: number; fromAyah: number; toAyah: number }) {
@@ -561,7 +577,7 @@ export const appRouter = router({
     }),
     create: protectedProcedure
       .input(z.object({
-        centerId: z.number(),
+        centerId: z.number().optional(),
         circleId: z.number().optional(),
         userId: z.number().optional(),
         guardianUserId: z.number().optional(),
@@ -572,7 +588,14 @@ export const appRouter = router({
         nationalId: z.string().optional(),
         birthDate: z.date().optional(),
       }))
-      .mutation(async ({ ctx, input }) => { await assertStudentManageAccess(ctx.user, input.circleId, "students.create", input.centerId); return createStudent(input); }),
+      .mutation(async ({ ctx, input }) => {
+        const circleCenterId = input.circleId ? await getCenterIdForCircle(input.circleId) : undefined;
+        if (input.circleId && !circleCenterId) throw new TRPCError({ code: "NOT_FOUND", message: "الحلقة غير موجودة" });
+        if (input.circleId && input.centerId && input.centerId !== circleCenterId) throw new TRPCError({ code: "BAD_REQUEST", message: "الحلقة لا تنتمي إلى المركز المحدد" });
+        await assertStudentManageAccess(ctx.user, input.circleId, "students.create", circleCenterId ?? input.centerId);
+        if (!circleCenterId) throw new TRPCError({ code: "BAD_REQUEST", message: "يلزم تحديد المركز للطالب غير المرتبط بحلقة" });
+        return createStudent({ ...input, centerId: circleCenterId });
+      }),
     update: protectedProcedure
       .input(z.object({
         id: z.number(),
@@ -581,7 +604,10 @@ export const appRouter = router({
         circleId: z.number().optional(),
         userId: z.number().optional(),
         guardianUserId: z.number().optional(),
+        guardianName: z.string().nullable().optional(),
         guardianPhone: z.string().optional(),
+        nationalId: z.string().nullable().optional(),
+        birthDate: z.date().nullable().optional(),
         isActive: z.boolean().optional(),
         lastMemorizedSurah: z.number().optional(),
         lastMemorizedAyah: z.number().optional(),
@@ -618,14 +644,23 @@ export const appRouter = router({
     create: protectedProcedure
       .input(z.object({
         circleId: z.number(),
-        teacherId: z.number(),
-        seasonId: z.number(),
+        teacherId: z.number().optional(),
+        seasonId: z.number().optional(),
         title: z.string().optional(),
         type: z.enum(["regular", "exam", "review", "special"]).default("regular"),
         scheduledAt: z.date(),
         notes: z.string().optional(),
       }))
-      .mutation(async ({ ctx, input }) => { await assertCirclePermission(ctx.user, input.circleId, "attendance.create"); return createSession(input); }),
+      .mutation(async ({ ctx, input }) => createSession(await resolveSessionCreateInput(ctx.user, input))),
+    update: protectedProcedure
+      .input(z.object({ id: z.number(), title: z.string().nullable().optional(), type: z.enum(["regular", "exam", "review", "special"]).optional(), scheduledAt: z.date().optional(), notes: z.string().nullable().optional(), status: z.enum(["scheduled", "open", "closed", "cancelled"]).optional() }))
+      .mutation(async ({ ctx, input }) => {
+        const session = await getAuthorizedSession(ctx.user, input.id);
+        await assertCirclePermission(ctx.user, session.circleId, "attendance.edit");
+        const { id, ...data } = input;
+        await updateSession(id, data);
+        return { success: true } as const;
+      }),
     updateStatus: protectedProcedure
       .input(z.object({
         id: z.number(),

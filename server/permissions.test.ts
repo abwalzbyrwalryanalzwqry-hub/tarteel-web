@@ -9,6 +9,7 @@ describe("صلاحيات أدوار ترتيل", () => {
 
   it("يحصر صلاحية المعلم في الحلقات والطلاب والجلسات", () => {
     expect(hasTarteelPermission("teacher", "sessions:manage")).toBe(true);
+    expect(hasTarteelPermission("teacher", "students:manage")).toBe(true);
     expect(hasTarteelPermission("teacher", "centers:manage")).toBe(false);
     expect(hasTarteelPermission("teacher", "quran:view")).toBe(true);
     expect(hasTarteelPermission("teacher", "messages:manage")).toBe(true);

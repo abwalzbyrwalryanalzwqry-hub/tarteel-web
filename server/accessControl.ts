@@ -31,7 +31,7 @@ export const ROLE_PERMISSION_TEMPLATES: Record<CenterRole, readonly GranularPerm
   center_manager: ALL,
   supervisor: ["center.view", "users.view", "teachers.view", "teachers.create", "teachers.edit", "guides.view", "circles.view", "circles.create", "circles.edit", "circles.assign_teacher", "students.view", "students.create", "students.edit", "students.transfer", "parents.view", "parents.create", "parents.edit", "parents.link_children", "attendance.view", "attendance.create", "attendance.edit", "reports.view", "reports.export", "access_codes.view", "access_codes.create", "access_codes.revoke"],
   guide: ["center.view", "teachers.view", "guides.view", "circles.view", "students.view", "attendance.view", "reports.view"],
-  teacher: ["circles.view", "students.view", "students.create", "students.edit", "parents.view", "parents.create", "parents.link_children", "attendance.view", "attendance.create", "attendance.edit", "reports.view", "reports.export", "access_codes.view", "access_codes.create", "access_codes.revoke"],
+  teacher: ["circles.view", "students.view", "students.create", "students.edit", "students.delete", "parents.view", "parents.create", "parents.link_children", "attendance.view", "attendance.create", "attendance.edit", "reports.view", "reports.export", "access_codes.view", "access_codes.create", "access_codes.revoke"],
   assistant_teacher: ["circles.view", "students.view", "attendance.view", "attendance.create", "attendance.edit", "reports.view"],
   student: ["students.view", "reports.view"],
   guardian: ["students.view", "reports.view"],
