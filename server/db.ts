@@ -464,6 +464,10 @@ export async function redeemTeacherInvite(code: string, userId: number) {
     const [user] = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
     if (!user) throw new Error("حساب المستخدم غير موجود");
     const [existingTeacher] = await tx.select().from(teachers).where(and(eq(teachers.userId, userId), isNull(teachers.deletedAt))).limit(1);
+    if (existingTeacher) {
+      const existingTeacherCircles = await tx.select({ id: circles.id }).from(circles).where(and(or(eq(circles.teacherId, existingTeacher.id), eq(circles.assistantTeacherId, existingTeacher.id)), isNull(circles.deletedAt)));
+      if (existingTeacherCircles.some((circle) => circle.id !== invite.circleId)) throw new Error("هذا الحساب مرتبط بحلقة معلم أخرى ولا يمكن منحه حلقة إضافية");
+    }
     const teacherId = existingTeacher?.id ?? Number((await tx.insert(teachers).values({
       userId,
       centerId: invite.centerId,
@@ -1014,6 +1018,22 @@ export async function redeemAccessCodeSecure(input: { codeHash: string; userId: 
       await tx.update(accessCodes).set({ status: "used", updatedAt: now }).where(eq(accessCodes.id, accessCode.id));
       await invalidate("تم استخدام هذا الرمز بالكامل", true);
     }
+    const isTeacherAccessCode = accessCode.role === "teacher" || accessCode.role === "assistant_teacher";
+    if (isTeacherAccessCode) {
+      if (!accessCode.circleId || accessCode.maxUses !== 1) throw new Error("كود المعلم غير صالح؛ يلزم حلقة واحدة واستخدام واحد");
+      let embeddedScopes: unknown[] = [];
+      try { embeddedScopes = accessCode.scopeJson ? JSON.parse(accessCode.scopeJson) : []; } catch { throw new Error("نطاق كود المعلم غير صالح"); }
+      if (!Array.isArray(embeddedScopes) || embeddedScopes.some((scope: any) => scope?.scopeType !== "circle" || scope?.scopeId !== accessCode.circleId)) throw new Error("كود المعلم لا يمكن أن يمنح سوى نطاق الحلقة المعينة");
+      const [existingTeacher] = await tx.select({ id: teachers.id }).from(teachers).where(and(eq(teachers.userId, input.userId), eq(teachers.centerId, accessCode.centerId), isNull(teachers.deletedAt))).limit(1);
+      if (existingTeacher) {
+        const existingTeacherCircles = await tx.select({ id: circles.id }).from(circles).where(and(or(eq(circles.teacherId, existingTeacher.id), eq(circles.assistantTeacherId, existingTeacher.id)), isNull(circles.deletedAt)));
+        if (existingTeacherCircles.some((circle) => circle.id !== accessCode.circleId)) throw new Error("هذا الحساب مرتبط بحلقة معلم أخرى ولا يمكن منحه حلقة إضافية");
+      }
+      const [targetCircle] = await tx.select().from(circles).where(and(eq(circles.id, accessCode.circleId), isNull(circles.deletedAt))).limit(1);
+      if (!targetCircle) throw new Error("الحلقة المرتبطة بالكود لم تعد متاحة");
+      const occupiedTeacherId = accessCode.role === "teacher" ? targetCircle.teacherId : targetCircle.assistantTeacherId;
+      if (occupiedTeacherId && occupiedTeacherId !== existingTeacher?.id) throw new Error("مقعد المعلم في الحلقة مرتبط بحساب آخر");
+    }
     const nextCount = accessCode.usedCount + 1;
     const claim = await tx.update(accessCodes).set({ usedCount: sql`${accessCodes.usedCount} + 1`, assignedUserId: input.userId, failedAttempts: 0, lockedUntil: null, lastUsedAt: now, status: nextCount >= accessCode.maxUses ? "used" : "active", updatedAt: now }).where(and(eq(accessCodes.id, accessCode.id), eq(accessCodes.status, "active"), lt(accessCodes.usedCount, accessCodes.maxUses)));
     if (!claim[0]?.affectedRows) throw new Error("تعذر استرداد الرمز؛ حاول مجدداً");
@@ -1021,16 +1041,26 @@ export async function redeemAccessCodeSecure(input: { codeHash: string; userId: 
     await tx.update(users).set({ role: accessCode.role, isActive: true, accountStatus: "active", accessRevokedAt: null, lastActiveAt: now, updatedAt: now }).where(eq(users.id, input.userId));
     await tx.insert(centerMemberships).values({ userId: input.userId, centerId: accessCode.centerId, role: accessCode.role, status: "active", isOwner: false, grantedBy: accessCode.createdBy, grantedAt: now }).onDuplicateKeyUpdate({ set: { role: accessCode.role, status: "active", revokedAt: null, expiresAt: null, updatedAt: now } });
 
-    const scopes: { scopeType: "center" | "circle" | "teacher" | "student"; scopeId?: number }[] = [];
-    if (accessCode.circleId) scopes.push({ scopeType: "circle", scopeId: accessCode.circleId });
-    if (accessCode.teacherId) scopes.push({ scopeType: "teacher", scopeId: accessCode.teacherId });
-    if (accessCode.studentId) scopes.push({ scopeType: "student", scopeId: accessCode.studentId });
-    try {
-      const embedded = accessCode.scopeJson ? JSON.parse(accessCode.scopeJson) : [];
-      if (Array.isArray(embedded)) for (const scope of embedded) if (["center", "circle", "teacher", "student"].includes(scope?.scopeType)) scopes.push({ scopeType: scope.scopeType, scopeId: scope.scopeId });
-    } catch { /* مخطط النطاق غير صالح؛ يظل الرمز بنطاقه الصريح فقط. */ }
+    const scopes: { scopeType: "center" | "circle" | "teacher" | "student"; scopeId?: number }[] = isTeacherAccessCode
+      ? [{ scopeType: "circle", scopeId: accessCode.circleId! }]
+      : [];
+    if (!isTeacherAccessCode) {
+      if (accessCode.circleId) scopes.push({ scopeType: "circle", scopeId: accessCode.circleId });
+      if (accessCode.teacherId) scopes.push({ scopeType: "teacher", scopeId: accessCode.teacherId });
+      if (accessCode.studentId) scopes.push({ scopeType: "student", scopeId: accessCode.studentId });
+      try {
+        const embedded = accessCode.scopeJson ? JSON.parse(accessCode.scopeJson) : [];
+        if (Array.isArray(embedded)) for (const scope of embedded) if (["center", "circle", "teacher", "student"].includes(scope?.scopeType)) scopes.push({ scopeType: scope.scopeType, scopeId: scope.scopeId });
+      } catch { /* مخطط النطاق غير صالح؛ يظل الرمز بنطاقه الصريح فقط. */ }
+    }
+    if (isTeacherAccessCode) await tx.update(userScopes).set({ revokedAt: now }).where(and(eq(userScopes.userId, input.userId), eq(userScopes.centerId, accessCode.centerId), isNull(userScopes.revokedAt)));
     if (scopes.length) await tx.insert(userScopes).values(scopes.map((scope) => ({ userId: input.userId, centerId: accessCode.centerId, scopeType: scope.scopeType, scopeId: scope.scopeId ?? null, grantedBy: accessCode.createdBy })));
-    if (accessCode.teacherId && (accessCode.role === "teacher" || accessCode.role === "assistant_teacher")) await tx.update(teachers).set({ userId: input.userId, isActive: true, updatedAt: now }).where(and(eq(teachers.id, accessCode.teacherId), eq(teachers.centerId, accessCode.centerId)));
+    if (isTeacherAccessCode) {
+      const [existingTeacher] = await tx.select().from(teachers).where(and(eq(teachers.userId, input.userId), eq(teachers.centerId, accessCode.centerId), isNull(teachers.deletedAt))).limit(1);
+      const teacherId = existingTeacher?.id ?? Number((await tx.insert(teachers).values({ userId: input.userId, centerId: accessCode.centerId, name: "معلم جديد", isActive: true }))[0].insertId);
+      await tx.update(teachers).set({ userId: input.userId, isActive: true, updatedAt: now }).where(eq(teachers.id, teacherId));
+      await tx.update(circles).set(accessCode.role === "teacher" ? { teacherId } : { assistantTeacherId: teacherId }).where(eq(circles.id, accessCode.circleId!));
+    }
     if (accessCode.studentId && accessCode.role === "student") await tx.update(students).set({ userId: input.userId, isActive: true, updatedAt: now }).where(and(eq(students.id, accessCode.studentId), eq(students.centerId, accessCode.centerId)));
     if (accessCode.studentId && accessCode.role === "guardian") await tx.insert(parentStudentLinks).values({ guardianUserId: input.userId, studentId: accessCode.studentId, centerId: accessCode.centerId, linkedBy: accessCode.createdBy }).onDuplicateKeyUpdate({ set: { centerId: accessCode.centerId } });
     await tx.insert(notifications).values({ userId: input.userId, title: "تم تفعيل الوصول", message: "تم تفعيل حسابك بالدور والنطاق الممنوحين من المركز.", type: "success", relatedId: accessCode.id, relatedType: "access_code" });

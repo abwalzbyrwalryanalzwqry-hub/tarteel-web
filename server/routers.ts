@@ -846,6 +846,9 @@ export const appRouter = router({
       const membership = await getCenterMemberById(input.membershipId);
       if (!membership) throw new TRPCError({ code: "NOT_FOUND", message: "العضوية غير موجودة" });
       const auth = await assertPermission(ctx.user, membership.centerId, "users.edit");
+      const isTeacherMembership = membership.role === "teacher" || membership.role === "assistant_teacher";
+      if (isTeacherMembership && (input.scopes.length !== 1 || input.scopes[0]?.scopeType !== "circle" || !input.scopes[0]?.scopeId)) throw new TRPCError({ code: "BAD_REQUEST", message: "تفويض المعلم يجب أن يقتصر على حلقة واحدة فقط" });
+      if (isTeacherMembership && await getCenterIdForCircle(input.scopes[0]!.scopeId!) !== membership.centerId) throw new TRPCError({ code: "BAD_REQUEST", message: "حلقة المعلم لا تنتمي إلى مركز العضوية" });
       if (membership.isOwner || membership.userId === ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "لا يمكن تعديل تفويض مالك المركز أو تفويضك الشخصي" });
       if (!auth.membership.isOwner && membership.role === "supervisor") throw new TRPCError({ code: "FORBIDDEN", message: "تعديل تفويض المشرف من صلاحية مالك المركز فقط" });
       await assertCanDelegate(ctx.user, membership.centerId, input.permissions, input.scopes.map((scope) => scope.scopeId).filter((id): id is number => id != null));
@@ -867,17 +870,26 @@ export const appRouter = router({
       create: protectedProcedure.input(z.object({ centerId: z.number(), role: z.enum(["supervisor", "guide", "teacher", "assistant_teacher", "student", "guardian"]), circleId: z.number().optional(), teacherId: z.number().optional(), studentId: z.number().optional(), guardianUserId: z.number().optional(), expiresAt: z.date().optional(), maxUses: z.number().int().min(1).max(20).default(1), scopes: z.array(z.object({ scopeType: z.enum(["center", "circle", "teacher", "student"]), scopeId: z.number().nullable().optional() })).max(32).default([]) })).mutation(async ({ ctx, input }) => {
         const auth = await assertPermission(ctx.user, input.centerId, "access_codes.create");
         const rolePermissions = ROLE_PERMISSION_TEMPLATES[input.role];
+        const isTeacherCode = input.role === "teacher" || input.role === "assistant_teacher";
         if (input.role === "supervisor" && !auth.membership.isOwner) throw new TRPCError({ code: "FORBIDDEN", message: "إنشاء كود مشرف من صلاحية مالك المركز فقط" });
-        if (["teacher", "assistant_teacher"].includes(input.role) && !input.circleId) throw new TRPCError({ code: "BAD_REQUEST", message: "يلزم ربط كود المعلم بحلقة محددة" });
+        if (isTeacherCode && !input.circleId) throw new TRPCError({ code: "BAD_REQUEST", message: "يلزم ربط كود المعلم بحلقة واحدة محددة" });
+        if (isTeacherCode && input.maxUses !== 1) throw new TRPCError({ code: "BAD_REQUEST", message: "كود المعلم مخصص لمعلم واحد واستخدام واحد فقط" });
         if (["student", "guardian"].includes(input.role) && !input.studentId) throw new TRPCError({ code: "BAD_REQUEST", message: "يلزم ربط كود الطالب أو ولي الأمر بطالب محدد" });
         if (["teacher", "assistant_teacher", "student", "guardian"].includes(input.role) && input.scopes.some((scope) => scope.scopeType === "center")) throw new TRPCError({ code: "BAD_REQUEST", message: "لا يجوز منح هذا الدور نطاق المركز كاملاً" });
-        await assertCanDelegate(ctx.user, input.centerId, rolePermissions, input.scopes.map((scope) => scope.scopeId).filter((id): id is number => id != null));
         if (input.circleId && await getCenterIdForCircle(input.circleId) !== input.centerId) throw new TRPCError({ code: "BAD_REQUEST", message: "الحلقة لا تنتمي إلى المركز المحدد" });
         if (input.studentId && await getCenterIdForStudent(input.studentId) !== input.centerId) throw new TRPCError({ code: "BAD_REQUEST", message: "الطالب لا ينتمي إلى المركز المحدد" });
+        const codeScopes = isTeacherCode ? [{ scopeType: "circle" as const, scopeId: input.circleId! }] : input.scopes;
+        if (isTeacherCode) {
+          const circle = await getCircleById(input.circleId!);
+          if (!circle) throw new TRPCError({ code: "BAD_REQUEST", message: "الحلقة غير متاحة" });
+          const assignedTeacherId = input.role === "teacher" ? circle.teacherId : circle.assistantTeacherId;
+          if (assignedTeacherId) throw new TRPCError({ code: "BAD_REQUEST", message: "مقعد المعلم في الحلقة مرتبط بملف معلم بالفعل" });
+        }
+        await assertCanDelegate(ctx.user, input.centerId, rolePermissions, codeScopes.map((scope) => scope.scopeId).filter((id): id is number => id != null));
         const rawCode = createAccessCodeSecret();
         const codeHash = hashAccessCode(rawCode);
         const hint = getAccessCodeHint(rawCode);
-        const id = await createAccessCode({ centerId: input.centerId, codeHash, codeHint: hint, role: input.role, scopeJson: JSON.stringify(input.scopes), circleId: input.circleId, teacherId: input.teacherId, studentId: input.studentId, guardianUserId: input.guardianUserId, createdBy: ctx.user.id, expiresAt: input.expiresAt, maxUses: input.maxUses });
+        const id = await createAccessCode({ centerId: input.centerId, codeHash, codeHint: hint, role: input.role, scopeJson: JSON.stringify(codeScopes), circleId: input.circleId, teacherId: input.teacherId, studentId: input.studentId, guardianUserId: input.guardianUserId, createdBy: ctx.user.id, expiresAt: input.expiresAt, maxUses: isTeacherCode ? 1 : input.maxUses });
         await createAuditLog({ userId: ctx.user.id, centerId: input.centerId, action: "access.code.create", entity: "access_code", entityId: id, newData: JSON.stringify({ role: input.role, codeHint: hint, maxUses: input.maxUses, expiresAt: input.expiresAt }) });
         return { id, code: rawCode, hint };
       }),
