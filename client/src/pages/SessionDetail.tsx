@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import {
   BookOpen,
+  BookOpenText,
   CheckCircle,
   ChevronLeft,
   ClipboardList,
@@ -13,9 +14,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 import { AIGuidanceCard } from "@/components/AIGuidanceCard";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatHijriDate } from "../../../shared/dates";
-import { getAttendanceSummary } from "../../../shared/mizan";
+import { getAttendanceSummary, MIZAN_RATING_LABELS, scoreToStars } from "../../../shared/mizan";
 import {
   ATTENDANCE_LABELS as ATTENDANCE_STATUS_LABELS,
   GRADE_LABELS,
@@ -38,6 +39,7 @@ const tabs = [
 export default function SessionDetail({ sessionId }: Props) {
   const [activeTab, setActiveTab] = useState("attendance");
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [dialogTab, setDialogTab] = useState<"memorization" | "revision" | "evaluation">("memorization");
 
   const { data: session, isLoading: sessionLoading } = trpc.sessions.byId.useQuery(
     { id: sessionId! },
@@ -350,8 +352,8 @@ export default function SessionDetail({ sessionId }: Props) {
       )}
       <Dialog open={Boolean(selectedStudent)} onOpenChange={(open) => !open && setSelectedStudent(null)}>
         <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-xl" dir="rtl">
-          <DialogHeader><DialogTitle className="font-display text-xl">سجل الطالب في الجلسة</DialogTitle></DialogHeader>
-          {selectedStudent && <div className="space-y-4"><div className="rounded-2xl bg-primary/5 p-3"><p className="font-semibold text-foreground">{selectedStudent.name}</p><p className="mt-1 text-xs text-muted-foreground">آخر حفظ: {getSurahName(selectedStudent.lastMemorizedSurah)} · آية {selectedStudent.lastMemorizedAyah}</p></div><MemorizationForm student={selectedStudent} sessionId={session.id} onSubmit={(data: any) => createMemorizationMutation.mutate(data)} isLoading={createMemorizationMutation.isPending} /><RevisionForm student={selectedStudent} sessionId={session.id} onSubmit={(data: any) => createRevisionMutation.mutate(data)} isLoading={createRevisionMutation.isPending} /><EvaluationForm student={selectedStudent} sessionId={session.id} existing={getStudentEvaluation(selectedStudent.id)} onSubmit={(data: any) => upsertEvaluationMutation.mutate(data)} isLoading={upsertEvaluationMutation.isPending} /></div>}
+          <DialogHeader><DialogTitle className="font-display text-xl">سجل الطالب في الجلسة</DialogTitle><DialogDescription>سجّل الحفظ أو المراجعة أو التقييم، ثم افتح موضع البداية في المصحف عند الحاجة.</DialogDescription></DialogHeader>
+          {selectedStudent && <div className="space-y-4"><div className="rounded-2xl bg-primary/5 p-3"><p className="font-semibold text-foreground">{selectedStudent.name}</p><p className="mt-1 text-xs text-muted-foreground">آخر حفظ: {getSurahName(selectedStudent.lastMemorizedSurah)} · آية {selectedStudent.lastMemorizedAyah}</p></div><div className="flex gap-1 rounded-xl bg-muted/50 p-1">{([ ["memorization", "الحفظ"], ["revision", "المراجعة"], ["evaluation", "التقييم"] ] as const).map(([id, label]) => <button key={id} onClick={() => setDialogTab(id)} className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${dialogTab === id ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`}>{label}</button>)}</div>{dialogTab === "memorization" && <MemorizationForm student={selectedStudent} sessionId={session.id} onSubmit={(data: any) => createMemorizationMutation.mutate(data)} isLoading={createMemorizationMutation.isPending} forceExpanded />}{dialogTab === "revision" && <RevisionForm student={selectedStudent} sessionId={session.id} onSubmit={(data: any) => createRevisionMutation.mutate(data)} isLoading={createRevisionMutation.isPending} forceExpanded />}{dialogTab === "evaluation" && <EvaluationForm student={selectedStudent} sessionId={session.id} existing={getStudentEvaluation(selectedStudent.id)} onSubmit={(data: any) => upsertEvaluationMutation.mutate(data)} isLoading={upsertEvaluationMutation.isPending} forceExpanded />}</div>}
         </DialogContent>
       </Dialog>
     </div>
@@ -365,7 +367,7 @@ function SessionMetric({ label, value, tone }: { label: string; value: number; t
 function MemorizationForm(props: any) { return <QuranEntryForm {...props} kind="memorization" />; }
 function RevisionForm(props: any) { return <QuranEntryForm {...props} kind="revision" />; }
 
-function QuranEntryForm({ student, sessionId, onSubmit, isLoading, kind }: any) {
+function QuranEntryForm({ student, sessionId, onSubmit, isLoading, kind, forceExpanded = false }: any) {
   const [expanded, setExpanded] = useState(false);
   const [fromSurah, setFromSurah] = useState(1);
   const [toSurah, setToSurah] = useState(1);
@@ -377,24 +379,29 @@ function QuranEntryForm({ student, sessionId, onSubmit, isLoading, kind }: any) 
   const label = isMemorization ? "الحفظ" : "المراجعة";
   const accent = isMemorization ? "bg-emerald-600/10 text-emerald-600" : "bg-purple-600/10 text-purple-600";
   const selectSurah = (value: number, side: "from" | "to") => { if (side === "from") { setFromSurah(value); setFromAyah(1); } else { setToSurah(value); setToAyah(1); } };
-  return <div className="overflow-hidden rounded-xl border border-border/50"><button onClick={() => setExpanded(!expanded)} className="flex w-full items-center gap-3 p-3 text-right transition-colors hover:bg-muted/30"><div className={`flex h-8 w-8 items-center justify-center rounded-full ${accent}`}><span className="text-sm font-bold">{student.name.charAt(0)}</span></div><span className="flex-1 font-medium text-foreground">{student.name}</span><span className="text-xs text-muted-foreground">{expanded ? "إخفاء" : `تسجيل ${label}`}</span></button>{expanded && <form onSubmit={(event) => { event.preventDefault(); if (toSurah < fromSurah || (toSurah === fromSurah && toAyah < fromAyah)) { toast.error("يرجى اختيار نطاق صحيح من البداية إلى النهاية"); return; } onSubmit({ sessionId, studentId: student.id, surahNumber: fromSurah, toSurahNumber: toSurah, fromAyah, toAyah, pages: (new FormData(event.currentTarget).get("pages") as string) || undefined, grade: (new FormData(event.currentTarget).get("grade") as string) || undefined, notes: (new FormData(event.currentTarget).get("notes") as string) || undefined }); setExpanded(false); }} className="space-y-3 border-t border-border/50 p-3 pt-3"><div className="grid grid-cols-2 gap-2"><FieldSelect label="من سورة" value={fromSurah} onChange={(value) => selectSurah(value, "from")} /><FieldSelect label="إلى سورة" value={toSurah} onChange={(value) => selectSurah(value, "to")} /><NumberField label="من آية" value={fromAyah} max={fromMax} onChange={setFromAyah} /><NumberField label="إلى آية" value={toAyah} max={toMax} onChange={setToAyah} /></div><div className="grid grid-cols-3 gap-2"><div><label className="mb-1 block text-xs text-muted-foreground">الصفحات</label><input name="pages" type="number" min="0" step="0.5" className="tarteel-input py-1.5 text-sm" placeholder="0" /></div><div><label className="mb-1 block text-xs text-muted-foreground">التقدير</label><select name="grade" className="tarteel-input py-1.5 text-sm"><option value="">اختر</option>{Object.entries(GRADE_LABELS).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select></div><div><label className="mb-1 block text-xs text-muted-foreground">ملاحظات</label><input name="notes" className="tarteel-input py-1.5 text-sm" placeholder="اختياري" /></div></div><button type="submit" disabled={isLoading} className="btn-gold w-full py-2 text-sm">{isLoading ? "جارٍ الحفظ..." : `تسجيل ${label}`}</button></form>}</div>;
+  const openMushaf = () => window.open(`/quran?surah=${fromSurah}&ayah=${fromAyah}`, "_blank", "noopener,noreferrer");
+  const showForm = expanded || forceExpanded;
+  return <div className="overflow-hidden rounded-xl border border-border/50">{!forceExpanded && <button onClick={() => setExpanded(!expanded)} className="flex w-full items-center gap-3 p-3 text-right transition-colors hover:bg-muted/30"><div className={`flex h-8 w-8 items-center justify-center rounded-full ${accent}`}><span className="text-sm font-bold">{student.name.charAt(0)}</span></div><span className="flex-1 font-medium text-foreground">{student.name}</span><span className="text-xs text-muted-foreground">{expanded ? "إخفاء" : `تسجيل ${label}`}</span></button>}{showForm && <form onSubmit={(event) => { event.preventDefault(); if (toSurah < fromSurah || (toSurah === fromSurah && toAyah < fromAyah)) { toast.error("يرجى اختيار نطاق صحيح من البداية إلى النهاية"); return; } onSubmit({ sessionId, studentId: student.id, surahNumber: fromSurah, toSurahNumber: toSurah, fromAyah, toAyah, pages: (new FormData(event.currentTarget).get("pages") as string) || undefined, grade: (new FormData(event.currentTarget).get("grade") as string) || undefined, notes: (new FormData(event.currentTarget).get("notes") as string) || undefined }); if (!forceExpanded) setExpanded(false); }} className="space-y-3 border-t border-border/50 p-3 pt-3"><div className="grid grid-cols-2 gap-2"><FieldSelect label="من سورة" value={fromSurah} onChange={(value) => selectSurah(value, "from")} /><FieldSelect label="إلى سورة" value={toSurah} onChange={(value) => selectSurah(value, "to")} /><NumberField label="من آية" value={fromAyah} max={fromMax} onChange={setFromAyah} /><NumberField label="إلى آية" value={toAyah} max={toMax} onChange={setToAyah} /></div><button type="button" onClick={openMushaf} className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/25 bg-primary/5 py-2 text-sm font-semibold text-primary hover:bg-primary/10"><BookOpenText className="h-4 w-4" />فتح موضع البداية في المصحف</button><div className="grid grid-cols-3 gap-2"><div><label className="mb-1 block text-xs text-muted-foreground">الصفحات</label><input name="pages" type="number" min="0" step="0.5" className="tarteel-input py-1.5 text-sm" placeholder="0" /></div><div><label className="mb-1 block text-xs text-muted-foreground">التقدير</label><select name="grade" className="tarteel-input py-1.5 text-sm"><option value="">اختر</option>{Object.entries(GRADE_LABELS).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select></div><div><label className="mb-1 block text-xs text-muted-foreground">ملاحظات</label><input name="notes" className="tarteel-input py-1.5 text-sm" placeholder="اختياري" /></div></div><button type="submit" disabled={isLoading} className="btn-gold w-full py-2 text-sm">{isLoading ? "جارٍ الحفظ..." : `تسجيل ${label}`}</button></form>}</div>;
 }
 
 function FieldSelect({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) { return <div><label className="mb-1 block text-xs text-muted-foreground">{label}</label><select value={value} onChange={(event) => onChange(Number(event.target.value))} className="tarteel-input py-1.5 text-sm">{QURAN_SURAHS.map((surah) => <option key={surah.number} value={surah.number}>{surah.number}. {surah.name}</option>)}</select></div>; }
 function NumberField({ label, value, max, onChange }: { label: string; value: number; max: number; onChange: (value: number) => void }) { return <div><label className="mb-1 block text-xs text-muted-foreground">{label} <span className="text-muted-foreground/70">(1–{max})</span></label><input type="number" value={value} min={1} max={max} onChange={(event) => onChange(Math.max(1, Math.min(max, Number(event.target.value) || 1)))} className="tarteel-input py-1.5 text-sm" /></div>; }
 
-function EvaluationForm({ student, sessionId, existing, onSubmit, isLoading }: any) {
+function EvaluationForm({ student, sessionId, existing, onSubmit, isLoading, forceExpanded = false }: any) {
   const [expanded, setExpanded] = useState(false);
+  const [stars, setStars] = useState(() => scoreToStars(existing?.totalScore));
+  const showForm = expanded || forceExpanded;
   return (
     <div className="border border-border/50 rounded-xl overflow-hidden">
-      <button onClick={()=>setExpanded(!expanded)} className="w-full flex items-center gap-3 p-3 hover:bg-muted/30 transition-colors text-right">
+      {!forceExpanded && <button onClick={()=>setExpanded(!expanded)} className="w-full flex items-center gap-3 p-3 hover:bg-muted/30 transition-colors text-right">
         <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center"><span className="font-bold text-amber-600 text-sm">{student.name.charAt(0)}</span></div>
         <span className="font-medium text-foreground flex-1">{student.name}</span>
         {existing?.totalScore != null && <span className="text-sm font-bold text-primary">{existing.totalScore}/100</span>}
         <span className="text-xs text-muted-foreground">{expanded?"إخفاء":"تقييم"}</span>
-      </button>
-      {expanded && (
-        <form onSubmit={(e) => { e.preventDefault(); const fd=new FormData(e.currentTarget); onSubmit({sessionId,studentId:student.id,tajweedScore:Number(fd.get("tajweedScore"))||undefined,pronunciationScore:Number(fd.get("pronunciationScore"))||undefined,memorizationScore:Number(fd.get("memorizationScore"))||undefined,behaviorScore:Number(fd.get("behaviorScore"))||undefined,totalScore:Number(fd.get("totalScore"))||undefined,notes:fd.get("notes")||undefined}); setExpanded(false); }} className="p-3 pt-0 space-y-3 border-t border-border/50">
+      </button>}
+      {showForm && (
+        <form onSubmit={(e) => { e.preventDefault(); const fd=new FormData(e.currentTarget); onSubmit({sessionId,studentId:student.id,tajweedScore:Number(fd.get("tajweedScore"))||undefined,pronunciationScore:Number(fd.get("pronunciationScore"))||undefined,memorizationScore:Number(fd.get("memorizationScore"))||undefined,behaviorScore:Number(fd.get("behaviorScore"))||undefined,totalScore:stars ? stars * 20 : (Number(fd.get("totalScore")) || undefined),notes:fd.get("notes")||undefined}); if (!forceExpanded) setExpanded(false); }} className="p-3 pt-0 space-y-3 border-t border-border/50">
+          <div className="rounded-xl bg-primary/5 p-3 text-center"><p className="text-xs text-muted-foreground">التقييم العام</p><div className="mt-2 flex justify-center gap-1" role="radiogroup" aria-label="تقييم من خمس نجوم">{[1,2,3,4,5].map((star) => <button key={star} type="button" onClick={() => setStars(star)} className={`rounded-md p-1 transition-transform hover:scale-110 ${star <= stars ? "text-primary" : "text-muted-foreground/35"}`} aria-label={`${star} نجوم`}><Star className="h-6 w-6" fill="currentColor" /></button>)}</div><p className="mt-1 text-sm font-semibold text-primary">{MIZAN_RATING_LABELS[stars]} {stars ? `· ${stars}/5` : ""}</p></div>
           <div className="grid grid-cols-2 gap-2">
             {[{name:"tajweedScore",label:"التجويد"},{name:"pronunciationScore",label:"النطق"},{name:"memorizationScore",label:"الحفظ"},{name:"behaviorScore",label:"السلوك"}].map(f=>(
               <div key={f.name}><label className="block text-xs text-muted-foreground mb-1">{f.label} (0-100)</label><input name={f.name} type="number" min={0} max={100} defaultValue={existing?.[f.name]??""} className="tarteel-input text-sm py-1.5"/></div>

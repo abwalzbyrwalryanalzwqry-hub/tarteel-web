@@ -32,6 +32,6 @@ describe("منظومة الميزان", () => {
     expect(app).toContain('path="/circles/:id"');
     expect(app).toContain('path="/students/:id"');
     expect(circlePage).toContain("إدارة الفترات");
-    expect(studentPage).toContain("سجل الإنجاز");
+    expect(studentPage).toContain("السجل الزمني");
   });
 });

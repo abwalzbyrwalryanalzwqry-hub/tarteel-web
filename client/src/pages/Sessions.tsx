@@ -1,14 +1,18 @@
 import EntityForm, { FormInput } from "@/components/EntityForm";
 import { trpc } from "@/lib/trpc";
-import { ClipboardList, Edit, Plus, Search } from "lucide-react";
-import { useState } from "react";
+import { CalendarDays, ClipboardList, Edit, Plus, Search } from "lucide-react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 import { SESSION_STATUS_LABELS, SESSION_TYPE_LABELS } from "../../../shared/types";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export default function Sessions() {
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   const { data: sessions, isLoading, refetch } = trpc.sessions.list.useQuery({ circleId: undefined, seasonId: undefined });
   const { data: circles } = trpc.circles.list.useQuery({ branchId: undefined, seasonId: undefined });
@@ -30,7 +34,13 @@ export default function Sessions() {
     onError: (e) => toast.error(e.message),
   });
 
-  const filtered = sessions?.filter((s) => (s.title ?? "").includes(search) || String(s.id).includes(search)) ?? [];
+  const filtered = useMemo(() => (sessions?.filter((s) => {
+    const matchesSearch = (s.title ?? "").includes(search) || String(s.id).includes(search);
+    if (!selectedDate) return matchesSearch;
+    const sessionDate = new Date(s.scheduledAt);
+    return matchesSearch && sessionDate.getFullYear() === selectedDate.getFullYear() && sessionDate.getMonth() === selectedDate.getMonth() && sessionDate.getDate() === selectedDate.getDate();
+  }) ?? []), [sessions, search, selectedDate]);
+  const sessionDays = useMemo(() => (sessions ?? []).map((session) => new Date(session.scheduledAt)), [sessions]);
 
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -60,7 +70,7 @@ export default function Sessions() {
           <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center"><ClipboardList className="w-5 h-5 text-white"/></div>
           <div><h1 className="page-title">الجلسات</h1><p className="page-subtitle">إدارة جلسات التحفيظ والحضور</p></div>
         </div>
-        <button onClick={()=>setShowForm(true)} className="btn-gold flex items-center gap-2 text-sm"><Plus className="w-4 h-4"/>جلسة جديدة</button>
+        <div className="flex items-center gap-2"><Popover open={calendarOpen} onOpenChange={setCalendarOpen}><PopoverTrigger asChild><button className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${selectedDate ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-background/70 text-foreground hover:bg-muted"}`}><CalendarDays className="ml-1 inline h-4 w-4" />{selectedDate ? selectedDate.toLocaleDateString("ar-SA", { month: "short", day: "numeric" }) : "التقويم"}</button></PopoverTrigger><PopoverContent align="end" className="w-auto p-0" dir="rtl"><Calendar mode="single" selected={selectedDate} onSelect={(date) => { setSelectedDate(date); setCalendarOpen(false); }} modifiers={{ hasSession: sessionDays }} modifiersClassNames={{ hasSession: "bg-primary/10 font-bold text-primary" }} footer={<p className="border-t border-border px-3 py-2 text-center text-xs text-muted-foreground">الأيام المظللة تحتوي جلسات. {selectedDate && <button onClick={() => setSelectedDate(undefined)} className="mr-2 text-primary hover:underline">إزالة التصفية</button>}</p>} /></PopoverContent></Popover><button onClick={()=>setShowForm(true)} className="btn-gold flex items-center gap-2 text-sm"><Plus className="w-4 h-4"/>جلسة جديدة</button></div>
       </div>
       <div className="relative">
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>

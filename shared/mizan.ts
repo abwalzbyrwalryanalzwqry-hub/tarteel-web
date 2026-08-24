@@ -19,3 +19,9 @@ export function getAttendanceSummary(rows: { status: "present" | "absent" | "lat
     late: rows.filter((item) => item.status === "late").length,
   };
 }
+
+export const MIZAN_RATING_LABELS = ["لم يختر", "يحتاج متابعة", "دون المتوقع", "جيد", "جيد جداً", "ممتاز"] as const;
+
+export function scoreToStars(score?: number | null) {
+  return Math.max(0, Math.min(5, Math.round(Number(score ?? 0) / 20)));
+}
