@@ -18,8 +18,10 @@ describe("صلاحيات أدوار ترتيل", () => {
   it("يحصر الطالب وولي الأمر في الخدمات المسموح بها", () => {
     expect(hasTarteelPermission("student", "students:manage")).toBe(false);
     expect(hasTarteelPermission("guardian", "sessions:manage")).toBe(false);
-    expect(hasTarteelPermission("guardian", "ai:use")).toBe(true);
-    expect(hasTarteelPermission("guardian", "quran:view")).toBe(true);
+    expect(hasTarteelPermission("student", "students:view")).toBe(true);
+    expect(hasTarteelPermission("guardian", "students:view")).toBe(true);
+    expect(hasTarteelPermission("guardian", "ai:use")).toBe(false);
+    expect(hasTarteelPermission("guardian", "quran:view")).toBe(false);
     expect(hasTarteelPermission("guardian", "messages:manage")).toBe(false);
   });
 
@@ -39,11 +41,12 @@ describe("صلاحيات أدوار ترتيل", () => {
     expect(teacherPaths).toContain("/parent-messages");
     expect(teacherPaths).not.toContain("/teacher-invites");
     expect(teacherPaths).not.toContain("/centers");
-    expect(studentPaths).not.toContain("/students");
-    expect(studentPaths).toContain("/assistant");
-    expect(studentPaths).toContain("/quran");
+    expect(studentPaths).toContain("/students");
+    expect(studentPaths).not.toContain("/assistant");
+    expect(studentPaths).not.toContain("/quran");
     expect(studentPaths).not.toContain("/parent-messages");
     expect(guardianPaths).not.toContain("/reports");
+    expect(guardianPaths).toEqual(["/students"]);
     expect(getVisibleNavigationPaths("center_manager")).toContain("/teacher-invites");
   });
 });

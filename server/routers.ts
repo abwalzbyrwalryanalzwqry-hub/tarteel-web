@@ -153,6 +153,29 @@ async function assertStudentReadAccess(user: AccessSubject, student: Awaited<Ret
   return student;
 }
 
+function toReaderStudent(student: NonNullable<Awaited<ReturnType<typeof getStudentById>>>) {
+  return {
+    id: student.id,
+    name: student.name,
+    isActive: student.isActive,
+    circleId: student.circleId,
+    lastMemorizedSurah: student.lastMemorizedSurah,
+    lastMemorizedAyah: student.lastMemorizedAyah,
+    totalMemorizedJuz: student.totalMemorizedJuz,
+    guardianName: null,
+    guardianPhone: null,
+    phone: null,
+  };
+}
+
+async function getStudentProfileForReader(user: AccessSubject, studentId: number, startDate?: Date, endDate?: Date) {
+  const profile = await getStudentMizanProfile(studentId, startDate, endDate);
+  if (!profile) return profile;
+  if (user.role === "student") return { ...profile, student: toReaderStudent(profile.student), attendance: [], evaluations: [] };
+  if (user.role === "guardian") return { ...profile, student: toReaderStudent(profile.student) };
+  return profile;
+}
+
 async function assertStudentManageAccess(user: AccessSubject, circleId: number | null | undefined, permission: "students.create" | "students.edit" | "students.delete", centerId?: number) {
   if (circleId) return assertCirclePermission(user, circleId, permission);
   if (TEACHING_ROLES.has(user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "يلزم ربط الطالب بحلقة المعلم عند الإنشاء أو الإدارة" });
@@ -445,7 +468,7 @@ export const appRouter = router({
     studentProfile: protectedProcedure.input(z.object({ studentId: z.number(), startDate: z.date().optional(), endDate: z.date().optional() })).query(async ({ ctx, input }) => {
       const student = await getStudentById(input.studentId);
       await assertStudentReadAccess(ctx.user, student);
-      return getStudentMizanProfile(input.studentId, input.startDate, input.endDate);
+      return getStudentProfileForReader(ctx.user, input.studentId, input.startDate, input.endDate);
     }),
   }),
 
@@ -549,12 +572,12 @@ export const appRouter = router({
           const student = await getStudentByUserId(ctx.user.id);
           if (!student) return [];
           await assertStudentReadAccess(ctx.user, student);
-          return [student];
+          return [toReaderStudent(student)];
         }
         if (ctx.user.role === "guardian") {
           const linked = await getStudentsByGuardianUserId(ctx.user.id);
           const permitted = await Promise.all(linked.map(async (student) => { try { await assertStudentReadAccess(ctx.user, student); return student; } catch { return null; } }));
-          return permitted.filter((student): student is NonNullable<typeof student> => Boolean(student));
+          return permitted.filter((student): student is NonNullable<typeof student> => Boolean(student)).map(toReaderStudent);
         }
         const scope = await getTeacherCircleScope(ctx.user);
         if (!scope) {
@@ -573,7 +596,8 @@ export const appRouter = router({
       }),
     byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
       const student = await getStudentById(input.id);
-      return assertStudentReadAccess(ctx.user, student);
+      const authorizedStudent = await assertStudentReadAccess(ctx.user, student);
+      return ctx.user.role === "student" || ctx.user.role === "guardian" ? toReaderStudent(authorizedStudent) : authorizedStudent;
     }),
     create: protectedProcedure
       .input(z.object({
@@ -871,14 +895,27 @@ export const appRouter = router({
         const auth = await assertPermission(ctx.user, input.centerId, "access_codes.create");
         const rolePermissions = ROLE_PERMISSION_TEMPLATES[input.role];
         const isTeacherCode = input.role === "teacher" || input.role === "assistant_teacher";
+        const isReaderCode = input.role === "student" || input.role === "guardian";
+        const isGuideCode = input.role === "guide";
         if (input.role === "supervisor" && !auth.membership.isOwner) throw new TRPCError({ code: "FORBIDDEN", message: "إنشاء كود مشرف من صلاحية مالك المركز فقط" });
         if (isTeacherCode && !input.circleId) throw new TRPCError({ code: "BAD_REQUEST", message: "يلزم ربط كود المعلم بحلقة واحدة محددة" });
         if (isTeacherCode && input.maxUses !== 1) throw new TRPCError({ code: "BAD_REQUEST", message: "كود المعلم مخصص لمعلم واحد واستخدام واحد فقط" });
-        if (["student", "guardian"].includes(input.role) && !input.studentId) throw new TRPCError({ code: "BAD_REQUEST", message: "يلزم ربط كود الطالب أو ولي الأمر بطالب محدد" });
-        if (["teacher", "assistant_teacher", "student", "guardian"].includes(input.role) && input.scopes.some((scope) => scope.scopeType === "center")) throw new TRPCError({ code: "BAD_REQUEST", message: "لا يجوز منح هذا الدور نطاق المركز كاملاً" });
+        if (isReaderCode && !input.studentId) throw new TRPCError({ code: "BAD_REQUEST", message: "يلزم ربط كود الطالب أو ولي الأمر بطالب محدد" });
+        if (isReaderCode && input.maxUses !== 1) throw new TRPCError({ code: "BAD_REQUEST", message: "كود الطالب أو ولي الأمر مخصص لحساب واحد واستخدام واحد فقط" });
+        if (["teacher", "assistant_teacher", "student", "guardian", "guide"].includes(input.role) && input.scopes.some((scope) => scope.scopeType === "center")) throw new TRPCError({ code: "BAD_REQUEST", message: "لا يجوز منح هذا الدور نطاق المركز كاملاً" });
         if (input.circleId && await getCenterIdForCircle(input.circleId) !== input.centerId) throw new TRPCError({ code: "BAD_REQUEST", message: "الحلقة لا تنتمي إلى المركز المحدد" });
         if (input.studentId && await getCenterIdForStudent(input.studentId) !== input.centerId) throw new TRPCError({ code: "BAD_REQUEST", message: "الطالب لا ينتمي إلى المركز المحدد" });
-        const codeScopes = isTeacherCode ? [{ scopeType: "circle" as const, scopeId: input.circleId! }] : input.scopes;
+        const guideCircleIds = Array.from(new Set(input.scopes.filter((scope) => scope.scopeType === "circle" && typeof scope.scopeId === "number").map((scope) => scope.scopeId!)));
+        if (isGuideCode && (guideCircleIds.length === 0 || guideCircleIds.length !== input.scopes.length)) throw new TRPCError({ code: "BAD_REQUEST", message: "يلزم تحديد حلقة واحدة أو أكثر للموجّه ولا يقبل كود الموجّه نطاقات أخرى" });
+        if (isGuideCode && input.maxUses !== 1) throw new TRPCError({ code: "BAD_REQUEST", message: "كود الموجّه مخصص لحساب واحد واستخدام واحد فقط" });
+        if (isGuideCode && (await Promise.all(guideCircleIds.map(getCenterIdForCircle))).some((centerId) => centerId !== input.centerId)) throw new TRPCError({ code: "BAD_REQUEST", message: "كل حلقات الموجّه يجب أن تنتمي إلى المركز المحدد" });
+        const codeScopes = isTeacherCode
+          ? [{ scopeType: "circle" as const, scopeId: input.circleId! }]
+          : isReaderCode
+            ? [{ scopeType: "student" as const, scopeId: input.studentId! }]
+            : isGuideCode
+              ? guideCircleIds.map((scopeId) => ({ scopeType: "circle" as const, scopeId }))
+              : input.scopes;
         if (isTeacherCode) {
           const circle = await getCircleById(input.circleId!);
           if (!circle) throw new TRPCError({ code: "BAD_REQUEST", message: "الحلقة غير متاحة" });
@@ -889,7 +926,7 @@ export const appRouter = router({
         const rawCode = createAccessCodeSecret();
         const codeHash = hashAccessCode(rawCode);
         const hint = getAccessCodeHint(rawCode);
-        const id = await createAccessCode({ centerId: input.centerId, codeHash, codeHint: hint, role: input.role, scopeJson: JSON.stringify(codeScopes), circleId: input.circleId, teacherId: input.teacherId, studentId: input.studentId, guardianUserId: input.guardianUserId, createdBy: ctx.user.id, expiresAt: input.expiresAt, maxUses: isTeacherCode ? 1 : input.maxUses });
+        const id = await createAccessCode({ centerId: input.centerId, codeHash, codeHint: hint, role: input.role, scopeJson: JSON.stringify(codeScopes), circleId: isTeacherCode ? input.circleId : undefined, teacherId: isTeacherCode ? input.teacherId : undefined, studentId: isReaderCode ? input.studentId : undefined, guardianUserId: isReaderCode ? input.guardianUserId : undefined, createdBy: ctx.user.id, expiresAt: input.expiresAt, maxUses: isTeacherCode || isReaderCode || isGuideCode ? 1 : input.maxUses });
         await createAuditLog({ userId: ctx.user.id, centerId: input.centerId, action: "access.code.create", entity: "access_code", entityId: id, newData: JSON.stringify({ role: input.role, codeHint: hint, maxUses: input.maxUses, expiresAt: input.expiresAt }) });
         return { id, code: rawCode, hint };
       }),

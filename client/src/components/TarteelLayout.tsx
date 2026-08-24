@@ -164,12 +164,13 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
           {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.path;
+            const label = item.path === "/students" && role === "student" ? "إنجازي" : item.path === "/students" && role === "guardian" ? "إنجازات الابن" : item.label;
             return (
               <Link key={item.path} href={item.path}>
                 <div
                   className={`sidebar-nav-item ${isActive ? "active" : ""} ${collapsed ? "justify-center px-2" : ""}`}
                   onClick={() => setSidebarOpen(false)}
-                  title={collapsed ? item.label : undefined}
+                  title={collapsed ? label : undefined}
                 >
                   <div className="relative">
                     <Icon className="w-5 h-5 flex-shrink-0" />
@@ -179,7 +180,7 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
                       </span>
                     )}
                   </div>
-                  {!collapsed && <span>{item.label}</span>}
+                  {!collapsed && <span>{label}</span>}
                 </div>
               </Link>
             );

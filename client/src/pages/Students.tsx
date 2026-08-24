@@ -13,15 +13,16 @@ export default function Students() {
   const { user } = useAuth();
   const { can, role } = usePermissions();
   const isTeachingRole = role === "teacher" || role === "assistant_teacher";
+  const isReaderRole = role === "student" || role === "guardian";
   const canManageStudents = can("students:manage");
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
   const [editItem, setEditItem] = useState<any>(null);
 
   const { data: students, isLoading, refetch } = trpc.students.list.useQuery({ search: search || undefined });
-  const { data: centers } = trpc.centers.list.useQuery({ orgId: undefined });
-  const { data: circles } = trpc.circles.list.useQuery({ branchId: undefined, seasonId: undefined });
-  const { data: users } = trpc.users.list.useQuery(undefined, { enabled: !isTeachingRole });
+  const { data: centers } = trpc.centers.list.useQuery({ orgId: undefined }, { enabled: !isReaderRole });
+  const { data: circles } = trpc.circles.list.useQuery({ branchId: undefined, seasonId: undefined }, { enabled: !isReaderRole });
+  const { data: users } = trpc.users.list.useQuery(undefined, { enabled: !isTeachingRole && !isReaderRole });
 
   const createMutation = trpc.students.create.useMutation({
     onSuccess: () => { toast.success("تم تسجيل الطالب بنجاح"); setShowForm(false); refetch(); },
@@ -77,15 +78,15 @@ export default function Students() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center"><User className="w-5 h-5 text-white"/></div>
-          <div><h1 className="page-title">الطلاب</h1><p className="page-subtitle">إدارة بيانات الطلاب وتتبع حفظهم</p></div>
+          <div><h1 className="page-title">{role === "student" ? "إنجازي" : role === "guardian" ? "إنجازات الابن" : "الطلاب"}</h1><p className="page-subtitle">{isReaderRole ? "قراءة التقدم المصرح به فقط." : "إدارة بيانات الطلاب وتتبع حفظهم"}</p></div>
         </div>
         {canManageStudents && <button onClick={()=>setShowForm(true)} className="btn-gold flex items-center gap-2 text-sm"><Plus className="w-4 h-4"/>تسجيل طالب</button>}
       </div>
-      <AIGuidanceCard context="students" />
-      <div className="relative">
+      {!isReaderRole && <AIGuidanceCard context="students" />}
+      {!isReaderRole && <div className="relative">
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
         <input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="بحث باسم الطالب..." className="tarteel-input pr-10"/>
-      </div>
+      </div>}
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{[1,2,3,4,5,6].map(i=><div key={i} className="glass-card rounded-2xl p-5"><div className="skeleton h-10 w-10 rounded-full mb-3"/><div className="skeleton h-5 w-32 mb-2"/><div className="skeleton h-4 w-24"/></div>)}</div>
       ) : (students?.length ?? 0) === 0 ? (
@@ -104,8 +105,8 @@ export default function Students() {
                 </div>}
               </div>
               <h3 className="font-display font-bold text-foreground text-lg mb-1">{student.name}</h3>
-              {student.guardianName&&<p className="text-sm text-muted-foreground mb-1">ولي الأمر: {student.guardianName}</p>}
-              {student.phone&&<div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-1"><Phone className="w-3.5 h-3.5"/>{student.phone}</div>}
+              {!isReaderRole && student.guardianName&&<p className="text-sm text-muted-foreground mb-1">ولي الأمر: {student.guardianName}</p>}
+              {!isReaderRole && student.phone&&<div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-1"><Phone className="w-3.5 h-3.5"/>{student.phone}</div>}
               <div className="flex items-center gap-1.5 text-sm text-primary mt-2">
                 <BookOpen className="w-3.5 h-3.5"/>
                 <span>آخر حفظ: {getSurahName(student.lastMemorizedSurah ?? 1)} - آية {student.lastMemorizedAyah ?? 1}</span>

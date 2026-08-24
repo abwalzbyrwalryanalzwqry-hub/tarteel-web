@@ -9,8 +9,8 @@ describe("كود المعلم للحلقة الواحدة", () => {
     const router = readFileSync(path.join(root, "server/routers.ts"), "utf8");
     expect(router).toContain("يلزم ربط كود المعلم بحلقة واحدة محددة");
     expect(router).toContain("كود المعلم مخصص لمعلم واحد واستخدام واحد فقط");
-    expect(router).toContain("const codeScopes = isTeacherCode ? [{ scopeType: \"circle\"");
-    expect(router).toContain("maxUses: isTeacherCode ? 1 : input.maxUses");
+    expect(router).toMatch(/const codeScopes = isTeacherCode\s*\? \[\{ scopeType: "circle"/);
+    expect(router).toContain("maxUses: isTeacherCode || isReaderCode || isGuideCode ? 1 : input.maxUses");
   });
 
   it("يرفض نطاقاً ثانياً للمعلم عند التعديل أو الاسترداد", () => {

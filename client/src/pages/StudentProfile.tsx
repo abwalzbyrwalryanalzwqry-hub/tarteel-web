@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { ArrowRight, BookOpen, CalendarDays, ClipboardList, Clock3, ExternalLink, ListTree, Star, UserRound } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
+import { usePermissions } from "@/hooks/usePermissions";
 import { GRADE_LABELS, QURAN_SURAHS } from "../../../shared/types";
 import { scoreToStars } from "../../../shared/mizan";
 
@@ -17,6 +18,9 @@ const profileTabs: { id: ProfileTab; label: string }[] = [
 ];
 
 export default function StudentProfile({ studentId }: { studentId?: number }) {
+  const { role } = usePermissions();
+  const isStudentReader = role === "student";
+  const isGuardianReader = role === "guardian";
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [activeTab, setActiveTab] = useState<ProfileTab>("summary");
@@ -35,15 +39,16 @@ export default function StudentProfile({ studentId }: { studentId?: number }) {
   const latestMemorization = memorization[0];
   const latestRevision = revision[0];
 
+  const visibleTabs = isStudentReader ? profileTabs.filter((tab) => ["summary", "memorization", "revision", "timeline"].includes(tab.id)) : profileTabs;
   return <div className="space-y-6" dir="rtl">
     <Link href="/students" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowRight className="h-4 w-4" />الطلاب</Link>
-    <section className="glass-card rounded-3xl p-5 sm:p-7"><div className="flex flex-col gap-5 sm:flex-row sm:items-center"><div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/15 font-display text-2xl font-bold text-primary">{student.name.charAt(0)}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h1 className="page-title">{student.name}</h1><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${student.isActive ? "bg-emerald-500/10 text-emerald-700" : "bg-muted text-muted-foreground"}`}>{student.isActive ? "نشط" : "موقوف"}</span></div><p className="mt-1 text-sm text-muted-foreground">الحلقة الحالية · آخر حفظ: {surah(student.lastMemorizedSurah ?? 1)}، آية {student.lastMemorizedAyah ?? 1}</p></div><div className="text-sm text-muted-foreground">{student.guardianName ? `ولي الأمر: ${student.guardianName}` : "لا يوجد ولي أمر مسجل"}</div></div></section>
-    <AIGuidanceCard context="students" />
+    <section className="glass-card rounded-3xl p-5 sm:p-7"><div className="flex flex-col gap-5 sm:flex-row sm:items-center"><div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/15 font-display text-2xl font-bold text-primary">{student.name.charAt(0)}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h1 className="page-title">{student.name}</h1><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${student.isActive ? "bg-emerald-500/10 text-emerald-700" : "bg-muted text-muted-foreground"}`}>{student.isActive ? "نشط" : "موقوف"}</span></div><p className="mt-1 text-sm text-muted-foreground">الحلقة الحالية · آخر حفظ: {surah(student.lastMemorizedSurah ?? 1)}، آية {student.lastMemorizedAyah ?? 1}</p></div>{!isStudentReader && !isGuardianReader && <div className="text-sm text-muted-foreground">{student.guardianName ? `ولي الأمر: ${student.guardianName}` : "لا يوجد ولي أمر مسجل"}</div>}</div></section>
+    {!isStudentReader && !isGuardianReader && <AIGuidanceCard context="students" />}
     <section className="glass-card rounded-2xl p-4"><div className="flex flex-col gap-3 md:flex-row md:items-end"><label className="flex-1 text-sm font-medium text-foreground">من تاريخ<input type="date" className="tarteel-input mt-1" value={start} onChange={(event) => setStart(event.target.value)} /></label><label className="flex-1 text-sm font-medium text-foreground">إلى تاريخ<input type="date" className="tarteel-input mt-1" value={end} onChange={(event) => setEnd(event.target.value)} /></label><div className="pb-2 text-xs text-muted-foreground">تتحدث النتائج تلقائياً عند تغيير الفترة.</div></div></section>
-    <div className="flex gap-1 overflow-x-auto rounded-2xl bg-muted/50 p-1">{profileTabs.map((tab) => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${activeTab === tab.id ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>{tab.label}</button>)}</div>
+    <div className="flex gap-1 overflow-x-auto rounded-2xl bg-muted/50 p-1">{visibleTabs.map((tab) => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${activeTab === tab.id ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>{tab.label}</button>)}</div>
 
     {activeTab === "summary" && <>
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4"><Stat label="نسبة الحضور" value={`${attendanceRate}%`} icon={<UserRound className="h-4 w-4" />} tone="text-emerald-700" /><Stat label="إجمالي الغياب" value={count("absent")} icon={<Clock3 className="h-4 w-4" />} tone="text-destructive" /><Stat label="متوسط التقييم" value={evaluations.length ? `${averageScore}/100` : "—"} icon={<Star className="h-4 w-4" />} tone="text-primary" /><Stat label="التأخر" value={count("late")} icon={<CalendarDays className="h-4 w-4" />} tone="text-amber-600" /></section>
+      {!isStudentReader && <section className="grid grid-cols-2 gap-3 md:grid-cols-4"><Stat label="نسبة الحضور" value={`${attendanceRate}%`} icon={<UserRound className="h-4 w-4" />} tone="text-emerald-700" /><Stat label="إجمالي الغياب" value={count("absent")} icon={<Clock3 className="h-4 w-4" />} tone="text-destructive" /><Stat label="متوسط التقييم" value={evaluations.length ? `${averageScore}/100` : "—"} icon={<Star className="h-4 w-4" />} tone="text-primary" /><Stat label="التأخر" value={count("late")} icon={<CalendarDays className="h-4 w-4" />} tone="text-amber-600" /></section>}
       <section className="grid gap-4 lg:grid-cols-2"><AchievementSummary title="الحفظ" icon={<BookOpen className="h-5 w-5 text-primary" />} pages={pages(memorization)} latest={latestMemorization} surah={surah} /><AchievementSummary title="المراجعة" icon={<ClipboardList className="h-5 w-5 text-primary" />} pages={pages(revision)} latest={latestRevision} surah={surah} /></section>
     </>}
 

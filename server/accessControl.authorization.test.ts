@@ -27,9 +27,15 @@ vi.mock("./db", () => ({
 import { assertCanDelegate, assertPermission, assertScope } from "./accessControl";
 
 const guide = { id: 41, role: "guide", isActive: true, accountStatus: "active" as const, accessRevokedAt: null };
+const studentReader = { id: 51, role: "student", isActive: true, accountStatus: "active" as const, accessRevokedAt: null };
+const guardianReader = { id: 61, role: "guardian", isActive: true, accountStatus: "active" as const, accessRevokedAt: null };
 
 function activeGuideMembership(centerId = 1) {
   return { id: 1, userId: guide.id, centerId, role: "guide" as const, status: "active" as const, isOwner: false, grantedBy: 1, grantedAt: new Date(), expiresAt: null, revokedAt: null, createdAt: new Date(), updatedAt: new Date() };
+}
+
+function activeMembership(userId: number, role: "student" | "guardian", centerId = 1) {
+  return { id: userId, userId, centerId, role, status: "active" as const, isOwner: false, grantedBy: 1, grantedAt: new Date(), expiresAt: null, revokedAt: null, createdAt: new Date(), updatedAt: new Date() };
 }
 
 describe("حراسة الصلاحيات والنطاق", () => {
@@ -56,5 +62,22 @@ describe("حراسة الصلاحيات والنطاق", () => {
   it("يمنع الموجه من تفويض صلاحية تحرير الطلاب أو نطاق غير مملوك", async () => {
     await expect(assertCanDelegate(guide, 1, ["students.edit"], [11])).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(assertCanDelegate(guide, 1, ["reports.view"], [12])).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("يقصر الطالب على ملفه ويمنع القراءة خارج نطاق كوده أو قراءة الحضور", async () => {
+    dbMocks.membership.mockResolvedValue(activeMembership(studentReader.id, "student"));
+    dbMocks.scopes.mockResolvedValue([{ id: 2, userId: studentReader.id, centerId: 1, scopeType: "student", scopeId: 101, grantedBy: 1, expiresAt: null, revokedAt: null, createdAt: new Date() }]);
+    dbMocks.student.mockResolvedValue({ id: 101 });
+    await expect(assertScope(studentReader, 1, { studentId: 101 })).resolves.toBeDefined();
+    await expect(assertScope(studentReader, 1, { studentId: 102 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(assertPermission(studentReader, 1, "attendance.view")).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("يقصر ولي الأمر على الابن المربوط ويمنع أي طالب آخر", async () => {
+    dbMocks.membership.mockResolvedValue(activeMembership(guardianReader.id, "guardian"));
+    dbMocks.scopes.mockResolvedValue([{ id: 3, userId: guardianReader.id, centerId: 1, scopeType: "student", scopeId: 201, grantedBy: 1, expiresAt: null, revokedAt: null, createdAt: new Date() }]);
+    dbMocks.parentLinks.mockResolvedValue([{ studentId: 201, centerId: 1 }]);
+    await expect(assertScope(guardianReader, 1, { studentId: 201 })).resolves.toBeDefined();
+    await expect(assertScope(guardianReader, 1, { studentId: 202 })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });
