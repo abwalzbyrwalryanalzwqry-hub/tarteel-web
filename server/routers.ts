@@ -897,6 +897,7 @@ export const appRouter = router({
         const isTeacherCode = input.role === "teacher" || input.role === "assistant_teacher";
         const isReaderCode = input.role === "student" || input.role === "guardian";
         const isGuideCode = input.role === "guide";
+        if (input.expiresAt && input.expiresAt <= new Date()) throw new TRPCError({ code: "BAD_REQUEST", message: "تاريخ الانتهاء يجب أن يكون في المستقبل" });
         if (input.role === "supervisor" && !auth.membership.isOwner) throw new TRPCError({ code: "FORBIDDEN", message: "إنشاء كود مشرف من صلاحية مالك المركز فقط" });
         if (isTeacherCode && !input.circleId) throw new TRPCError({ code: "BAD_REQUEST", message: "يلزم ربط كود المعلم بحلقة واحدة محددة" });
         if (isTeacherCode && input.maxUses !== 1) throw new TRPCError({ code: "BAD_REQUEST", message: "كود المعلم مخصص لمعلم واحد واستخدام واحد فقط" });
@@ -940,7 +941,7 @@ export const appRouter = router({
         await createAuditLog({ userId: ctx.user.id, centerId: code.centerId, action: "access.code.revoke", entity: "access_code", entityId: code.id, oldData: JSON.stringify({ status: code.status, codeHint: code.codeHint }) });
         return { success: true };
       }),
-      reissue: protectedProcedure.input(z.object({ id: z.number(), expiresAt: z.date().optional() })).mutation(async ({ ctx, input }) => {
+      reissue: protectedProcedure.input(z.object({ id: z.number(), expiresAt: z.date().nullable().optional() })).mutation(async ({ ctx, input }) => {
         const previous = await getAccessCodeById(input.id);
         if (!previous) throw new TRPCError({ code: "NOT_FOUND", message: "الكود غير موجود" });
         await assertPermission(ctx.user, previous.centerId, "access_codes.create");
@@ -948,7 +949,9 @@ export const appRouter = router({
         if (previous.studentId) await assertScope(ctx.user, previous.centerId, { studentId: previous.studentId });
         const rawCode = createAccessCodeSecret();
         const hint = getAccessCodeHint(rawCode);
-        const id = await createAccessCode({ centerId: previous.centerId, codeHash: hashAccessCode(rawCode), codeHint: hint, role: previous.role, scopeJson: previous.scopeJson, circleId: previous.circleId, teacherId: previous.teacherId, studentId: previous.studentId, guardianUserId: previous.guardianUserId, createdBy: ctx.user.id, expiresAt: input.expiresAt ?? previous.expiresAt ?? undefined, maxUses: previous.maxUses });
+        if (input.expiresAt && input.expiresAt <= new Date()) throw new TRPCError({ code: "BAD_REQUEST", message: "تاريخ الانتهاء يجب أن يكون في المستقبل" });
+        const expiresAt = input.expiresAt === undefined ? previous.expiresAt ?? undefined : input.expiresAt ?? undefined;
+        const id = await createAccessCode({ centerId: previous.centerId, codeHash: hashAccessCode(rawCode), codeHint: hint, role: previous.role, scopeJson: previous.scopeJson, circleId: previous.circleId, teacherId: previous.teacherId, studentId: previous.studentId, guardianUserId: previous.guardianUserId, createdBy: ctx.user.id, expiresAt, maxUses: previous.maxUses });
         if (previous.status === "active") await revokeAccessCode(previous.id);
         await createAuditLog({ userId: ctx.user.id, centerId: previous.centerId, action: "access.code.reissue", entity: "access_code", entityId: id, oldData: JSON.stringify({ previousId: previous.id, codeHint: previous.codeHint }), newData: JSON.stringify({ codeHint: hint, role: previous.role }) });
         return { id, code: rawCode, hint };

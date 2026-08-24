@@ -1101,6 +1101,12 @@ export async function redeemAccessCodeSecure(input: { codeHash: string; userId: 
       await tx.update(students).set({ guardianUserId: input.userId, updatedAt: now }).where(and(eq(students.id, accessCode.studentId), eq(students.centerId, accessCode.centerId)));
       await tx.insert(parentStudentLinks).values({ guardianUserId: input.userId, studentId: accessCode.studentId, centerId: accessCode.centerId, linkedBy: accessCode.createdBy }).onDuplicateKeyUpdate({ set: { centerId: accessCode.centerId } });
     }
+    const [center] = await tx.select({ managerId: centers.managerId, name: centers.name }).from(centers).where(eq(centers.id, accessCode.centerId)).limit(1);
+    const managers = await tx.select({ userId: centerMemberships.userId }).from(centerMemberships).where(and(eq(centerMemberships.centerId, accessCode.centerId), eq(centerMemberships.status, "active"), isNull(centerMemberships.revokedAt), or(eq(centerMemberships.role, "center_manager"), eq(centerMemberships.isOwner, true))));
+    const managerIds = Array.from(new Set([center?.managerId, ...managers.map((manager) => manager.userId)].filter((id): id is number => typeof id === "number")));
+    const [redeemingUser] = await tx.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, input.userId)).limit(1);
+    const roleLabel = ({ supervisor: "مشرف", guide: "موجّه", teacher: "معلم", assistant_teacher: "معلم مساعد", student: "طالب", guardian: "ولي أمر" } as Record<string, string>)[accessCode.role] ?? accessCode.role;
+    if (managerIds.length) await tx.insert(notifications).values(managerIds.map((userId) => ({ userId, title: "تم استخدام كود دخول", message: `استرد ${redeemingUser?.name || redeemingUser?.email || "مستخدم"} كود دخول بدور ${roleLabel} في مركز ${center?.name || accessCode.centerId}.`, type: "success" as const, relatedId: accessCode.id, relatedType: "access_code_redeemed" })));
     await tx.insert(notifications).values({ userId: input.userId, title: "تم تفعيل الوصول", message: "تم تفعيل حسابك بالدور والنطاق الممنوحين من المركز.", type: "success", relatedId: accessCode.id, relatedType: "access_code" });
     await tx.insert(accessCodeAttempts).values({ accessCodeId: accessCode.id, codeFingerprint: input.codeHash, attemptedByUserId: input.userId, wasSuccessful: true, ipAddress: input.ipAddress, userAgent: input.userAgent });
     return { centerId: accessCode.centerId, role: accessCode.role, status: nextCount >= accessCode.maxUses ? "used" : "active" };
