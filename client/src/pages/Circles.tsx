@@ -4,6 +4,7 @@ import { BookOpen, Edit, Plus, Search, Trash2, Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AIGuidanceCard } from "@/components/AIGuidanceCard";
+import { Link } from "wouter";
 
 export default function Circles() {
   const [showForm, setShowForm] = useState(false);
@@ -94,6 +95,7 @@ export default function Circles() {
                   <div className="flex items-center gap-1.5 text-sm text-muted-foreground"><Users className="w-3.5 h-3.5"/>الحد الأقصى: {circle.maxStudents}</div>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${circle.isActive?"bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400":"bg-gray-100 text-gray-500"}`}>{circle.isActive?"نشطة":"غير نشطة"}</span>
                 </div>
+                <Link href={`/circles/${circle.id}`} className="mt-3 block rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-center text-sm font-semibold text-primary transition-colors hover:bg-primary/10">فتح لوحة الحلقة</Link>
               </div>
             );
           })}

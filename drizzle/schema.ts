@@ -128,6 +128,26 @@ export const circles = mysqlTable("circles", {
 export type Circle = typeof circles.$inferSelect;
 export type InsertCircle = typeof circles.$inferInsert;
 
+// ===================== CIRCLE PERIODS =====================
+// فترات متكررة خاصة بالحَلَقة؛ لا تنشئ جلسات تلقائياً من دون إجراء معلم صريح.
+export const circlePeriods = mysqlTable("circle_periods", {
+  id: int("id").autoincrement().primaryKey(),
+  circleId: int("circleId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  sessionType: varchar("sessionType", { length: 64 }).notNull().default("جلسة يومية"),
+  daysOfWeek: varchar("daysOfWeek", { length: 128 }).notNull(),
+  startTime: varchar("startTime", { length: 8 }).notNull(),
+  endTime: varchar("endTime", { length: 8 }),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdBy: int("createdBy"),
+  deletedAt: timestamp("deletedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CirclePeriod = typeof circlePeriods.$inferSelect;
+export type InsertCirclePeriod = typeof circlePeriods.$inferInsert;
+
 // ===================== TEACHERS =====================
 export const teachers = mysqlTable("teachers", {
   id: int("id").autoincrement().primaryKey(),
@@ -236,6 +256,7 @@ export const memorization = mysqlTable("memorization", {
   sessionId: int("sessionId").notNull(),
   studentId: int("studentId").notNull(),
   surahNumber: int("surahNumber").notNull(),
+  toSurahNumber: int("toSurahNumber"),
   fromAyah: int("fromAyah").notNull(),
   toAyah: int("toAyah").notNull(),
   pages: decimal("pages", { precision: 4, scale: 2 }),
@@ -255,6 +276,7 @@ export const revision = mysqlTable("revision", {
   sessionId: int("sessionId").notNull(),
   studentId: int("studentId").notNull(),
   surahNumber: int("surahNumber").notNull(),
+  toSurahNumber: int("toSurahNumber"),
   fromAyah: int("fromAyah").notNull(),
   toAyah: int("toAyah").notNull(),
   pages: decimal("pages", { precision: 4, scale: 2 }),

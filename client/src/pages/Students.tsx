@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { QURAN_SURAHS } from "../../../shared/types";
 import { AIGuidanceCard } from "@/components/AIGuidanceCard";
+import { Link } from "wouter";
 
 export default function Students() {
   const [showForm, setShowForm] = useState(false);
@@ -103,6 +104,7 @@ export default function Students() {
                 <span className={`text-xs px-2 py-0.5 rounded-full ${student.isActive?"bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400":"bg-gray-100 text-gray-500"}`}>{student.isActive?"نشط":"غير نشط"}</span>
                 <span className="text-xs text-muted-foreground">{student.totalMemorizedJuz ?? 0} جزء</span>
               </div>
+              <Link href={`/students/${student.id}`} className="mt-3 block rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-center text-sm font-semibold text-primary transition-colors hover:bg-primary/10">فتح ملف الطالب</Link>
             </div>
           ))}
         </div>

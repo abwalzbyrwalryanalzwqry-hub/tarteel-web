@@ -10,7 +10,9 @@ import Centers from "./pages/Centers";
 import Branches from "./pages/Branches";
 import Teachers from "./pages/Teachers";
 import Students from "./pages/Students";
+import StudentProfile from "./pages/StudentProfile";
 import Circles from "./pages/Circles";
+import CircleDetail from "./pages/CircleDetail";
 import Sessions from "./pages/Sessions";
 import SessionDetail from "./pages/SessionDetail";
 import Reports from "./pages/Reports";
@@ -37,7 +39,9 @@ function Router() {
       <Route path="/branches" component={() => <TarteelLayout><Branches /></TarteelLayout>} />
       <Route path="/seasons" component={() => <TarteelLayout><AcademicSeasons /></TarteelLayout>} />
       <Route path="/circles" component={() => <TarteelLayout><Circles /></TarteelLayout>} />
+      <Route path="/circles/:id" component={(props: any) => <TarteelLayout><CircleDetail circleId={Number(props.params?.id)} /></TarteelLayout>} />
       <Route path="/teachers" component={() => <TarteelLayout><Teachers /></TarteelLayout>} />
+      <Route path="/students/:id" component={(props: any) => <TarteelLayout><StudentProfile studentId={Number(props.params?.id)} /></TarteelLayout>} />
       <Route path="/students" component={() => <TarteelLayout><Students /></TarteelLayout>} />
       <Route path="/sessions" component={() => <TarteelLayout><Sessions /></TarteelLayout>} />
       <Route path="/sessions/:id" component={(props: any) => <TarteelLayout><SessionDetail sessionId={Number(props.params?.id)} /></TarteelLayout>} />

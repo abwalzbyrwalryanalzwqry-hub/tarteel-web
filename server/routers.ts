@@ -3,6 +3,7 @@ import { z } from "zod";
 import { randomBytes } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { hasTarteelPermission } from "../shared/permissions";
+import { getQuranRangeError } from "../shared/mizan";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -13,6 +14,7 @@ import {
   createBranch,
   createCenter,
   createCircle,
+  createCirclePeriod,
   createMemorization,
   createNotification,
   createOrganization,
@@ -32,6 +34,9 @@ import {
   getCenters,
   getCircleById,
   getCircleIdsForTeacher,
+  getCirclePeriodById,
+  getCirclePeriods,
+  getCircleMonthlyRecord,
   getCircles,
   getDashboardStats,
   getEvaluationBySession,
@@ -45,6 +50,7 @@ import {
   getSessionById,
   getSessions,
   getStudentById,
+  getStudentMizanProfile,
   getStudentByUserId,
   getStudentsByGuardianUserId,
   getStudents,
@@ -62,6 +68,7 @@ import {
   softDeleteBranch,
   softDeleteCenter,
   softDeleteCircle,
+  softDeleteCirclePeriod,
   softDeleteSession,
   softDeleteStudent,
   softDeleteTeacher,
@@ -70,6 +77,7 @@ import {
   updateBranch,
   updateCenter,
   updateCircle,
+  updateCirclePeriod,
   updateSession,
   updateStudent,
   updateTeacher,
@@ -115,6 +123,11 @@ async function assertStudentReadAccess(user: { id: number; role: string }, stude
 async function assertStudentManageAccess(user: { id: number; role: string }, circleId: number | null | undefined) {
   if (!TEACHING_ROLES.has(user.role) && !hasTarteelPermission(user.role, "students:manage")) throw new TRPCError({ code: "FORBIDDEN" });
   await assertTeacherCircleAccess(user, circleId);
+}
+
+function assertQuranRange(input: { surahNumber: number; toSurahNumber?: number; fromAyah: number; toAyah: number }) {
+  const message = getQuranRangeError(input);
+  if (message) throw new TRPCError({ code: "BAD_REQUEST", message });
 }
 
 export const appRouter = router({
@@ -283,6 +296,51 @@ export const appRouter = router({
         await updateCircle(id, data);
       }),
     delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => { if (!hasTarteelPermission(ctx.user.role, "circles:manage")) throw new TRPCError({ code: "FORBIDDEN" }); return softDeleteCircle(input.id); }),
+  }),
+
+  // ===================== CIRCLE PERIODS =====================
+  circlePeriods: router({
+    list: protectedProcedure.input(z.object({ circleId: z.number() })).query(async ({ ctx, input }) => {
+      await assertTeacherCircleAccess(ctx.user, input.circleId);
+      return getCirclePeriods(input.circleId);
+    }),
+    create: protectedProcedure.input(z.object({ circleId: z.number(), name: z.string().min(2), sessionType: z.string().min(2).max(64), daysOfWeek: z.string().min(1).max(128), startTime: z.string().regex(/^\d{2}:\d{2}$/), endTime: z.string().regex(/^\d{2}:\d{2}$/).optional() })).mutation(async ({ ctx, input }) => {
+      await assertTeacherCircleAccess(ctx.user, input.circleId);
+      return createCirclePeriod({ ...input, createdBy: ctx.user.id });
+    }),
+    update: protectedProcedure.input(z.object({ id: z.number(), name: z.string().min(2).optional(), sessionType: z.string().min(2).max(64).optional(), daysOfWeek: z.string().min(1).max(128).optional(), startTime: z.string().regex(/^\d{2}:\d{2}$/).optional(), endTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(), isActive: z.boolean().optional() })).mutation(async ({ ctx, input }) => {
+      const period = await getCirclePeriodById(input.id);
+      if (!period) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertTeacherCircleAccess(ctx.user, period.circleId);
+      const { id, ...data } = input;
+      return updateCirclePeriod(id, data);
+    }),
+    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      const period = await getCirclePeriodById(input.id);
+      if (!period) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertTeacherCircleAccess(ctx.user, period.circleId);
+      return softDeleteCirclePeriod(input.id);
+    }),
+    createSession: protectedProcedure.input(z.object({ periodId: z.number(), scheduledAt: z.date() })).mutation(async ({ ctx, input }) => {
+      const period = await getCirclePeriodById(input.periodId);
+      if (!period) throw new TRPCError({ code: "NOT_FOUND", message: "الفترة غير موجودة" });
+      await assertTeacherCircleAccess(ctx.user, period.circleId);
+      const circle = await getCircleById(period.circleId);
+      if (!circle?.teacherId) throw new TRPCError({ code: "BAD_REQUEST", message: "يلزم تعيين معلم للحَلَقة قبل إنشاء جلسة" });
+      return createSession({ circleId: circle.id, teacherId: circle.teacherId, seasonId: circle.seasonId, title: `${period.name} · ${period.sessionType}`, type: "regular", scheduledAt: input.scheduledAt });
+    }),
+  }),
+
+  mizan: router({
+    monthlyRecord: protectedProcedure.input(z.object({ circleId: z.number(), startDate: z.date().optional(), endDate: z.date().optional() })).query(async ({ ctx, input }) => {
+      await assertTeacherCircleAccess(ctx.user, input.circleId);
+      return getCircleMonthlyRecord(input.circleId, input.startDate, input.endDate);
+    }),
+    studentProfile: protectedProcedure.input(z.object({ studentId: z.number(), startDate: z.date().optional(), endDate: z.date().optional() })).query(async ({ ctx, input }) => {
+      const student = await getStudentById(input.studentId);
+      await assertStudentReadAccess(ctx.user, student);
+      return getStudentMizanProfile(input.studentId, input.startDate, input.endDate);
+    }),
   }),
 
   // ===================== TEACHERS =====================
@@ -487,13 +545,14 @@ export const appRouter = router({
         sessionId: z.number(),
         studentId: z.number(),
         surahNumber: z.number().min(1).max(114),
+        toSurahNumber: z.number().min(1).max(114).optional(),
         fromAyah: z.number().min(1),
         toAyah: z.number().min(1),
         pages: z.string().optional(),
         grade: z.enum(["excellent", "very_good", "good", "acceptable", "weak", "not_done"]).optional(),
         notes: z.string().optional(),
       }))
-      .mutation(async ({ input, ctx }) => { await assertSessionStudentMatch(ctx.user, input.sessionId, input.studentId); return createMemorization({ ...input, recordedBy: ctx.user.id }); }),
+      .mutation(async ({ input, ctx }) => { assertQuranRange(input); await assertSessionStudentMatch(ctx.user, input.sessionId, input.studentId); return createMemorization({ ...input, recordedBy: ctx.user.id }); }),
   }),
 
   // ===================== REVISION =====================
@@ -504,13 +563,14 @@ export const appRouter = router({
         sessionId: z.number(),
         studentId: z.number(),
         surahNumber: z.number().min(1).max(114),
+        toSurahNumber: z.number().min(1).max(114).optional(),
         fromAyah: z.number().min(1),
         toAyah: z.number().min(1),
         pages: z.string().optional(),
         grade: z.enum(["excellent", "very_good", "good", "acceptable", "weak", "not_done"]).optional(),
         notes: z.string().optional(),
       }))
-      .mutation(async ({ input, ctx }) => { await assertSessionStudentMatch(ctx.user, input.sessionId, input.studentId); return createRevision({ ...input, recordedBy: ctx.user.id }); }),
+      .mutation(async ({ input, ctx }) => { assertQuranRange(input); await assertSessionStudentMatch(ctx.user, input.sessionId, input.studentId); return createRevision({ ...input, recordedBy: ctx.user.id }); }),
   }),
 
   // ===================== EVALUATION =====================

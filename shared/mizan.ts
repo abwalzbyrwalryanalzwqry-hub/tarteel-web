@@ -1,0 +1,21 @@
+import { QURAN_SURAHS } from "./types";
+
+export type QuranRangeInput = { surahNumber: number; toSurahNumber?: number; fromAyah: number; toAyah: number };
+
+export function getQuranRangeError(input: QuranRangeInput): string | null {
+  const endSurah = input.toSurahNumber ?? input.surahNumber;
+  const from = QURAN_SURAHS.find((surah) => surah.number === input.surahNumber);
+  const to = QURAN_SURAHS.find((surah) => surah.number === endSurah);
+  if (!from || !to || input.fromAyah < 1 || input.toAyah < 1 || input.fromAyah > from.ayahs || input.toAyah > to.ayahs) return "رقم الآية خارج نطاق السورة المحددة";
+  if (endSurah < input.surahNumber || (endSurah === input.surahNumber && input.toAyah < input.fromAyah)) return "نطاق الحفظ أو المراجعة غير صحيح";
+  return null;
+}
+
+export function getAttendanceSummary(rows: { status: "present" | "absent" | "late" | "excused" }[]) {
+  return {
+    present: rows.filter((item) => item.status === "present").length,
+    absent: rows.filter((item) => item.status === "absent").length,
+    excused: rows.filter((item) => item.status === "excused").length,
+    late: rows.filter((item) => item.status === "late").length,
+  };
+}
