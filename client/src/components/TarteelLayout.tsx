@@ -250,6 +250,15 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
               <Moon className="w-5 h-5 text-muted-foreground" />
             )}
           </button>
+          <button
+            onClick={() => logout()}
+            className="flex items-center gap-2 rounded-lg border border-red-500/20 px-2.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-red-500/10"
+            title="تسجيل الخروج وتبديل الحساب"
+            aria-label="تسجيل الخروج وتبديل الحساب"
+          >
+            <LogOut className="h-4 w-4" />
+            <span className="hidden sm:inline">تبديل الحساب</span>
+          </button>
         </header>
 
         {/* Page content */}
