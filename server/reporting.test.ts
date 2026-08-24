@@ -1,0 +1,59 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { generateUnifiedReportPDF } from "./reports/unifiedPdf";
+
+const root = path.resolve(import.meta.dirname, "..");
+const read = (relative: string) => readFileSync(path.join(root, relative), "utf8");
+
+describe("نظام التقرير الموحد", () => {
+  it("يبني نموذجاً من بيانات الحلقة الفعلية ويحافظ على أقسام وتراكم عمليات الطالب", () => {
+    const builder = read("server/reports/reportBuilder.ts");
+    expect(builder).toContain("buildUnifiedReport");
+    expect(builder).toContain("memorizationRows");
+    expect(builder).toContain("revisionRows");
+    expect(builder).toContain("StudentReportBlock");
+    expect(builder).toContain("attendanceRate");
+  });
+
+  it("يعرض ترويسة وملخصاً وجدول حضور وكتلاً مستقلة للطلاب في RTL", () => {
+    const preview = read("client/src/components/ReportPreview.tsx");
+    expect(preview).toContain('dir="rtl"');
+    expect(preview).toContain("بيانات الحضور");
+    expect(preview).toContain("StudentBlock");
+    expect(preview).toContain("تم التوليد بواسطة تطبيق ترتيل");
+  });
+
+  it("يوفر إعداد التقرير والمعاينة والطباعة والمشاركة دون إلغاء التصديرات الحالية", () => {
+    const composer = read("client/src/components/ReportComposer.tsx");
+    expect(composer).toContain("reporting.preview");
+    expect(composer).toContain("معاينة التقرير");
+    expect(composer).toContain("window.print");
+    expect(composer).toContain("navigator.share");
+    expect(composer).toContain("ExportButtons");
+  });
+
+  it("يوفر PDF موحداً بحجم A4 وفوتر وترقيم صفحات ويسجله في الأرشيف", () => {
+    const pdf = read("server/reports/unifiedPdf.ts");
+    const router = read("server/routers/reporting.ts");
+    const composer = read("client/src/components/ReportComposer.tsx");
+    expect(pdf).toContain('size: "A4"');
+    expect(pdf).toContain("تم التوليد بواسطة تطبيق ترتيل");
+    expect(pdf).toContain("bufferedPageRange");
+    expect(router).toContain("exportPdf");
+    expect(composer).toContain("PDF موحد");
+    expect(composer).toContain('reportType: "unified"');
+  });
+
+  it("يولد PDF عربياً متعدد الصفحات مع خط مضمّن وفوتر وترقيم", async () => {
+    const students = Array.from({ length: 22 }, (_, index) => ({ student: { id: index + 1, name: `طالب عربي طويل الاسم ${index + 1}`, enrollmentDate: null }, attendance: { present: 2, absent: 0, late: 0, excused: 0, total: 2 }, memorization: [{ id: index + 1, kind: "memorization" as const, from: "الفاتحة · آية 1", to: "الفاتحة · آية 7", pages: 1, grade: "ممتاز", date: new Date("2026-08-24"), notes: null }], revision: [], averageScore: 100, evaluations: [] }));
+    const report = { meta: { title: "حلقة الاختبار", typeLabel: "تقرير شامل", circleName: "حلقة الاختبار", centerName: "المركز", startDate: null, endDate: null, generatedAt: new Date("2026-08-24") }, sections: { summary: true, attendance: true, memorization: true, revision: true, evaluations: true }, summary: { students: students.length, present: 44, absent: 0, late: 0, excused: 0, attendanceRate: 100, memorizationCount: students.length, revisionCount: 0, averageScore: 100 }, students };
+    const pdf = await generateUnifiedReportPDF(report);
+    expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
+    expect(pdf.length).toBeGreaterThan(2_000);
+    expect(pdf.toString("latin1")).toContain("Amiri");
+    expect(pdf.toString("latin1").match(/\/Type \/Page\b/g)?.length).toBeGreaterThan(1);
+    const compactPdf = await generateUnifiedReportPDF({ ...report, summary: { ...report.summary, students: 2, present: 4, memorizationCount: 2 }, students: students.slice(0, 2) });
+    expect(compactPdf.toString("latin1").match(/\/Type \/Page\b/g)?.length).toBe(1);
+  });
+});

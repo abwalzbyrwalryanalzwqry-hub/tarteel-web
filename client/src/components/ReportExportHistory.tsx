@@ -6,6 +6,7 @@ const REPORT_LABELS: Record<ReportExportHistoryItem["reportType"], string> = {
   memorization: "تقرير الحفظ",
   attendance: "تقرير الحضور",
   students: "تقرير الطلاب",
+  unified: "التقرير الموحد",
 };
 
 export function ReportExportHistory() {

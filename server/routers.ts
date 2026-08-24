@@ -9,6 +9,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { exportRouter } from "./routers/export";
 import { aiRouter } from "./routers/ai";
+import { reportingRouter } from "./routers/reporting";
 import {
   createAcademicSeason,
   createBranch,
@@ -614,6 +615,9 @@ export const appRouter = router({
 
   // ===================== EXPORT =====================
   export: exportRouter,
+
+  // ===================== UNIFIED REPORTING =====================
+  reporting: reportingRouter,
 
   // ===================== AI ASSISTANT =====================
   ai: aiRouter,

@@ -1,7 +1,7 @@
 export type ReportExportHistoryItem = {
   id: string;
   filename: string;
-  reportType: "memorization" | "attendance" | "students";
+  reportType: "memorization" | "attendance" | "students" | "unified";
   format: "pdf" | "excel" | "csv" | "word";
   createdAt: string;
 };
