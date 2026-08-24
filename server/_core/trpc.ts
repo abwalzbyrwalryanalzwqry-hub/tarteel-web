@@ -17,6 +17,12 @@ const requireUser = t.middleware(async opts => {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
 
+  const simulationHeader = ctx.req.headers?.["x-tarteel-role-simulation"];
+  const simulationActive = Array.isArray(simulationHeader) ? simulationHeader.includes("1") : simulationHeader === "1";
+  if (opts.type === "mutation" && simulationActive) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "لا يمكن تنفيذ إجراءات تعديل أثناء محاكاة الدور" });
+  }
+
   return next({
     ctx: {
       ...ctx,

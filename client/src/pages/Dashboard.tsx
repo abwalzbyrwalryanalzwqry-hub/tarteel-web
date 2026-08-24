@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { AIGuidanceCard } from "@/components/AIGuidanceCard";
+import { RoleSimulationControl } from "@/components/RoleSimulationControl";
 import { SESSION_STATUS_LABELS, SESSION_TYPE_LABELS } from "../../../shared/types";
 
 function LayoutDashboard({ className }: { className?: string }) {
@@ -94,6 +95,7 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <RoleSimulationControl />
             {unreadCount > 0 && (
               <Link href="/notifications">
                 <div className="relative cursor-pointer">

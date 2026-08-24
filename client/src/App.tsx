@@ -4,6 +4,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { RoleSimulationProvider } from "./contexts/RoleSimulationContext";
 import TarteelLayout from "./components/TarteelLayout";
 import Dashboard from "./pages/Dashboard";
 import Centers from "./pages/Centers";
@@ -73,10 +74,12 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light" switchable>
-        <TooltipProvider>
-          <Toaster position="top-center" richColors />
-          <Router />
-        </TooltipProvider>
+        <RoleSimulationProvider>
+          <TooltipProvider>
+            <Toaster position="top-center" richColors />
+            <Router />
+          </TooltipProvider>
+        </RoleSimulationProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

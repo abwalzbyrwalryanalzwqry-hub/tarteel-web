@@ -3,6 +3,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { getVisibleNavigationPaths } from "../../../shared/permissions";
 import { trpc } from "@/lib/trpc";
+import { useRoleSimulation } from "@/contexts/RoleSimulationContext";
 import {
   ArchiveRestore,
   BarChart3,
@@ -63,6 +64,7 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const { can, role, roleLabel } = usePermissions();
+  const { simulation, stopSimulation } = useRoleSimulation();
   const switchAccount = () => {
     try { sessionStorage.setItem("tarteel-switch-account", "1"); } catch {}
     void logout();
@@ -267,6 +269,7 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
 
         {/* Page content */}
         <main className="flex-1 overflow-auto p-4 lg:p-6">
+          {simulation && <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between"><span><strong>وضع محاكاة: {roleLabel}.</strong> الواجهة مقيدة للدور المختار وجميع عمليات التعديل موقوفة.</span><button onClick={stopSimulation} className="font-semibold underline underline-offset-4">إنهاء المحاكاة</button></div>}
           {mayViewCurrentRoute ? children : (
             <section className="mx-auto mt-16 max-w-md rounded-3xl border border-destructive/20 bg-destructive/5 p-8 text-center">
               <h1 className="font-display text-2xl font-bold text-foreground">ليس لديك صلاحية لعرض هذه الصفحة</h1>

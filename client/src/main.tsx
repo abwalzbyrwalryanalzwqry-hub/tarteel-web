@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { startLogin } from "./const";
+import { ROLE_SIMULATION_STORAGE_KEY } from "./contexts/RoleSimulationContext";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -60,6 +61,9 @@ const trpcClient = trpc.createClient({
         } catch {
           // sessionStorage unavailable
         }
+        try {
+          if (sessionStorage.getItem(ROLE_SIMULATION_STORAGE_KEY)) return { "x-tarteel-role-simulation": "1" };
+        } catch {}
         return {};
       },
       fetch(input, init) {

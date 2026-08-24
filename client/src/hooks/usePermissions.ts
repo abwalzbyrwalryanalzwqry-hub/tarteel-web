@@ -5,13 +5,18 @@ import {
   ROLE_LABELS,
   type TarteelPermission,
 } from "../../../shared/permissions";
+import { useRoleSimulation } from "@/contexts/RoleSimulationContext";
 
 export function usePermissions() {
   const { user } = useAuth();
-  const role = normalizeTarteelRole(user?.role);
+  const { simulation } = useRoleSimulation();
+  const actualRole = normalizeTarteelRole(user?.role);
+  const role = simulation?.role ?? actualRole;
 
   return {
     role,
+    actualRole,
+    isSimulating: Boolean(simulation),
     roleLabel: ROLE_LABELS[role],
     can: (permission: TarteelPermission) => hasTarteelPermission(role, permission),
   };
