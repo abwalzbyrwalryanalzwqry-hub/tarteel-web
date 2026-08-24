@@ -3,6 +3,13 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ===================== TARTEEL TYPOGRAPHY SYSTEM ===================== */
+@font-face { font-family: "Tarteel Serif Text"; src: url("/manus-storage/thmanyahseriftext-Light_bb4bb1fe.woff2") format("woff2"); font-style: normal; font-weight: 300; font-display: swap; }
+@font-face { font-family: "Tarteel Serif Text"; src: url("/manus-storage/thmanyahseriftext-Regular_f5aef1ee.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: "Tarteel Serif Text"; src: url("/manus-storage/thmanyahseriftext-Medium_be200abb.woff2") format("woff2"); font-style: normal; font-weight: 500; font-display: swap; }
+@font-face { font-family: "Tarteel Serif Text"; src: url("/manus-storage/thmanyahseriftext-Bold_6c86ea07.woff2") format("woff2"); font-style: normal; font-weight: 700; font-display: swap; }
+@font-face { font-family: "Tarteel Serif Text"; src: url("/manus-storage/thmanyahseriftext-Black_99238822.woff2") format("woff2"); font-style: normal; font-weight: 900; font-display: swap; }
+
 /* ===================== ISLAMIC LUXURY UI TOKENS ===================== */
 @theme inline {
   /* Islamic Gold Palette */
@@ -29,11 +36,13 @@
   --color-emerald-800: oklch(0.28 0.11 155);
   --color-emerald-900: oklch(0.18 0.08 155);
 
-  /* Font families */
-  --font-sans: "Tajawal", "Segoe UI", system-ui, sans-serif;
-  --font-serif: "Amiri", "Times New Roman", serif;
-  --font-display: "Amiri", serif;
-  --font-body: "Tajawal", sans-serif;
+  /* Central font families — all Arabic UI inherits the supplied font. */
+  --font-sans: "Tarteel Serif Text", serif;
+  --font-serif: "Tarteel Serif Text", serif;
+  --font-display: "Tarteel Serif Text", serif;
+  --font-body: "Tarteel Serif Text", serif;
+  --font-code: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
 
   /* Radius */
   --radius: 0.75rem;
@@ -84,6 +93,27 @@
   --color-sidebar-ring: oklch(0.72 0.18 72);
 }
 
+:root {
+  --tarteel-type-display-lg: clamp(1.75rem, 3vw, 2rem);
+  --tarteel-type-display-md: clamp(1.5rem, 2.6vw, 1.75rem);
+  --tarteel-type-display-sm: clamp(1.375rem, 2.2vw, 1.5rem);
+  --tarteel-type-h1: 1.5rem;
+  --tarteel-type-h2: 1.375rem;
+  --tarteel-type-h3: 1.25rem;
+  --tarteel-type-h4: 1.125rem;
+  --tarteel-type-body-lg: 1.0625rem;
+  --tarteel-type-body: 1rem;
+  --tarteel-type-body-sm: 0.875rem;
+  --tarteel-type-caption: 0.75rem;
+  --tarteel-type-label: 0.875rem;
+  --tarteel-type-button: 0.9375rem;
+  --tarteel-line-display: 1.35;
+  --tarteel-line-heading: 1.45;
+  --tarteel-line-body: 1.8;
+  --tarteel-line-quran: 2.35;
+  --tarteel-font-size: 15px;
+}
+
 /* ===================== DARK MODE ===================== */
 .dark {
   --color-background: oklch(0.12 0.04 240);
@@ -124,8 +154,8 @@
 
   html {
     direction: rtl;
-    font-family: "Tajawal", "Segoe UI", system-ui, sans-serif;
-    --tarteel-font-size: 15px;
+    font-family: var(--font-sans);
+    text-rendering: optimizeLegibility;
   }
 
   html[data-font-scale="small"] {
@@ -138,27 +168,42 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: "Tajawal", "Segoe UI", system-ui, sans-serif;
+    font-family: var(--font-body);
     font-size: var(--tarteel-font-size);
-    line-height: 1.7;
+    line-height: var(--tarteel-line-body);
+    font-synthesis: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: "Amiri", serif;
+    font-family: var(--font-display);
     font-weight: 700;
-    line-height: 1.4;
+    line-height: var(--tarteel-line-heading);
   }
 
   .font-display {
-    font-family: "Amiri", serif;
+    font-family: var(--font-display);
   }
 
   .font-body {
-    font-family: "Tajawal", sans-serif;
+    font-family: var(--font-body);
   }
 }
+
+.tarteel-display-lg { font-family: var(--font-display); font-size: var(--tarteel-type-display-lg); font-weight: 700; line-height: var(--tarteel-line-display); }
+.tarteel-display-md { font-family: var(--font-display); font-size: var(--tarteel-type-display-md); font-weight: 700; line-height: var(--tarteel-line-display); }
+.tarteel-display-sm { font-family: var(--font-display); font-size: var(--tarteel-type-display-sm); font-weight: 700; line-height: var(--tarteel-line-display); }
+.tarteel-heading { font-family: var(--font-display); font-size: var(--tarteel-type-h2); font-weight: 700; line-height: var(--tarteel-line-heading); }
+.tarteel-card-title { font-family: var(--font-body); font-size: var(--tarteel-type-h4); font-weight: 700; line-height: var(--tarteel-line-heading); }
+.tarteel-body-lg { font-size: var(--tarteel-type-body-lg); line-height: var(--tarteel-line-body); }
+.tarteel-body { font-size: var(--tarteel-type-body); line-height: var(--tarteel-line-body); }
+.tarteel-caption { font-size: var(--tarteel-type-caption); font-weight: 500; line-height: 1.6; }
+.tarteel-label { font-size: var(--tarteel-type-label); font-weight: 500; line-height: 1.5; }
+.tarteel-code, code, kbd, samp { direction: ltr; font-family: var(--font-code); font-variant-numeric: tabular-nums; letter-spacing: 0.06em; }
+.quran-text { display: block; font-family: var(--font-serif); font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 400; line-height: var(--tarteel-line-quran); text-align: right; text-wrap: pretty; font-feature-settings: "liga" 1, "calt" 1; }
+.quran-text--compact { font-size: clamp(1.25rem, 2.3vw, 1.5rem); line-height: 2.15; }
+.quran-text--large { font-size: clamp(2rem, 4vw, 2.5rem); line-height: 2.5; }
 
 /* ===================== CONTAINER ===================== */
 .container {
@@ -258,8 +303,8 @@
   color: oklch(0.92 0.03 85 / 0.8);
   transition: all 0.15s;
   cursor: pointer;
-  font-family: "Tajawal", sans-serif;
-  font-size: 14px;
+  font-family: var(--font-body);
+  font-size: var(--tarteel-type-label);
   font-weight: 500;
   text-decoration: none;
 }
@@ -284,7 +329,8 @@ button:active {
 .btn-gold {
   background: linear-gradient(135deg, oklch(0.78 0.17 75) 0%, oklch(0.65 0.17 70) 50%, oklch(0.72 0.18 72) 100%);
   color: white;
-  font-family: "Tajawal", sans-serif;
+  font-family: var(--font-body);
+  font-size: var(--tarteel-type-button);
   font-weight: 500;
   border-radius: 0.75rem;
   padding: 0.625rem 1.5rem;
@@ -302,7 +348,8 @@ button:active {
 .btn-green {
   background: linear-gradient(135deg, oklch(0.38 0.14 155) 0%, oklch(0.28 0.11 155) 100%);
   color: white;
-  font-family: "Tajawal", sans-serif;
+  font-family: var(--font-body);
+  font-size: var(--tarteel-type-button);
   font-weight: 500;
   border-radius: 0.75rem;
   padding: 0.625rem 1.5rem;
@@ -426,7 +473,8 @@ button:active {
 /* ===================== TABLE ===================== */
 .tarteel-table {
   width: 100%;
-  font-size: 0.875rem;
+  font-size: var(--tarteel-type-body-sm);
+  line-height: 1.65;
 }
 
 .tarteel-table th {
@@ -435,7 +483,7 @@ button:active {
   font-weight: 600;
   color: oklch(0.50 0.04 240);
   background: oklch(0.94 0.02 85 / 0.5);
-  font-family: "Tajawal", sans-serif;
+  font-family: var(--font-body);
 }
 
 .dark .tarteel-table th {
@@ -468,7 +516,9 @@ button:active {
   border: 1px solid oklch(0.88 0.03 85);
   background: oklch(1 0 0);
   color: oklch(0.15 0.04 240);
-  font-family: "Tajawal", sans-serif;
+  font-family: var(--font-body);
+  font-size: var(--tarteel-type-body);
+  line-height: 1.55;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -490,8 +540,8 @@ button:active {
 }
 
 .page-title {
-  font-family: "Amiri", serif;
-  font-size: 1.5rem;
+  font-family: var(--font-display);
+  font-size: var(--tarteel-type-h1);
   font-weight: 700;
   color: oklch(0.15 0.04 240);
 }
@@ -501,8 +551,8 @@ button:active {
 }
 
 .page-subtitle {
-  font-family: "Tajawal", sans-serif;
-  font-size: 0.875rem;
+  font-family: var(--font-body);
+  font-size: var(--tarteel-type-body-sm);
   color: oklch(0.50 0.04 240);
   margin-top: 0.25rem;
 }

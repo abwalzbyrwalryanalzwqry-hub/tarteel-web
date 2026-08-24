@@ -41,7 +41,7 @@ export default function QuranCenter() {
 
   const currentSurah = QURAN_SURAHS.find((surah) => surah.number === selectedSurah) ?? QURAN_SURAHS[0];
   const displayedVerses = query.trim() ? searchQuranVerses(verses, query) : verses.filter((verse) => verse.surah === selectedSurah);
-  const textSize = fontScale === "compact" ? "text-xl leading-10" : fontScale === "large" ? "text-4xl leading-[2.35]" : "text-3xl leading-[2.15]";
+  const textSize = fontScale === "compact" ? "quran-text--compact" : fontScale === "large" ? "quran-text--large" : "";
 
   const selectVerse = (verse: QuranVerse) => {
     setSelectedSurah(verse.surah);
@@ -95,10 +95,10 @@ export default function QuranCenter() {
 
           <article className="glass-card min-h-[520px] rounded-3xl p-5 sm:p-8">
             {isLoading ? <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 text-muted-foreground"><Loader2 className="h-7 w-7 animate-spin text-primary" /><span>جارٍ تجهيز النص العثماني...</span></div> : displayedVerses.length === 0 ? <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 text-center"><Sparkles className="h-8 w-8 text-primary" /><p className="font-display text-lg font-bold text-foreground">لا توجد نتائج مطابقة</p><p className="text-sm text-muted-foreground">جرّب كلمة أخرى أو اختر سورة من الفهرس.</p></div> : <div className="space-y-4">
-              {!query && <div className="mx-auto mb-8 max-w-2xl rounded-2xl bg-primary/5 px-5 py-4 text-center text-sm text-primary">بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ</div>}
+              {!query && <div className="quran-text quran-text--compact mx-auto mb-8 max-w-2xl rounded-2xl bg-primary/5 px-5 py-4 text-center text-primary">بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ</div>}
               {displayedVerses.map((verse) => <button key={`${verse.surah}-${verse.ayah}`} onClick={() => selectVerse(verse)} className={`block w-full rounded-2xl border px-4 py-4 text-right transition-all ${selectedAyah === verse.ayah && selectedSurah === verse.surah ? "border-primary bg-primary/10 shadow-sm" : "border-transparent hover:border-primary/20 hover:bg-muted/30"}`}>
                 {query && <span className="mb-2 flex items-center gap-2 text-xs text-primary"><ChevronLeft className="h-3.5 w-3.5" />{QURAN_SURAHS.find((surah) => surah.number === verse.surah)?.name} — آية {verse.ayah}</span>}
-                <span className={`font-serif text-foreground ${textSize}`}>{verse.text}</span><span className="mr-3 inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-primary/10 px-1.5 align-middle text-xs font-bold text-primary">{verse.ayah}</span>
+                <span className={`quran-text text-foreground ${textSize}`}>{verse.text}</span><span className="mr-3 inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-primary/10 px-1.5 align-middle text-xs font-bold text-primary">{verse.ayah}</span>
               </button>)}
             </div>}
           </article>
