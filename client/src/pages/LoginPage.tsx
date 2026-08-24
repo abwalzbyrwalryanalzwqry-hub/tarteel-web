@@ -1,7 +1,7 @@
 import { startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { BookOpen, Chrome, Mail, Star } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { readPendingTeacherInvite } from "../../../shared/teacherInviteFlow";
@@ -9,6 +9,9 @@ import { readPendingTeacherInvite } from "../../../shared/teacherInviteFlow";
 export default function LoginPage() {
   const { isAuthenticated, loading } = useAuth();
   const [, navigate] = useLocation();
+  const [switchAccount] = useState(() => {
+    try { return sessionStorage.getItem("tarteel-switch-account") === "1"; } catch { return false; }
+  });
 
   useEffect(() => {
     if (!loading && isAuthenticated) {
@@ -44,6 +47,13 @@ export default function LoginPage() {
           <div className="flex items-center justify-center gap-1 mb-8">
             {[1,2,3,4,5].map(i=><Star key={i} className="w-4 h-4 fill-primary text-primary"/>)}
           </div>
+
+          {switchAccount && (
+            <div className="mb-5 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-right text-xs leading-6 text-muted-foreground">
+              <p className="font-semibold text-foreground">تم تسجيل خروجك من ترتيل.</p>
+              <p className="mt-1">إذا عاد موفر المصادقة بالحساب نفسه، فهذه جلسة خارجية مستقلة. لاستخدام حساب آخر افتح ترتيل في نافذة خاصة أو ملف متصفح مختلف، ثم سجّل الدخول بالحساب الثاني هناك.</p>
+            </div>
+          )}
 
           {/* Features */}
           <div className="grid grid-cols-2 gap-3 mb-8 text-right">

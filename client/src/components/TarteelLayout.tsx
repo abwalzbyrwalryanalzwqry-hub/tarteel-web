@@ -63,6 +63,10 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const { can, role, roleLabel } = usePermissions();
+  const switchAccount = () => {
+    try { sessionStorage.setItem("tarteel-switch-account", "1"); } catch {}
+    void logout();
+  };
   const visibleNavItems = navItems.filter((item) => getVisibleNavigationPaths(role).includes(item.path));
   const currentNav = location === "/developer"
     ? navItems.find((item) => item.path === "/settings")
@@ -203,7 +207,7 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
               {!collapsed && <span>{theme === "dark" ? "نهاري" : "ليلي"}</span>}
             </button>
             <button
-              onClick={() => logout()}
+              onClick={switchAccount}
               className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors text-sm"
               title="تسجيل الخروج"
             >
@@ -251,7 +255,7 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
             )}
           </button>
           <button
-            onClick={() => logout()}
+            onClick={switchAccount}
             className="flex items-center gap-2 rounded-lg border border-red-500/20 px-2.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-red-500/10"
             title="تسجيل الخروج وتبديل الحساب"
             aria-label="تسجيل الخروج وتبديل الحساب"
