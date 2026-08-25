@@ -118,4 +118,16 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     expect(detail).toContain("حفظ الفترة");
     expect(detail).toContain("مسودة محفوظة تلقائياً");
   });
+
+  it("يعيد المعلم إلى المسودة ويقبل نطاق السور الصاعد أو النازل مع زر اعتماد واضح", () => {
+    const mizan = source("shared/mizan.ts");
+    const router = source("server/routers.ts");
+    const periods = source("client/src/pages/Sessions.tsx");
+    const detail = source("client/src/pages/SessionDetail.tsx");
+    expect(mizan).toContain("endSurah === input.surahNumber");
+    expect(router).toContain("includeDrafts");
+    expect(periods).toContain("مسودات محفوظة تلقائياً");
+    expect(periods).toContain("استئناف");
+    expect(detail).toContain("حفظ الفترة وإضافتها للتقارير");
+  });
 });

@@ -7,7 +7,9 @@ export function getQuranRangeError(input: QuranRangeInput): string | null {
   const from = QURAN_SURAHS.find((surah) => surah.number === input.surahNumber);
   const to = QURAN_SURAHS.find((surah) => surah.number === endSurah);
   if (!from || !to || input.fromAyah < 1 || input.toAyah < 1 || input.fromAyah > from.ayahs || input.toAyah > to.ayahs) return "رقم الآية خارج نطاق السورة المحددة";
-  if (endSurah < input.surahNumber || (endSurah === input.surahNumber && input.toAyah < input.fromAyah)) return "نطاق الحفظ أو المراجعة غير صحيح";
+  // تسير بعض حلقات الحفظ من أواخر المصحف إلى أوله (مثل الناس إلى الماعون)، لذلك يكون ترتيب السور مرناً.
+  // أما داخل السورة الواحدة، فيلزم أن تتقدم الآية النهائية عن آية البداية أو تساويها.
+  if (endSurah === input.surahNumber && input.toAyah < input.fromAyah) return "نطاق الحفظ أو المراجعة غير صحيح";
   return null;
 }
 

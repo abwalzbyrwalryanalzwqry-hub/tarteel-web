@@ -673,19 +673,19 @@ export const appRouter = router({
   // ===================== SESSIONS =====================
   sessions: router({
     list: protectedProcedure
-      .input(z.object({ circleId: z.number().optional(), seasonId: z.number().optional() }))
+      .input(z.object({ circleId: z.number().optional(), seasonId: z.number().optional(), includeDrafts: z.boolean().optional().default(false) }))
       .query(async ({ ctx, input }) => {
         const scope = await getTeacherCircleScope(ctx.user);
         if (!scope) {
-          if (input.circleId) { await assertCirclePermission(ctx.user, input.circleId, "attendance.view"); return getSessions(input.circleId, input.seasonId); }
+          if (input.circleId) { await assertCirclePermission(ctx.user, input.circleId, "attendance.view"); return getSessions(input.circleId, input.seasonId, input.includeDrafts); }
           const circles = await filterAccessibleCircles(ctx.user, await getCircles());
-          return (await Promise.all(circles.map((circle) => getSessions(circle.id, input.seasonId)))).flat();
+          return (await Promise.all(circles.map((circle) => getSessions(circle.id, input.seasonId, input.includeDrafts)))).flat();
         }
         if (input.circleId) {
           if (!scope.includes(input.circleId)) throw new TRPCError({ code: "FORBIDDEN" });
-          return getSessions(input.circleId, input.seasonId);
+          return getSessions(input.circleId, input.seasonId, input.includeDrafts);
         }
-        return (await Promise.all(scope.map((circleId) => getSessions(circleId, input.seasonId)))).flat();
+        return (await Promise.all(scope.map((circleId) => getSessions(circleId, input.seasonId, input.includeDrafts)))).flat();
       }),
     byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => getAuthorizedSession(ctx.user, input.id)),
     latestStudentProgress: protectedProcedure.input(z.object({ circleId: z.number() })).query(async ({ ctx, input }) => {

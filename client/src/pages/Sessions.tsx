@@ -23,7 +23,8 @@ export default function Sessions() {
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
 
-  const { data: sessions, isLoading, refetch } = trpc.sessions.list.useQuery({ circleId: undefined, seasonId: undefined });
+  const { data: sessions, isLoading, refetch } = trpc.sessions.list.useQuery({ circleId: undefined, seasonId: undefined, includeDrafts: false });
+  const { data: sessionsWithDrafts } = trpc.sessions.list.useQuery({ circleId: undefined, seasonId: undefined, includeDrafts: true });
   const { data: circles } = trpc.circles.list.useQuery({ branchId: undefined, seasonId: undefined });
   const { data: teachers } = trpc.teachers.list.useQuery({ centerId: undefined });
   const { data: seasons } = trpc.seasons.list.useQuery({ centerId: undefined });
@@ -68,6 +69,7 @@ export default function Sessions() {
     return matchesSearch && sessionDate.getFullYear() === selectedDate.getFullYear() && sessionDate.getMonth() === selectedDate.getMonth() && sessionDate.getDate() === selectedDate.getDate();
   }) ?? []), [sessions, search, selectedDate]);
   const sessionDays = useMemo(() => (sessions ?? []).map((session) => new Date(session.scheduledAt)), [sessions]);
+  const drafts = useMemo(() => sessionsWithDrafts?.filter((session) => session.status === "draft") ?? [], [sessionsWithDrafts]);
 
   function handleCreate(values: NewSessionValues) {
     setCreateConflict(null);
@@ -83,6 +85,7 @@ export default function Sessions() {
   }
 
   const statusColors: Record<string, string> = {
+    draft: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
     scheduled: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
     open: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
     closed: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
@@ -102,6 +105,7 @@ export default function Sessions() {
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
         <input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="بحث في الفترات..." className="tarteel-input pr-10"/>
       </div>
+      {drafts.length > 0 && <section className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4"><div className="flex items-start justify-between gap-3"><div><h2 className="font-display text-lg font-bold text-foreground">مسودات محفوظة تلقائياً</h2><p className="mt-1 text-sm text-muted-foreground">أكمل التسجيل من حيث توقفت، ثم اضغط «حفظ الفترة» داخلها لإضافتها إلى الفترات والتقارير.</p></div><span className="rounded-full bg-background px-2.5 py-1 text-xs font-bold text-amber-800">{drafts.length}</span></div><div className="mt-3 space-y-2">{drafts.map((draft) => <Link key={draft.id} href={`/periods/${draft.id}`} className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-background/80 px-3 py-3 transition-colors hover:bg-amber-500/10"><span><strong className="block text-sm text-foreground">{draft.title ?? `فترة مسودة #${draft.id}`}</strong><span className="mt-0.5 block text-xs text-muted-foreground">{new Date(draft.scheduledAt).toLocaleDateString("ar-SA", { weekday: "long", month: "long", day: "numeric" })}</span></span><span className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">استئناف</span></Link>)}</div></section>}
       {isLoading ? (
         <div className="space-y-3">{[1,2,3,4].map(i=><div key={i} className="glass-card rounded-2xl p-4"><div className="skeleton h-5 w-48 mb-2"/><div className="skeleton h-4 w-32"/></div>)}</div>
       ) : filtered.length === 0 ? (
