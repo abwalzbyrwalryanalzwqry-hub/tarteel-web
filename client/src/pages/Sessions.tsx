@@ -38,12 +38,14 @@ export default function Sessions() {
 
   const createMutation = trpc.sessions.create.useMutation({
     onSuccess: (result) => {
+      const periodId = result.periodId ?? result.sessionId;
+      if (!periodId) { toast.error("تعذر فتح سجل طلاب الفترة الجديدة"); return; }
       toast.success("تم إنشاء الفترة بنجاح");
       setCreateConflict(null);
       setShowForm(false);
+      navigate(`/periods/${periodId}`, { replace: true });
       refetch();
       syncSharedData();
-      if (result.sessionId) navigate(`/periods/${result.sessionId}`);
     },
     onError: (e) => { setCreateConflict(e.message); toast.error(e.message); },
   });

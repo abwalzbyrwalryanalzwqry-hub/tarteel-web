@@ -210,7 +210,9 @@ async function createDailyPeriod(user: AccessSubject, input: { circleId: number;
   const existing = await getSessionByCircleDay(resolved.circleId, dayKey);
   if (existing) throw new TRPCError({ code: "CONFLICT", message: "توجد بالفعل فترة لهذه الحلقة في التاريخ المحدد. اختر يوماً أو تاريخاً آخر." });
   const result = await createSession({ ...resolved, dayKey });
-  return { sessionId: Number((result as { insertId?: number | bigint }).insertId) };
+  const periodId = Number((result as { insertId?: number | bigint }).insertId);
+  if (!Number.isInteger(periodId) || periodId < 1) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر فتح سجل طلاب الفترة الجديدة" });
+  return { sessionId: periodId, periodId } as const;
 }
 
 function assertQuranRange(input: { surahNumber: number; toSurahNumber?: number; fromAyah: number; toAyah: number }) {

@@ -55,7 +55,8 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     expect(composer).toContain("إدخال هجري يدوي");
     expect(composer).toContain("الحلقة");
     expect(sessions).toContain("<NewSessionComposer");
-    expect(sessions).toContain("navigate(`/periods/${result.sessionId}`)");
+    expect(sessions).toContain("const periodId = result.periodId ?? result.sessionId");
+    expect(sessions).toContain("navigate(`/periods/${periodId}`");
   });
 
   it("يحفظ أزرار الحضور كعناصر مستقلة قابلة للتفاعل مع حراسة تعديل خادمية", () => {
@@ -129,5 +130,15 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     expect(periods).toContain("مسودات محفوظة تلقائياً");
     expect(periods).toContain("استئناف");
     expect(detail).toContain("حفظ الفترة وإضافتها للتقارير");
+  });
+
+  it("يفتح سجل طلاب الفترة الجديدة فور إنشائها من القائمة أو من الحلقة", () => {
+    const router = source("server/routers.ts");
+    const periods = source("client/src/pages/Sessions.tsx");
+    const circle = source("client/src/pages/CircleDetail.tsx");
+    expect(router).toContain("periodId = Number");
+    expect(router).toContain("periodId } as const");
+    expect(periods).toContain("navigate(`/periods/${periodId}`");
+    expect(circle).toContain("navigate(`/periods/${periodId}`");
   });
 });

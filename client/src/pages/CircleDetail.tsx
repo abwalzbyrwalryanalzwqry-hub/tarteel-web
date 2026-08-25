@@ -47,12 +47,14 @@ export default function CircleDetail({ circleId }: Props) {
 
   const createPeriod = trpc.sessions.create.useMutation({
     onSuccess: (result) => {
+      const periodId = result.periodId ?? result.sessionId;
+      if (!periodId) { toast.error("تعذر فتح سجل طلاب الفترة الجديدة"); return; }
       toast.success("تم إنشاء الفترة بنجاح");
       setPeriodConflict(null);
       setShowPeriodComposer(false);
+      navigate(`/periods/${periodId}`, { replace: true });
       void Promise.all([utils.sessions.list.invalidate(), utils.dashboard.stats.invalidate(), utils.dashboard.recentSessions.invalidate(), utils.circles.list.invalidate()]);
       refetchRecord();
-      if (result.sessionId) navigate(`/periods/${result.sessionId}`);
     },
     onError: (error) => { setPeriodConflict(error.message); toast.error(error.message); },
   });
