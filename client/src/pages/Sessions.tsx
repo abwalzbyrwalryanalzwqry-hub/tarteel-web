@@ -20,28 +20,36 @@ export default function Sessions() {
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const utils = trpc.useUtils();
 
   const { data: sessions, isLoading, refetch } = trpc.sessions.list.useQuery({ circleId: undefined, seasonId: undefined });
   const { data: circles } = trpc.circles.list.useQuery({ branchId: undefined, seasonId: undefined });
   const { data: teachers } = trpc.teachers.list.useQuery({ centerId: undefined });
   const { data: seasons } = trpc.seasons.list.useQuery({ centerId: undefined });
+  const syncSharedData = () => void Promise.all([
+    utils.dashboard.stats.invalidate(),
+    utils.dashboard.recentSessions.invalidate(),
+    utils.sessions.list.invalidate(),
+    utils.students.list.invalidate(),
+    utils.circles.list.invalidate(),
+  ]);
 
   const createMutation = trpc.sessions.create.useMutation({
-    onSuccess: () => { toast.success("تم إنشاء الجلسة بنجاح"); setShowForm(false); refetch(); },
+    onSuccess: () => { toast.success("تم إنشاء الجلسة بنجاح"); setShowForm(false); refetch(); syncSharedData(); },
     onError: (e) => toast.error(e.message),
   });
 
   const updateStatusMutation = trpc.sessions.updateStatus.useMutation({
-    onSuccess: () => { toast.success("تم تحديث حالة الجلسة"); refetch(); },
+    onSuccess: () => { toast.success("تم تحديث حالة الجلسة"); refetch(); syncSharedData(); },
     onError: (e) => toast.error(e.message),
   });
 
   const deleteMutation = trpc.sessions.delete.useMutation({
-    onSuccess: () => { toast.success("تم حذف الجلسة"); refetch(); },
+    onSuccess: () => { toast.success("تم حذف الجلسة"); refetch(); syncSharedData(); },
     onError: (e) => toast.error(e.message),
   });
   const updateMutation = trpc.sessions.update.useMutation({
-    onSuccess: () => { toast.success("تم تحديث الجلسة"); setEditItem(null); refetch(); },
+    onSuccess: () => { toast.success("تم تحديث الجلسة"); setEditItem(null); refetch(); syncSharedData(); },
     onError: (e) => toast.error(e.message),
   });
   const teacherOptions = isTeachingRole ? teachers?.filter((teacher) => teacher.userId === user?.id) : teachers;

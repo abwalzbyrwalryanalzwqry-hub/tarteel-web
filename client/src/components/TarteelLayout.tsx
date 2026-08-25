@@ -6,6 +6,7 @@ import { hasActiveAccessMembership } from "../../../shared/accessMembership";
 import { trpc } from "@/lib/trpc";
 import { useRoleSimulation } from "@/contexts/RoleSimulationContext";
 import {
+  ArrowRight,
   ArchiveRestore,
   BarChart3,
   Bell,
@@ -71,6 +72,10 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
   const switchAccount = () => {
     try { sessionStorage.setItem("tarteel-switch-account", "1"); } catch {}
     void logout();
+  };
+  const goBack = () => {
+    if (window.history.length > 1) window.history.back();
+    else navigate("/dashboard");
   };
   const visibleNavItems = navItems.filter((item) => getVisibleNavigationPaths(role).includes(item.path));
   const currentNav = location === "/developer"
@@ -257,6 +262,15 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
             className="lg:hidden p-2 rounded-lg hover:bg-muted transition-colors"
           >
             <Menu className="w-5 h-5" />
+          </button>
+          <button
+            onClick={goBack}
+            className="group flex items-center gap-1.5 rounded-xl border border-primary/15 bg-primary/5 px-2.5 py-1.5 text-sm font-semibold text-primary transition-all hover:-translate-x-0.5 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            title="العودة للشاشة السابقة"
+            aria-label="العودة للشاشة السابقة"
+          >
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            <span className="hidden sm:inline">رجوع</span>
           </button>
           <div className="flex-1" />
           <Link href="/notifications">

@@ -18,22 +18,31 @@ export default function Students() {
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
   const [editItem, setEditItem] = useState<any>(null);
+  const utils = trpc.useUtils();
 
   const { data: students, isLoading, refetch } = trpc.students.list.useQuery({ search: search || undefined });
   const { data: centers } = trpc.centers.list.useQuery({ orgId: undefined }, { enabled: !isReaderRole });
   const { data: circles } = trpc.circles.list.useQuery({ branchId: undefined, seasonId: undefined }, { enabled: !isReaderRole });
   const { data: users } = trpc.users.list.useQuery(undefined, { enabled: !isTeachingRole && !isReaderRole });
+  const syncSharedData = () => void Promise.all([
+    utils.dashboard.stats.invalidate(),
+    utils.dashboard.recentSessions.invalidate(),
+    utils.students.list.invalidate(),
+    utils.sessions.list.invalidate(),
+    utils.circles.list.invalidate(),
+    utils.teachers.list.invalidate(),
+  ]);
 
   const createMutation = trpc.students.create.useMutation({
-    onSuccess: () => { toast.success("تم تسجيل الطالب بنجاح"); setShowForm(false); refetch(); },
+    onSuccess: () => { toast.success("تم تسجيل الطالب بنجاح"); setShowForm(false); refetch(); syncSharedData(); },
     onError: (e) => toast.error(e.message),
   });
   const updateMutation = trpc.students.update.useMutation({
-    onSuccess: () => { toast.success("تم تحديث بيانات الطالب"); setEditItem(null); refetch(); },
+    onSuccess: () => { toast.success("تم تحديث بيانات الطالب"); setEditItem(null); refetch(); syncSharedData(); },
     onError: (e) => toast.error(e.message),
   });
   const deleteMutation = trpc.students.delete.useMutation({
-    onSuccess: () => { toast.success("تم نقل الطالب إلى سلة المحذوفات"); refetch(); },
+    onSuccess: () => { toast.success("تم نقل الطالب إلى سلة المحذوفات"); refetch(); syncSharedData(); },
     onError: (e) => toast.error(e.message),
   });
 

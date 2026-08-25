@@ -53,6 +53,7 @@ import {
   getCircleMonthlyRecord,
   getCircles,
   getDashboardStats,
+  getDashboardStatsForCircles,
   getDashboardStatsForCenters,
   getEvaluationBySession,
   getMemorizationBySession,
@@ -62,6 +63,7 @@ import {
   getParentStudentLinks,
   getOrganizations,
   getRecentSessions,
+  getRecentSessionsForCircles,
   getRecentSessionsForCenters,
   getRevisionBySession,
   getSessionById,
@@ -222,6 +224,12 @@ async function filterAccessibleCircles(user: AccessSubject, items: Awaited<Retur
   return items.filter((_, index) => access[index]);
 }
 
+async function getAccessibleDashboardCircleIds(user: AccessSubject) {
+  const circles = await getCircles();
+  const allowed = await filterAccessibleCircles(user, circles);
+  return allowed.map((circle) => circle.id);
+}
+
 export const appRouter = router({
   system: systemRouter,
 
@@ -238,11 +246,13 @@ export const appRouter = router({
   dashboard: router({
     stats: protectedProcedure.query(async ({ ctx }) => {
       const centerIds = await getAccessibleCenterIds(ctx.user, "center.view");
-      return getDashboardStatsForCenters(centerIds);
+      if (centerIds.length) return getDashboardStatsForCenters(centerIds);
+      return getDashboardStatsForCircles(await getAccessibleDashboardCircleIds(ctx.user));
     }),
     recentSessions: protectedProcedure.query(async ({ ctx }) => {
       const centerIds = await getAccessibleCenterIds(ctx.user, "center.view");
-      return getRecentSessionsForCenters(centerIds, 5);
+      if (centerIds.length) return getRecentSessionsForCenters(centerIds, 5);
+      return getRecentSessionsForCircles(await getAccessibleDashboardCircleIds(ctx.user), 5);
     }),
   }),
 

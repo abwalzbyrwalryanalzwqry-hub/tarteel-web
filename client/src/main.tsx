@@ -8,7 +8,24 @@ import App from "./App";
 import { ROLE_SIMULATION_STORAGE_KEY } from "./contexts/RoleSimulationContext";
 import "./index.css";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 0,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: true,
+    },
+  },
+});
+let dataSyncTimer: number | undefined;
+
+const scheduleSharedDataRefresh = () => {
+  if (typeof window === "undefined") return;
+  window.clearTimeout(dataSyncTimer);
+  dataSyncTimer = window.setTimeout(() => {
+    void queryClient.invalidateQueries();
+  }, 120);
+};
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
@@ -36,6 +53,9 @@ queryClient.getMutationCache().subscribe(event => {
     const error = event.mutation.state.error;
     redirectToLoginIfUnauthorized(error);
     console.error("[API Mutation Error]", error);
+  }
+  if (event.type === "updated" && event.action.type === "success") {
+    scheduleSharedDataRefresh();
   }
 });
 
