@@ -30,7 +30,7 @@ export function SessionHeaderControls({ session }: { session: SessionRow }) {
   const [hijriDraft, setHijriDraft] = useState(() => getHijriDateParts(new Date(session.scheduledAt)) ?? { year: 1448, month: 1, day: 1 });
   const update = trpc.sessions.update.useMutation({
     onSuccess: async () => {
-      toast.success("تم تحديث بيانات الجلسة");
+      toast.success("تم تحديث بيانات الفترة");
       await Promise.all([utils.sessions.byId.invalidate({ id: session.id }), utils.sessions.list.invalidate(), utils.dashboard.stats.invalidate(), utils.dashboard.recentSessions.invalidate()]);
       setTypeOpen(false);
       setDateOpen(false);
@@ -62,18 +62,18 @@ export function SessionHeaderControls({ session }: { session: SessionRow }) {
 
       <Dialog open={typeOpen} onOpenChange={setTypeOpen}>
         <DialogContent className="sm:max-w-lg" dir="rtl">
-          <DialogHeader><DialogTitle className="font-display text-xl">نوع الجلسة</DialogTitle><DialogDescription>اختر نوع الجلسة، ويمكن تسمية النوع المخصص بما يناسب الحلقة.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle className="font-display text-xl">نوع الفترة</DialogTitle><DialogDescription>اختر نوع الفترة، ويمكن تسمية النوع المخصص بما يناسب الحلقة.</DialogDescription></DialogHeader>
           <div className="grid gap-2 sm:grid-cols-2">
             {sessionKinds.map((item) => <button key={item.value} type="button" onClick={() => setKind(item.value)} className={`rounded-2xl border p-4 text-right transition-colors ${kind === item.value ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted/50"}`}><span className="block font-bold">{item.label}</span><span className="mt-1 block text-xs text-muted-foreground">{item.description}</span></button>)}
           </div>
-          {kind === "special" && <label className="block"><span className="mb-1.5 block text-sm font-semibold">اسم الجلسة المخصص</span><input value={customTitle} onChange={(event) => setCustomTitle(event.target.value)} placeholder="مثال: زيارة الشيخ" className="tarteel-input" maxLength={120} /></label>}
+          {kind === "special" && <label className="block"><span className="mb-1.5 block text-sm font-semibold">اسم الفترة المخصص</span><input value={customTitle} onChange={(event) => setCustomTitle(event.target.value)} placeholder="مثال: زيارة الشيخ" className="tarteel-input" maxLength={120} /></label>}
           <button disabled={update.isPending || (kind === "special" && !customTitle.trim())} onClick={() => update.mutate({ id: session.id, type: kind, title: kind === "special" ? customTitle.trim() : session.title })} className="btn-gold w-full py-3">{update.isPending ? "جارٍ الحفظ…" : "حفظ النوع"}</button>
         </DialogContent>
       </Dialog>
 
       <Dialog open={dateOpen} onOpenChange={setDateOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl" dir="rtl">
-          <DialogHeader><DialogTitle className="font-display text-xl">تحديد تاريخ الجلسة</DialogTitle><DialogDescription>اختر التاريخ من التقويم أو أدخله يدوياً. يعرض التطبيق التاريخين الهجري والميلادي تلقائياً.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle className="font-display text-xl">تحديد تاريخ الفترة</DialogTitle><DialogDescription>اختر التاريخ من التقويم أو أدخله يدوياً. يعرض التطبيق التاريخين الهجري والميلادي تلقائياً.</DialogDescription></DialogHeader>
           <div className="grid gap-3 rounded-2xl bg-primary/5 p-4 text-sm sm:grid-cols-2"><div><p className="text-xs text-muted-foreground">الميلادي</p><p className="mt-1 font-semibold text-foreground">{calendars.gregorian}</p></div><div><p className="text-xs text-muted-foreground">الهجري</p><p className="mt-1 font-semibold text-primary">{calendars.hijri}</p></div></div>
           <div className="rounded-2xl border border-border p-2"><Calendar mode="single" selected={selectedDate} onSelect={chooseCalendarDate} className="mx-auto" /></div>
           <label className="block"><span className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold"><Clock3 className="h-4 w-4 text-primary" />تعديل يدوي للميلادي والوقت</span><input type="datetime-local" value={toDateTimeLocal(selectedDate)} onChange={(event) => { const next = new Date(event.target.value); if (!Number.isNaN(next.getTime())) { setSelectedDate(next); setHijriDraft(getHijriDateParts(next) ?? hijriDraft); } }} className="tarteel-input" /></label>

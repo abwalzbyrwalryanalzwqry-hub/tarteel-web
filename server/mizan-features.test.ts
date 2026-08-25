@@ -6,13 +6,14 @@ import { QURAN_SURAHS } from "../shared/types";
 const root = process.cwd();
 
 describe("منظومة الميزان", () => {
-  it("تعرف فترات الحلقة وسجلها الشهري في نموذج البيانات والمسارات", () => {
+  it("يحفظ قوالب الفترات التاريخية ويجعل الفترات الفعلية من سجلات الجلسات", () => {
     const schema = readFileSync(path.join(root, "drizzle/schema.ts"), "utf8");
     const router = readFileSync(path.join(root, "server/routers.ts"), "utf8");
     expect(schema).toContain('mysqlTable("circle_periods"');
     expect(router).toContain("circlePeriods: router");
     expect(router).toContain("monthlyRecord");
     expect(router).toContain("createSession");
+    expect(router).toContain("sessions: router");
   });
 
   it("يحتفظ بحدود آيات السور ويطبق نهايات السور في سجلات الإنجاز", () => {
@@ -31,7 +32,8 @@ describe("منظومة الميزان", () => {
     const studentPage = readFileSync(path.join(root, "client/src/pages/StudentProfile.tsx"), "utf8");
     expect(app).toContain('path="/circles/:id"');
     expect(app).toContain('path="/students/:id"');
-    expect(circlePage).toContain("إدارة الفترات");
+    expect(circlePage).toContain("فترات الحَلَقة");
+    expect(circlePage).toContain("كل فترة هي سجل عمل مستقل");
     expect(studentPage).toContain("السجل الزمني");
   });
 });

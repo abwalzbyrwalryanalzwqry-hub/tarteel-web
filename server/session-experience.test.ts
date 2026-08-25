@@ -51,11 +51,11 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
   it("يدمج إنشاء الجلسة في واجهة موحدة ويعيد المعلّم إلى سجل الطلاب", () => {
     const composer = source("client/src/components/NewSessionComposer.tsx");
     const sessions = source("client/src/pages/Sessions.tsx");
-    expect(composer).toContain("إنشاء الجلسة وفتح سجل الطلاب");
+    expect(composer).toContain("إنشاء الفترة وفتح سجل الطلاب");
     expect(composer).toContain("إدخال هجري يدوي");
     expect(composer).toContain("الحلقة");
     expect(sessions).toContain("<NewSessionComposer");
-    expect(sessions).toContain("navigate(`/sessions/${result.sessionId}`)");
+    expect(sessions).toContain("navigate(`/periods/${result.sessionId}`)");
   });
 
   it("يحفظ أزرار الحضور كعناصر مستقلة قابلة للتفاعل مع حراسة تعديل خادمية", () => {
@@ -65,5 +65,20 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     expect(detail).toContain("attendanceOverrides");
     expect(detail).toContain("aria-pressed={status === s}");
     expect(router).toContain('assertCirclePermission(ctx.user, session.circleId, "attendance.edit")');
+  });
+
+  it("يجعل الفترات واجهة تشغيل السجل الموحد ويحوّل المسار القديم بأمان", () => {
+    const app = source("client/src/App.tsx");
+    const layout = source("client/src/components/TarteelLayout.tsx");
+    const circle = source("client/src/pages/CircleDetail.tsx");
+    const dashboard = source("client/src/pages/Dashboard.tsx");
+    expect(app).toContain('path="/periods"');
+    expect(app).toContain("LegacySessionRedirect");
+    expect(layout).toContain('path: "/periods", label: "الفترات"');
+    expect(circle).toContain("كل فترة هي سجل عمل مستقل");
+    expect(circle).toContain("<NewSessionComposer");
+    expect(circle).not.toContain("trpc.circlePeriods");
+    expect(dashboard).toContain('href="/periods"');
+    expect(dashboard).not.toContain('href="/sessions"');
   });
 });

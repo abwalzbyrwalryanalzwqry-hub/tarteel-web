@@ -152,8 +152,8 @@ export default function SessionDetail({ sessionId }: Props) {
   if (!session) {
     return (
       <div className="text-center py-16">
-        <p className="text-muted-foreground">الجلسة غير موجودة</p>
-        <Link href="/sessions"><button className="mt-4 btn-gold text-sm px-4 py-2">العودة للجلسات</button></Link>
+        <p className="text-muted-foreground">الفترة غير موجودة</p>
+        <Link href="/periods"><button className="mt-4 btn-gold text-sm px-4 py-2">العودة للفترات</button></Link>
       </div>
     );
   }
@@ -169,9 +169,9 @@ export default function SessionDetail({ sessionId }: Props) {
     <div className="space-y-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Link href="/sessions"><span className="hover:text-foreground cursor-pointer">الجلسات</span></Link>
+        <Link href="/periods"><span className="hover:text-foreground cursor-pointer">الفترات</span></Link>
         <ChevronLeft className="w-4 h-4" />
-        <span className="text-foreground">{session.title ?? `جلسة #${session.id}`}</span>
+        <span className="text-foreground">{session.title ?? `فترة #${session.id}`}</span>
       </div>
 
       {/* Session Info Card */}
@@ -179,7 +179,7 @@ export default function SessionDetail({ sessionId }: Props) {
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="font-display text-2xl font-bold text-foreground">{session.title ?? `جلسة #${session.id}`}</h1>
+              <h1 className="font-display text-2xl font-bold text-foreground">{session.title ?? `فترة #${session.id}`}</h1>
               <span className={`text-sm px-3 py-1 rounded-full font-medium ${statusColors[session.status]}`}>{SESSION_STATUS_LABELS[session.status]}</span>
             </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -191,10 +191,10 @@ export default function SessionDetail({ sessionId }: Props) {
           <div className="flex flex-wrap justify-end gap-2">
             <SessionHeaderControls session={session} />
             {session.status === "scheduled" && (
-              <button onClick={()=>updateStatusMutation.mutate({id:session.id,status:"open"})} className="btn-gold text-sm px-4 py-2">فتح الجلسة</button>
+              <button onClick={()=>updateStatusMutation.mutate({id:session.id,status:"open"})} className="btn-gold text-sm px-4 py-2">فتح الفترة</button>
             )}
             {session.status === "open" && (
-              <button onClick={()=>updateStatusMutation.mutate({id:session.id,status:"closed"})} className="px-4 py-2 rounded-xl bg-gray-600 text-white text-sm hover:bg-gray-700 transition-colors">إغلاق الجلسة</button>
+              <button onClick={()=>updateStatusMutation.mutate({id:session.id,status:"closed"})} className="px-4 py-2 rounded-xl bg-gray-600 text-white text-sm hover:bg-gray-700 transition-colors">إغلاق الفترة</button>
             )}
           </div>
         </div>

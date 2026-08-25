@@ -137,8 +137,8 @@ export default function Dashboard() {
             <StatCard label="الحلقات" value={stats?.totalCircles ?? 0} icon={BookOpen} color="bg-purple-600" href="/circles" delay={4} />
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard label="إجمالي الجلسات" value={stats?.totalSessions ?? 0} icon={ClipboardList} color="bg-teal-600" href="/sessions" delay={1} />
-            <StatCard label="جلسات مفتوحة" value={stats?.openSessions ?? 0} icon={Calendar} color="bg-indigo-600" href="/sessions" delay={2} />
+            <StatCard label="إجمالي الفترات" value={stats?.totalSessions ?? 0} icon={ClipboardList} color="bg-teal-600" href="/periods" delay={1} />
+            <StatCard label="فترات مفتوحة" value={stats?.openSessions ?? 0} icon={Calendar} color="bg-indigo-600" href="/periods" delay={2} />
             <StatCard label="حضور اليوم" value={stats?.todayAttendance ?? 0} icon={CheckCircle} color="bg-green-600" delay={3} />
             <StatCard label="غياب اليوم" value={stats?.todayAbsence ?? 0} icon={XCircle} color="bg-red-500" delay={4} />
           </div>
@@ -147,24 +147,24 @@ export default function Dashboard() {
 
       {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Sessions */}
+        {/* Recent periods */}
         <div className="lg:col-span-2 glass-card rounded-2xl p-5 animate-fade-in-up">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display font-bold text-foreground text-lg">آخر الجلسات</h2>
-            <Link href="/sessions">
+            <h2 className="font-display font-bold text-foreground text-lg">آخر الفترات</h2>
+            <Link href="/periods">
               <span className="text-sm text-primary hover:underline cursor-pointer">عرض الكل</span>
             </Link>
           </div>
           {recentSessions && recentSessions.length > 0 ? (
             <div className="space-y-2">
               {recentSessions.map((session, i) => (
-                <Link key={session.id} href={`/sessions/${session.id}`}>
+                <Link key={session.id} href={`/periods/${session.id}`}>
                   <div className={`flex items-center gap-4 p-3 rounded-xl hover:bg-muted/30 transition-colors cursor-pointer animate-fade-in-up stagger-${(i % 5) + 1}`}>
                     <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center flex-shrink-0">
                       <ClipboardList className="w-5 h-5 text-blue-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground truncate">{session.title ?? `جلسة #${session.id}`}</p>
+                      <p className="font-medium text-foreground truncate">{session.title ?? `فترة #${session.id}`}</p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(session.scheduledAt).toLocaleDateString("ar-SA", {
                           weekday: "short",
@@ -193,9 +193,9 @@ export default function Dashboard() {
           ) : (
             <div className="text-center py-8">
               <ClipboardList className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-muted-foreground text-sm">لا توجد جلسات بعد</p>
-              <Link href="/sessions">
-                <button className="mt-3 btn-gold text-sm px-4 py-2">إنشاء جلسة</button>
+              <p className="text-muted-foreground text-sm">لا توجد فترات بعد</p>
+              <Link href="/periods">
+                <button className="mt-3 btn-gold text-sm px-4 py-2">إنشاء فترة</button>
               </Link>
             </div>
           )}
@@ -208,7 +208,7 @@ export default function Dashboard() {
             <h2 className="font-display font-bold text-foreground text-base mb-3">إجراءات سريعة</h2>
             <div className="space-y-1.5">
               {[
-                { label: "جلسة جديدة", href: "/sessions", icon: ClipboardList, color: "bg-blue-600" },
+                { label: "فترة جديدة", href: "/periods", icon: ClipboardList, color: "bg-blue-600" },
                 { label: "إضافة طالب", href: "/students", icon: Users, color: "bg-emerald-600" },
                 { label: "إضافة معلم", href: "/teachers", icon: GraduationCap, color: "bg-amber-500" },
                 { label: "مركز جديد", href: "/centers", icon: Building2, color: "bg-purple-600" },
@@ -274,7 +274,7 @@ export default function Dashboard() {
           </div>
           <div className="mr-auto hidden md:flex items-center gap-2">
             <TrendingUp className="w-5 h-5" style={{ color: "oklch(0.84 0.13 78)" }} />
-            <span className="text-white/80 text-sm">إجمالي الجلسات: {stats?.totalSessions ?? 0}</span>
+            <span className="text-white/80 text-sm">إجمالي الفترات: {stats?.totalSessions ?? 0}</span>
           </div>
         </div>
       </div>

@@ -20,7 +20,7 @@ const promptsByContext: Record<AiContext, string[]> = {
     "اقترح أولويات إدارية لهذا الأسبوع لمركز التحفيظ.",
   ],
   sessions: [
-    "اقترح تسلسلاً عملياً لإدارة جلسة حفظ مدتها ساعة.",
+    "اقترح تسلسلاً عملياً لإدارة فترة حفظ مدتها ساعة.",
     "كيف أتعامل تربوياً مع غياب الطالب المتكرر؟",
   ],
   students: [
@@ -109,7 +109,7 @@ export default function AIAssistant() {
               <h2 className="font-display text-lg font-bold">كيف يساعدك؟</h2>
             </div>
             <p className="text-sm leading-7 text-muted-foreground">
-              اطلب خطة للحفظ والمراجعة، فكرة لنشاط حلقة، قراءة عملية لتقرير، أو إرشاداً لإدارة الجلسات والطلاب.
+              اطلب خطة للحفظ والمراجعة، فكرة لنشاط حلقة، قراءة عملية لتقرير، أو إرشاداً لإدارة الفترات والطلاب.
             </p>
           </div>
           <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5">

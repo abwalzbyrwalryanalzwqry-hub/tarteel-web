@@ -1,7 +1,8 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
+import { useEffect } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleSimulationProvider } from "./contexts/RoleSimulationContext";
@@ -34,6 +35,12 @@ import AccessManagement from "./pages/AccessManagement";
 import RedeemAccessCode from "./pages/RedeemAccessCode";
 import GuideDashboard from "./pages/GuideDashboard";
 
+function LegacySessionRedirect({ id }: { id?: number }) {
+  const [, navigate] = useLocation();
+  useEffect(() => { navigate(id ? `/periods/${id}` : "/periods"); }, [id, navigate]);
+  return null;
+}
+
 function Router() {
   return (
     <Switch>
@@ -47,8 +54,10 @@ function Router() {
       <Route path="/teachers" component={() => <TarteelLayout><Teachers /></TarteelLayout>} />
       <Route path="/students/:id" component={(props: any) => <TarteelLayout><StudentProfile studentId={Number(props.params?.id)} /></TarteelLayout>} />
       <Route path="/students" component={() => <TarteelLayout><Students /></TarteelLayout>} />
-      <Route path="/sessions" component={() => <TarteelLayout><Sessions /></TarteelLayout>} />
-      <Route path="/sessions/:id" component={(props: any) => <TarteelLayout><SessionDetail sessionId={Number(props.params?.id)} /></TarteelLayout>} />
+      <Route path="/periods" component={() => <TarteelLayout><Sessions /></TarteelLayout>} />
+      <Route path="/periods/:id" component={(props: any) => <TarteelLayout><SessionDetail sessionId={Number(props.params?.id)} /></TarteelLayout>} />
+      <Route path="/sessions" component={() => <LegacySessionRedirect />} />
+      <Route path="/sessions/:id" component={(props: any) => <LegacySessionRedirect id={Number(props.params?.id)} />} />
       <Route path="/assistant" component={() => <TarteelLayout><AIAssistant /></TarteelLayout>} />
       <Route path="/quran" component={() => <TarteelLayout><QuranCenter /></TarteelLayout>} />
       <Route path="/parent-messages" component={() => <TarteelLayout><ParentMessages /></TarteelLayout>} />

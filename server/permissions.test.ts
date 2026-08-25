@@ -7,7 +7,7 @@ describe("صلاحيات أدوار ترتيل", () => {
     expect(hasTarteelPermission("supervisor", "students:manage")).toBe(true);
   });
 
-  it("يحصر صلاحية المعلم في الحلقات والطلاب والجلسات", () => {
+  it("يحصر صلاحية المعلم في الحلقات والطلاب والفترات", () => {
     expect(hasTarteelPermission("teacher", "sessions:manage")).toBe(true);
     expect(hasTarteelPermission("teacher", "students:manage")).toBe(true);
     expect(hasTarteelPermission("teacher", "centers:manage")).toBe(false);
@@ -35,7 +35,7 @@ describe("صلاحيات أدوار ترتيل", () => {
     const studentPaths = getVisibleNavigationPaths("student");
     const guardianPaths = getVisibleNavigationPaths("guardian");
 
-    expect(teacherPaths).toContain("/sessions");
+    expect(teacherPaths).toContain("/periods");
     expect(teacherPaths).toContain("/students");
     expect(teacherPaths).toContain("/quran");
     expect(teacherPaths).toContain("/parent-messages");

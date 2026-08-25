@@ -96,7 +96,7 @@ export const NAVIGATION_PERMISSION_RULES = {
   "/guide": "circles:view",
   "/access-management": "settings:manage",
   "/students": "students:view",
-  "/sessions": "sessions:view",
+  "/periods": "sessions:view",
   "/reports": "reports:view",
   "/assistant": "ai:use",
   "/quran": "quran:view",
