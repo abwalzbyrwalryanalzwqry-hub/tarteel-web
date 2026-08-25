@@ -685,7 +685,10 @@ export const appRouter = router({
         scheduledAt: z.date(),
         notes: z.string().optional(),
       }))
-      .mutation(async ({ ctx, input }) => createSession(await resolveSessionCreateInput(ctx.user, input))),
+      .mutation(async ({ ctx, input }) => {
+        const result = await createSession(await resolveSessionCreateInput(ctx.user, input));
+        return { sessionId: Number((result as { insertId?: number | bigint }).insertId) };
+      }),
     update: protectedProcedure
       .input(z.object({ id: z.number(), title: z.string().nullable().optional(), type: z.enum(["regular", "exam", "review", "special"]).optional(), scheduledAt: z.date().optional(), notes: z.string().nullable().optional(), status: z.enum(["scheduled", "open", "closed", "cancelled"]).optional() }))
       .mutation(async ({ ctx, input }) => {
@@ -721,7 +724,11 @@ export const appRouter = router({
         notes: z.string().optional(),
         recordedBy: z.number().optional(),
       }))
-      .mutation(async ({ input, ctx }) => { await assertSessionStudentMatch(ctx.user, input.sessionId, input.studentId); return upsertAttendance({ ...input, recordedBy: ctx.user.id }); }),
+      .mutation(async ({ input, ctx }) => {
+        const { session } = await assertSessionStudentMatch(ctx.user, input.sessionId, input.studentId);
+        await assertCirclePermission(ctx.user, session.circleId, "attendance.edit");
+        return upsertAttendance({ ...input, recordedBy: ctx.user.id });
+      }),
   }),
 
   // ===================== MEMORIZATION =====================

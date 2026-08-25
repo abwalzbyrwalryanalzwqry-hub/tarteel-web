@@ -1,17 +1,16 @@
 import EntityForm, { FormInput } from "@/components/EntityForm";
+import { NewSessionComposer, type NewSessionValues } from "@/components/NewSessionComposer";
 import { trpc } from "@/lib/trpc";
 import { CalendarDays, ClipboardList, Edit, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { SESSION_STATUS_LABELS, SESSION_TYPE_LABELS } from "../../../shared/types";
 import { Calendar } from "@/components/ui/calendar";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export default function Sessions() {
-  const { user } = useAuth();
   const { can, role } = usePermissions();
   const isTeachingRole = role === "teacher" || role === "assistant_teacher";
   const canManageSessions = can("sessions:manage");
@@ -20,6 +19,7 @@ export default function Sessions() {
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [, navigate] = useLocation();
   const utils = trpc.useUtils();
 
   const { data: sessions, isLoading, refetch } = trpc.sessions.list.useQuery({ circleId: undefined, seasonId: undefined });
@@ -35,7 +35,13 @@ export default function Sessions() {
   ]);
 
   const createMutation = trpc.sessions.create.useMutation({
-    onSuccess: () => { toast.success("تم إنشاء الجلسة بنجاح"); setShowForm(false); refetch(); syncSharedData(); },
+    onSuccess: (result) => {
+      toast.success("تم إنشاء الجلسة بنجاح");
+      setShowForm(false);
+      refetch();
+      syncSharedData();
+      if (result.sessionId) navigate(`/sessions/${result.sessionId}`);
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -52,7 +58,6 @@ export default function Sessions() {
     onSuccess: () => { toast.success("تم تحديث الجلسة"); setEditItem(null); refetch(); syncSharedData(); },
     onError: (e) => toast.error(e.message),
   });
-  const teacherOptions = isTeachingRole ? teachers?.filter((teacher) => teacher.userId === user?.id) : teachers;
 
   const filtered = useMemo(() => (sessions?.filter((s) => {
     const matchesSearch = (s.title ?? "").includes(search) || String(s.id).includes(search);
@@ -62,17 +67,9 @@ export default function Sessions() {
   }) ?? []), [sessions, search, selectedDate]);
   const sessionDays = useMemo(() => (sessions ?? []).map((session) => new Date(session.scheduledAt)), [sessions]);
 
-  function handleCreate(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+  function handleCreate(values: NewSessionValues) {
     createMutation.mutate({
-      circleId: Number(fd.get("circleId")),
-      teacherId: fd.get("teacherId") ? Number(fd.get("teacherId")) : undefined,
-      seasonId: fd.get("seasonId") ? Number(fd.get("seasonId")) : undefined,
-      title: fd.get("title") as string,
-      type: (fd.get("type") as any) || "regular",
-      scheduledAt: new Date(fd.get("scheduledAt") as string),
-      notes: fd.get("notes") as string,
+      ...values,
     });
   }
 
@@ -139,25 +136,7 @@ export default function Sessions() {
           ))}
         </div>
       )}
-      {showForm&&<EntityForm title="إنشاء جلسة جديدة" onClose={()=>setShowForm(false)} onSubmit={handleCreate} isLoading={createMutation.isPending}>
-        <div><label className="block text-sm font-medium text-foreground mb-1.5">الحلقة <span className="text-destructive">*</span></label>
-          <select name="circleId" required className="tarteel-input"><option value="">اختر الحلقة</option>{circles?.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
-        </div>
-        {!isTeachingRole && <><div><label className="block text-sm font-medium text-foreground mb-1.5">المعلم <span className="text-destructive">*</span></label>
-          <select name="teacherId" required className="tarteel-input"><option value="">اختر المعلم</option>{teacherOptions?.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>
-        </div><div><label className="block text-sm font-medium text-foreground mb-1.5">الموسم الدراسي <span className="text-destructive">*</span></label>
-          <select name="seasonId" required className="tarteel-input"><option value="">اختر الموسم</option>{seasons?.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>
-        </div></>}
-        <FormInput label="عنوان الجلسة" name="title" placeholder="جلسة الأسبوع الأول"/>
-        <div><label className="block text-sm font-medium text-foreground mb-1.5">نوع الجلسة</label>
-          <select name="type" className="tarteel-input">
-            {Object.entries(SESSION_TYPE_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
-          </select>
-        </div>
-        <FormInput label="موعد الجلسة" name="scheduledAt" type="datetime-local" required/>
-        <div><label className="block text-sm font-medium text-foreground mb-1.5">ملاحظات</label>
-          <textarea name="notes" rows={2} className="tarteel-input resize-none" placeholder="ملاحظات إضافية..."/></div>
-      </EntityForm>}
+      <NewSessionComposer open={showForm} onOpenChange={setShowForm} circles={circles} teachers={teachers} seasons={seasons} isTeachingRole={isTeachingRole} isLoading={createMutation.isPending} onSubmit={handleCreate} />
       {editItem&&<EntityForm title="تعديل الجلسة" onClose={()=>setEditItem(null)} onSubmit={handleUpdate} isLoading={updateMutation.isPending} submitLabel="حفظ التعديلات"><FormInput label="عنوان الجلسة" name="title" defaultValue={editItem.title??""}/><div><label className="block text-sm font-medium text-foreground mb-1.5">نوع الجلسة</label><select name="type" defaultValue={editItem.type} className="tarteel-input">{Object.entries(SESSION_TYPE_LABELS).map(([key, value])=><option key={key} value={key}>{value}</option>)}</select></div><FormInput label="موعد الجلسة" name="scheduledAt" type="datetime-local" required defaultValue={new Date(editItem.scheduledAt).toISOString().slice(0,16)}/><div><label className="block text-sm font-medium text-foreground mb-1.5">الحالة</label><select name="status" defaultValue={editItem.status} className="tarteel-input">{Object.entries(SESSION_STATUS_LABELS).map(([key, value])=><option key={key} value={key}>{value}</option>)}</select></div><div><label className="block text-sm font-medium text-foreground mb-1.5">ملاحظات</label><textarea name="notes" defaultValue={editItem.notes??""} rows={2} className="tarteel-input resize-none"/></div></EntityForm>}
     </div>
   );

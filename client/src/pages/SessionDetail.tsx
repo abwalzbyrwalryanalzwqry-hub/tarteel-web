@@ -42,6 +42,8 @@ export default function SessionDetail({ sessionId }: Props) {
   const [activeTab, setActiveTab] = useState("attendance");
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [dialogTab, setDialogTab] = useState<"memorization" | "revision" | "evaluation">("memorization");
+  const [attendanceOverrides, setAttendanceOverrides] = useState<Record<number, "present" | "absent" | "late" | "excused" | undefined>>({});
+  const [pendingAttendanceStudentId, setPendingAttendanceStudentId] = useState<number | null>(null);
   const utils = trpc.useUtils();
   const syncSharedData = () => void Promise.all([
     utils.dashboard.stats.invalidate(),
@@ -92,8 +94,23 @@ export default function SessionDetail({ sessionId }: Props) {
   });
 
   const upsertAttendanceMutation = trpc.attendance.upsert.useMutation({
-    onSuccess: () => { refetchAttendance(); syncSharedData(); },
-    onError: (e) => toast.error(e.message),
+    onMutate: (input) => {
+      const hasLocalStatus = Object.prototype.hasOwnProperty.call(attendanceOverrides, input.studentId);
+      const previous = hasLocalStatus ? attendanceOverrides[input.studentId] : attendance?.find((item) => item.studentId === input.studentId)?.status;
+      setPendingAttendanceStudentId(input.studentId);
+      setAttendanceOverrides((current) => ({ ...current, [input.studentId]: input.status }));
+      return { previous };
+    },
+    onSuccess: (_result, input) => toast.success(`تم تسجيل ${ATTENDANCE_STATUS_LABELS[input.status]}`),
+    onError: (error, input, context) => {
+      setAttendanceOverrides((current) => ({ ...current, [input.studentId]: context?.previous }));
+      toast.error(error.message);
+    },
+    onSettled: async (_result, _error, input) => {
+      await refetchAttendance();
+      setPendingAttendanceStudentId((current) => current === input.studentId ? null : current);
+      syncSharedData();
+    },
   });
 
   const createMemorizationMutation = trpc.memorization.create.useMutation({
@@ -114,7 +131,9 @@ export default function SessionDetail({ sessionId }: Props) {
   const getSurahName = (num: number) => QURAN_SURAHS.find((s) => s.number === num)?.name ?? `سورة ${num}`;
 
   const getAttendanceStatus = (studentId: number) =>
-    attendance?.find((a) => a.studentId === studentId)?.status;
+    Object.prototype.hasOwnProperty.call(attendanceOverrides, studentId)
+      ? attendanceOverrides[studentId]
+      : attendance?.find((a) => a.studentId === studentId)?.status;
 
   const getStudentEvaluation = (studentId: number) =>
     evaluation?.find((e) => e.studentId === studentId);
@@ -220,7 +239,7 @@ export default function SessionDetail({ sessionId }: Props) {
               {students.map((student) => {
                 const status = getAttendanceStatus(student.id);
                 return (
-                  <button key={student.id} type="button" onClick={() => setSelectedStudent(student)} className="flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-background/45 p-3 text-right transition-all hover:border-primary/30 hover:bg-primary/5">
+                  <div key={student.id} role="button" tabIndex={0} onClick={() => setSelectedStudent(student)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedStudent(student); } }} className="flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-background/45 p-3 text-right transition-all hover:border-primary/30 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
                     <div className="w-9 h-9 rounded-full bg-emerald-600/10 flex items-center justify-center flex-shrink-0">
                       <span className="font-bold text-emerald-600 text-sm">{student.name.charAt(0)}</span>
                     </div>
@@ -231,9 +250,12 @@ export default function SessionDetail({ sessionId }: Props) {
                         <button
                           key={s}
                           aria-label={ATTENDANCE_STATUS_LABELS[s]}
+                          aria-pressed={status === s}
                           title={ATTENDANCE_STATUS_LABELS[s]}
+                          type="button"
+                          disabled={pendingAttendanceStudentId === student.id}
                           onClick={() => upsertAttendanceMutation.mutate({ sessionId: session.id, studentId: student.id, status: s })}
-                          className={`flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
+                          className={`flex h-9 w-9 items-center justify-center rounded-full border transition-colors disabled:cursor-wait disabled:opacity-70 ${
                             status === s
                               ? s === "present" ? "bg-emerald-600 text-white border-emerald-600"
                               : s === "absent" ? "bg-red-600 text-white border-red-600"
@@ -245,7 +267,7 @@ export default function SessionDetail({ sessionId }: Props) {
                         </button>
                       ))}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>

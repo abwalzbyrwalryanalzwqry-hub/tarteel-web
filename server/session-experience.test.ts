@@ -47,4 +47,23 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     expect(layout).toContain('navigate("/dashboard")');
     expect(layout).toContain("العودة للشاشة السابقة");
   });
+
+  it("يدمج إنشاء الجلسة في واجهة موحدة ويعيد المعلّم إلى سجل الطلاب", () => {
+    const composer = source("client/src/components/NewSessionComposer.tsx");
+    const sessions = source("client/src/pages/Sessions.tsx");
+    expect(composer).toContain("إنشاء الجلسة وفتح سجل الطلاب");
+    expect(composer).toContain("إدخال هجري يدوي");
+    expect(composer).toContain("الحلقة");
+    expect(sessions).toContain("<NewSessionComposer");
+    expect(sessions).toContain("navigate(`/sessions/${result.sessionId}`)");
+  });
+
+  it("يحفظ أزرار الحضور كعناصر مستقلة قابلة للتفاعل مع حراسة تعديل خادمية", () => {
+    const detail = source("client/src/pages/SessionDetail.tsx");
+    const router = source("server/routers.ts");
+    expect(detail).toContain('role="button"');
+    expect(detail).toContain("attendanceOverrides");
+    expect(detail).toContain("aria-pressed={status === s}");
+    expect(router).toContain('assertCirclePermission(ctx.user, session.circleId, "attendance.edit")');
+  });
 });
