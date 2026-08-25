@@ -4,7 +4,7 @@ import { getDb, keepLatestAttendanceRows } from '../db';
 import { generateMemorizationExcel, generateAttendanceExcel } from '../export/excel';
 import { generateMemorizationPDF, generateAttendancePDF, generateStudentsReportPDF } from '../export/pdf';
 import { generateCsv, generateWordDocument } from '../export/text';
-import { eq, and, gte, lte } from 'drizzle-orm';
+import { eq, and, gte, lte, ne } from 'drizzle-orm';
 import {
   sessions,
   memorization,
@@ -93,10 +93,11 @@ export const exportRouter = router({
           input.startDate && input.endDate
             ? and(
                 eq(sessions.circleId, input.circleId),
+                ne(sessions.status, 'draft'),
                 gte(memorization.createdAt, new Date(input.startDate)),
                 lte(memorization.createdAt, new Date(input.endDate))
               )
-            : eq(sessions.circleId, input.circleId)
+            : and(eq(sessions.circleId, input.circleId), ne(sessions.status, 'draft'))
         );
 
       // تحويل البيانات إلى الصيغة المطلوبة
@@ -217,6 +218,7 @@ export const exportRouter = router({
         .where(
           and(
             eq(sessions.circleId, input.circleId),
+            ne(sessions.status, 'draft'),
             gte(sessions.scheduledAt, startDate),
             lte(sessions.scheduledAt, endDate)
           )

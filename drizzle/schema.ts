@@ -268,7 +268,7 @@ export const sessions = mysqlTable("sessions", {
   seasonId: int("seasonId").notNull(),
   title: varchar("title", { length: 255 }),
   type: mysqlEnum("type", ["regular", "exam", "review", "special"]).default("regular").notNull(),
-  status: mysqlEnum("status", ["scheduled", "open", "closed", "cancelled"]).default("scheduled").notNull(),
+  status: mysqlEnum("status", ["draft", "scheduled", "open", "closed", "cancelled"]).default("draft").notNull(),
   scheduledAt: timestamp("scheduledAt").notNull(),
   dayKey: varchar("dayKey", { length: 10 }).notNull(),
   startedAt: timestamp("startedAt"),

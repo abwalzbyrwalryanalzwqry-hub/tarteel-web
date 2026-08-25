@@ -721,7 +721,7 @@ export const appRouter = router({
     updateStatus: protectedProcedure
       .input(z.object({
         id: z.number(),
-        status: z.enum(["scheduled", "open", "closed", "cancelled"]),
+        status: z.enum(["draft", "scheduled", "open", "closed", "cancelled"]),
       }))
       .mutation(async ({ ctx, input }) => {
         const session = await getAuthorizedSession(ctx.user, input.id); await assertCirclePermission(ctx.user, session.circleId, "attendance.edit");
@@ -730,6 +730,13 @@ export const appRouter = router({
         if (input.status === "closed") updateData.closedAt = new Date();
         await updateSession(input.id, updateData as any);
       }),
+    finalize: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      const session = await getAuthorizedSession(ctx.user, input.id);
+      await assertCirclePermission(ctx.user, session.circleId, "attendance.edit");
+      if (session.status === "cancelled") throw new TRPCError({ code: "BAD_REQUEST", message: "لا يمكن اعتماد فترة ملغاة" });
+      await updateSession(input.id, { status: "closed", closedAt: new Date() });
+      return { success: true } as const;
+    }),
     delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => { const session = await getAuthorizedSession(ctx.user, input.id); await assertCirclePermission(ctx.user, session.circleId, "attendance.edit"); return softDeleteSession(input.id); }),
   }),
 

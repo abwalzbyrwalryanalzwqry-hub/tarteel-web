@@ -101,4 +101,21 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     expect(detail).toContain("latestStudentProgress");
     expect(detail).toContain("setToSurah(value)");
   });
+
+  it("يحفظ الفترة كمسودة تلقائية ثم يعرضها للتقارير بعد الاعتماد النهائي فقط", () => {
+    const schema = source("drizzle/schema.ts");
+    const database = source("server/db.ts");
+    const router = source("server/routers.ts");
+    const composer = source("client/src/components/NewSessionComposer.tsx");
+    const header = source("client/src/components/SessionHeaderControls.tsx");
+    const detail = source("client/src/pages/SessionDetail.tsx");
+    expect(schema).toContain('["draft", "scheduled", "open", "closed", "cancelled"]');
+    expect(database).toContain('ne(sessions.status, "draft")');
+    expect(router).toContain("finalize: protectedProcedure");
+    expect(composer).toContain("onClearConflict");
+    expect(header).toContain("dateConflict");
+    expect(detail).toContain("trpc.sessions.finalize.useMutation");
+    expect(detail).toContain("حفظ الفترة");
+    expect(detail).toContain("مسودة محفوظة تلقائياً");
+  });
 });

@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, gte, inArray, isNull, like, lt, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, isNull, like, lt, lte, ne, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -534,10 +534,11 @@ export async function softDeleteStudent(id: number) {
 }
 
 // ===================== SESSIONS =====================
-export async function getSessions(circleId?: number, seasonId?: number) {
+export async function getSessions(circleId?: number, seasonId?: number, includeDrafts = false) {
   const db = await getDb();
   if (!db) return [];
   const conditions = [isNull(sessions.deletedAt)];
+  if (!includeDrafts) conditions.push(ne(sessions.status, "draft"));
   if (circleId) conditions.push(eq(sessions.circleId, circleId));
   if (seasonId) conditions.push(eq(sessions.seasonId, seasonId));
   return db.select().from(sessions).where(and(...conditions)).orderBy(desc(sessions.scheduledAt));
@@ -627,7 +628,7 @@ export async function getStudentMizanProfile(studentId: number, startDate?: Date
   if (!db) return undefined;
   const student = await getStudentById(studentId);
   if (!student) return undefined;
-  const sessionConditions = [eq(sessions.circleId, student.circleId ?? -1), isNull(sessions.deletedAt)];
+  const sessionConditions = [eq(sessions.circleId, student.circleId ?? -1), isNull(sessions.deletedAt), ne(sessions.status, "draft")];
   if (startDate) sessionConditions.push(gte(sessions.scheduledAt, startDate));
   if (endDate) sessionConditions.push(lte(sessions.scheduledAt, endDate));
   const sessionRows = await db.select({ id: sessions.id }).from(sessions).where(and(...sessionConditions));
@@ -677,8 +678,8 @@ export async function getLatestStudentPeriodProgress(circleId: number) {
   const db = await getDb();
   if (!db) return {} as Record<number, { memorization: typeof memorization.$inferSelect | null; revision: typeof revision.$inferSelect | null }>;
   const [memorizationRows, revisionRows] = await Promise.all([
-    db.select({ record: memorization }).from(memorization).innerJoin(sessions, eq(memorization.sessionId, sessions.id)).where(and(eq(sessions.circleId, circleId), isNull(sessions.deletedAt))).orderBy(desc(sessions.scheduledAt), desc(memorization.updatedAt)),
-    db.select({ record: revision }).from(revision).innerJoin(sessions, eq(revision.sessionId, sessions.id)).where(and(eq(sessions.circleId, circleId), isNull(sessions.deletedAt))).orderBy(desc(sessions.scheduledAt), desc(revision.updatedAt)),
+    db.select({ record: memorization }).from(memorization).innerJoin(sessions, eq(memorization.sessionId, sessions.id)).where(and(eq(sessions.circleId, circleId), isNull(sessions.deletedAt), ne(sessions.status, "draft"))).orderBy(desc(sessions.scheduledAt), desc(memorization.updatedAt)),
+    db.select({ record: revision }).from(revision).innerJoin(sessions, eq(revision.sessionId, sessions.id)).where(and(eq(sessions.circleId, circleId), isNull(sessions.deletedAt), ne(sessions.status, "draft"))).orderBy(desc(sessions.scheduledAt), desc(revision.updatedAt)),
   ]);
   const progress: Record<number, { memorization: typeof memorization.$inferSelect | null; revision: typeof revision.$inferSelect | null }> = {};
   for (const row of memorizationRows) if (!progress[row.record.studentId]?.memorization) progress[row.record.studentId] = { memorization: row.record, revision: progress[row.record.studentId]?.revision ?? null };
@@ -771,10 +772,10 @@ export async function getDashboardStats() {
     db.select({ count: sql<number>`count(*)` }).from(teachers).where(isNull(teachers.deletedAt)),
     db.select({ count: sql<number>`count(*)` }).from(centers).where(isNull(centers.deletedAt)),
     db.select({ count: sql<number>`count(*)` }).from(circles).where(isNull(circles.deletedAt)),
-    db.select({ count: sql<number>`count(*)` }).from(sessions).where(isNull(sessions.deletedAt)),
+    db.select({ count: sql<number>`count(*)` }).from(sessions).where(and(isNull(sessions.deletedAt), ne(sessions.status, "draft"))),
     db.select({ count: sql<number>`count(*)` }).from(sessions).where(and(isNull(sessions.deletedAt), eq(sessions.status, 'open'))),
-    db.select({ count: sql<number>`count(*)` }).from(attendance).where(eq(attendance.status, 'present')),
-    db.select({ count: sql<number>`count(*)` }).from(attendance).where(eq(attendance.status, 'absent')),
+    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).where(and(eq(attendance.status, 'present'), ne(sessions.status, "draft"))),
+    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).where(and(eq(attendance.status, 'absent'), ne(sessions.status, "draft"))),
   ]);
 
   return {
@@ -802,10 +803,10 @@ export async function getDashboardStatsForCenters(centerIds: number[]) {
     db.select({ count: sql<number>`count(*)` }).from(students).where(and(inArray(students.centerId, centerIds), isNull(students.deletedAt))),
     db.select({ count: sql<number>`count(*)` }).from(teachers).where(and(inArray(teachers.centerId, centerIds), isNull(teachers.deletedAt))),
     db.select({ count: sql<number>`count(*)` }).from(circles).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), isNull(circles.deletedAt))),
-    db.select({ count: sql<number>`count(*)` }).from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), isNull(sessions.deletedAt))),
+    db.select({ count: sql<number>`count(*)` }).from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), isNull(sessions.deletedAt), ne(sessions.status, "draft"))),
     db.select({ count: sql<number>`count(*)` }).from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), isNull(sessions.deletedAt), eq(sessions.status, "open"))),
-    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), gte(sessions.scheduledAt, startOfDay), lt(sessions.scheduledAt, endOfDay), eq(attendance.status, "present"))),
-    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), gte(sessions.scheduledAt, startOfDay), lt(sessions.scheduledAt, endOfDay), eq(attendance.status, "absent"))),
+    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), gte(sessions.scheduledAt, startOfDay), lt(sessions.scheduledAt, endOfDay), eq(attendance.status, "present"), ne(sessions.status, "draft"))),
+    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), gte(sessions.scheduledAt, startOfDay), lt(sessions.scheduledAt, endOfDay), eq(attendance.status, "absent"), ne(sessions.status, "draft"))),
   ]);
   return { totalStudents: studentsCount[0]?.count ?? 0, totalTeachers: teachersCount[0]?.count ?? 0, totalCenters: centerIds.length, totalCircles: circlesCount[0]?.count ?? 0, totalSessions: sessionsCount[0]?.count ?? 0, openSessions: openSessionsCount[0]?.count ?? 0, todayAttendance: presentCount[0]?.count ?? 0, todayAbsence: absentCount[0]?.count ?? 0 };
 }
@@ -824,10 +825,10 @@ export async function getDashboardStatsForCircles(circleIds: number[]) {
     db.select({ count: sql<number>`count(*)` }).from(students).where(and(inArray(students.circleId, circleIds), isNull(students.deletedAt))),
     db.select({ count: sql<number>`count(distinct ${circles.teacherId})` }).from(circles).where(and(inArray(circles.id, circleIds), isNull(circles.deletedAt))),
     db.select({ count: sql<number>`count(distinct ${branches.centerId})` }).from(circles).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(circles.id, circleIds), isNull(circles.deletedAt))),
-    db.select({ count: sql<number>`count(*)` }).from(sessions).where(and(inArray(sessions.circleId, circleIds), isNull(sessions.deletedAt))),
+    db.select({ count: sql<number>`count(*)` }).from(sessions).where(and(inArray(sessions.circleId, circleIds), isNull(sessions.deletedAt), ne(sessions.status, "draft"))),
     db.select({ count: sql<number>`count(*)` }).from(sessions).where(and(inArray(sessions.circleId, circleIds), isNull(sessions.deletedAt), eq(sessions.status, "open"))),
-    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).where(and(inArray(sessions.circleId, circleIds), gte(sessions.scheduledAt, startOfDay), lt(sessions.scheduledAt, endOfDay), eq(attendance.status, "present"))),
-    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).where(and(inArray(sessions.circleId, circleIds), gte(sessions.scheduledAt, startOfDay), lt(sessions.scheduledAt, endOfDay), eq(attendance.status, "absent"))),
+    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).where(and(inArray(sessions.circleId, circleIds), gte(sessions.scheduledAt, startOfDay), lt(sessions.scheduledAt, endOfDay), eq(attendance.status, "present"), ne(sessions.status, "draft"))),
+    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).where(and(inArray(sessions.circleId, circleIds), gte(sessions.scheduledAt, startOfDay), lt(sessions.scheduledAt, endOfDay), eq(attendance.status, "absent"), ne(sessions.status, "draft"))),
   ]);
   return {
     totalStudents: studentsCount[0]?.count ?? 0,
@@ -844,14 +845,14 @@ export async function getDashboardStatsForCircles(circleIds: number[]) {
 export async function getRecentSessions(limit = 5) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(sessions).where(isNull(sessions.deletedAt)).orderBy(desc(sessions.createdAt)).limit(limit);
+  return db.select().from(sessions).where(and(isNull(sessions.deletedAt), ne(sessions.status, "draft"))).orderBy(desc(sessions.createdAt)).limit(limit);
 }
 
 export async function getRecentSessionsForCenters(centerIds: number[], limit = 5) {
   if (!centerIds.length) return [];
   const db = await getDb();
   if (!db) return [];
-  const rows = await db.select({ session: sessions }).from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), isNull(sessions.deletedAt))).orderBy(desc(sessions.createdAt)).limit(limit);
+  const rows = await db.select({ session: sessions }).from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), isNull(sessions.deletedAt), ne(sessions.status, "draft"))).orderBy(desc(sessions.createdAt)).limit(limit);
   return rows.map((row) => row.session);
 }
 
@@ -859,7 +860,7 @@ export async function getRecentSessionsForCircles(circleIds: number[], limit = 5
   if (!circleIds.length) return [];
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(sessions).where(and(inArray(sessions.circleId, circleIds), isNull(sessions.deletedAt))).orderBy(desc(sessions.createdAt)).limit(limit);
+  return db.select().from(sessions).where(and(inArray(sessions.circleId, circleIds), isNull(sessions.deletedAt), ne(sessions.status, "draft"))).orderBy(desc(sessions.createdAt)).limit(limit);
 }
 
 // ===================== TRASH =====================

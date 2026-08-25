@@ -7,6 +7,7 @@ describe("منطق الميزان", () => {
     expect(getQuranRangeError({ surahNumber: 1, fromAyah: 1, toAyah: 8 })).toBe("رقم الآية خارج نطاق السورة المحددة");
     expect(getQuranRangeError({ surahNumber: 3, toSurahNumber: 2, fromAyah: 1, toAyah: 2 })).toBe("نطاق الحفظ أو المراجعة غير صحيح");
     expect(getQuranRangeError({ surahNumber: 2, fromAyah: 40, toAyah: 8 })).toBe("نطاق الحفظ أو المراجعة غير صحيح");
+    expect(getQuranRangeError({ surahNumber: 107, toSurahNumber: 109, fromAyah: 1, toAyah: 6 })).toBeNull();
   });
 
   it("يلخص حالات الحضور للحلقة والجلسة دون خلط الحالات", () => {

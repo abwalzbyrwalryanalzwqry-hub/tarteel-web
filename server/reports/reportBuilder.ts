@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, ne } from "drizzle-orm";
 import { getDb, keepLatestAttendanceRows } from "../db";
 import { attendance, branches, centers, circles, evaluation, memorization, revision, sessions, students } from "../../drizzle/schema";
 import { GRADE_LABELS, QURAN_SURAHS } from "../../shared/types";
@@ -45,7 +45,7 @@ export async function buildUnifiedReport(input: ReportBuilderInput): Promise<Uni
   const [center] = branch ? await db.select().from(centers).where(eq(centers.id, branch.centerId)).limit(1) : [];
   const start = asDateBoundary(input.startDate);
   const end = asDateBoundary(input.endDate, true);
-  const sessionConditions = [eq(sessions.circleId, input.circleId)];
+  const sessionConditions = [eq(sessions.circleId, input.circleId), ne(sessions.status, "draft")];
   if (start) sessionConditions.push(gte(sessions.scheduledAt, start));
   if (end) sessionConditions.push(lte(sessions.scheduledAt, end));
   const circleSessions = await db.select().from(sessions).where(and(...sessionConditions));

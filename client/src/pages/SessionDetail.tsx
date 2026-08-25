@@ -10,7 +10,7 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 import { AIGuidanceCard } from "@/components/AIGuidanceCard";
@@ -98,6 +98,15 @@ export default function SessionDetail({ sessionId }: Props) {
     onError: (e) => toast.error(e.message),
   });
 
+  const finalizeMutation = trpc.sessions.finalize.useMutation({
+    onSuccess: async () => {
+      toast.success("تم حفظ الفترة واعتماد بياناتها في القوائم والتقارير");
+      await Promise.all([utils.sessions.byId.invalidate({ id: sessionId! }), utils.sessions.list.invalidate(), utils.dashboard.stats.invalidate(), utils.dashboard.recentSessions.invalidate()]);
+      syncSharedData();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
   const upsertAttendanceMutation = trpc.attendance.upsert.useMutation({
     onMutate: (input) => {
       const hasLocalStatus = Object.prototype.hasOwnProperty.call(attendanceOverrides, input.studentId);
@@ -164,6 +173,7 @@ export default function SessionDetail({ sessionId }: Props) {
   }
 
   const statusColors: Record<string, string> = {
+    draft: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
     scheduled: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
     open: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
     closed: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
@@ -195,6 +205,9 @@ export default function SessionDetail({ sessionId }: Props) {
           </div>
           <div className="flex flex-wrap justify-end gap-2">
             <SessionHeaderControls session={session} />
+            {session.status === "draft" && (
+              <button disabled={finalizeMutation.isPending} onClick={() => finalizeMutation.mutate({ id: session.id })} className="btn-gold text-sm px-4 py-2">{finalizeMutation.isPending ? "جارٍ حفظ الفترة…" : "حفظ الفترة"}</button>
+            )}
             {session.status === "scheduled" && (
               <button onClick={()=>updateStatusMutation.mutate({id:session.id,status:"open"})} className="btn-gold text-sm px-4 py-2">فتح الفترة</button>
             )}
@@ -203,6 +216,7 @@ export default function SessionDetail({ sessionId }: Props) {
             )}
           </div>
         </div>
+        {session.status === "draft" && <p className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-sm text-foreground">هذه الفترة مسودة محفوظة تلقائياً؛ لن تظهر في قائمة الفترات أو التقارير حتى تضغط «حفظ الفترة».</p>}
         {session.notes && <p className="mt-3 text-sm text-muted-foreground border-t border-border/50 pt-3">{session.notes}</p>}
         <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <SessionMetric label="حاضر" value={attendanceStats.present} tone="text-emerald-700 dark:text-emerald-300" />
@@ -417,6 +431,15 @@ function QuranEntryForm({ student, sessionId, progress, onSubmit, isLoading, kin
   const [toSurah, setToSurah] = useState(() => initialSurah);
   const [fromAyah, setFromAyah] = useState(() => initialAyah);
   const [toAyah, setToAyah] = useState(() => initialAyah);
+  useEffect(() => {
+    if (!remembered) return;
+    const resumedSurah = remembered.toSurahNumber ?? remembered.surahNumber;
+    const resumedAyah = remembered.toAyah;
+    setFromSurah(resumedSurah);
+    setToSurah(resumedSurah);
+    setFromAyah(resumedAyah);
+    setToAyah(resumedAyah);
+  }, [remembered?.id]);
   const fromMax = QURAN_SURAHS.find((surah) => surah.number === fromSurah)?.ayahs ?? 1;
   const toMax = QURAN_SURAHS.find((surah) => surah.number === toSurah)?.ayahs ?? 1;
   const label = isMemorization ? "الحفظ" : "المراجعة";
