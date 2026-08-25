@@ -534,6 +534,29 @@ button:active {
   box-shadow: 0 0 0 3px oklch(0.32 0.12 155 / 0.15);
 }
 
+/* Public code redemption must fit narrow mobile viewports without horizontal scroll. */
+.access-redemption-shell {
+  box-sizing: border-box;
+  width: min(100%, 36rem);
+  margin-inline: auto;
+  padding: 1rem;
+  overflow-x: clip;
+}
+
+.access-code-input {
+  box-sizing: border-box;
+  min-width: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.045em;
+}
+
+@media (min-width: 640px) {
+  .access-code-input {
+    font-size: 0.875rem;
+    letter-spacing: 0.09em;
+  }
+}
+
 /* ===================== PAGE HEADER ===================== */
 .page-header {
   margin-bottom: 1.5rem;

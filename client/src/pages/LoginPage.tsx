@@ -4,10 +4,13 @@ import { BookOpen, Chrome, Mail, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { trpc } from "@/lib/trpc";
 import { readPendingTeacherInvite } from "../../../shared/teacherInviteFlow";
+import { hasActiveAccessMembership } from "../../../shared/accessMembership";
 
 export default function LoginPage() {
   const { isAuthenticated, loading } = useAuth();
+  const { data: memberships, isLoading: membershipsLoading } = trpc.access.mine.useQuery(undefined, { enabled: isAuthenticated });
   const [, navigate] = useLocation();
   const oauthStateFailed = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("authError") === "oauth_state";
 
@@ -19,11 +22,11 @@ export default function LoginPage() {
   });
 
   useEffect(() => {
-    if (!loading && isAuthenticated) {
+    if (!loading && !membershipsLoading && isAuthenticated) {
       const pendingCode = readPendingTeacherInvite();
-      navigate(pendingCode ? `/redeem-teacher-invite?code=${pendingCode}` : "/dashboard");
+      navigate(pendingCode ? `/redeem-teacher-invite?code=${pendingCode}` : hasActiveAccessMembership(memberships) ? "/dashboard" : "/redeem-access-code");
     }
-  }, [isAuthenticated, loading, navigate]);
+  }, [isAuthenticated, loading, memberships, membershipsLoading, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden" dir="rtl">

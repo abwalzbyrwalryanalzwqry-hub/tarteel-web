@@ -2,6 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { useTheme } from "@/contexts/ThemeContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { getVisibleNavigationPaths } from "../../../shared/permissions";
+import { hasActiveAccessMembership } from "../../../shared/accessMembership";
 import { trpc } from "@/lib/trpc";
 import { useRoleSimulation } from "@/contexts/RoleSimulationContext";
 import {
@@ -65,6 +66,8 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { can, role, roleLabel } = usePermissions();
   const { simulation, stopSimulation } = useRoleSimulation();
+  const { data: memberships, isLoading: membershipsLoading } = trpc.access.mine.useQuery(undefined, { enabled: isAuthenticated });
+  const needsAccessCode = isAuthenticated && !membershipsLoading && !hasActiveAccessMembership(memberships);
   const switchAccount = () => {
     try { sessionStorage.setItem("tarteel-switch-account", "1"); } catch {}
     void logout();
@@ -87,6 +90,10 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
       navigate("/login");
     }
   }, [loading, isAuthenticated, navigate]);
+
+  useEffect(() => {
+    if (needsAccessCode) navigate("/redeem-access-code");
+  }, [navigate, needsAccessCode]);
 
   if (loading) {
     return (
@@ -114,6 +121,19 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
           <button onClick={() => navigate("/login")} className="btn-gold w-full text-base">
             تسجيل الدخول
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (needsAccessCode) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4" dir="rtl">
+        <div className="glass-card max-w-md rounded-3xl p-8 text-center shadow-xl">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl gold-gradient text-white shadow-lg"><KeyRound className="h-8 w-8" /></div>
+          <h1 className="mt-5 font-display text-2xl font-bold text-foreground">فعّل حسابك بكود الدخول</h1>
+          <p className="mt-2 text-sm leading-7 text-muted-foreground">تم تسجيل دخولك بنجاح. أدخل كود الوصول الذي منحك إياه مدير المركز أو معلم الحلقة لتظهر صلاحياتك المناسبة.</p>
+          <button onClick={() => navigate("/redeem-access-code")} className="btn-gold mt-6 w-full py-3">استرداد كود الدخول</button>
         </div>
       </div>
     );
