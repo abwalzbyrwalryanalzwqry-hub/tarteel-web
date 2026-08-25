@@ -28,6 +28,19 @@ export function formatDualCalendarDate(value: string | number | Date): { gregori
 
 export type HijriDateParts = { year: number; month: number; day: number };
 
+/** مفتاح اليوم التشغيلي في توقيت السعودية، ليبقى لكل حلقة سجل واحد في اليوم نفسه. */
+export function getRiyadhDayKey(value: string | number | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error("تاريخ الفترة غير صالح");
+  const parts = new Intl.DateTimeFormat("en-US", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "Asia/Riyadh" }).formatToParts(date);
+  const valueOf = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
+  const year = valueOf("year");
+  const month = valueOf("month");
+  const day = valueOf("day");
+  if (!year || !month || !day) throw new Error("تعذر تحديد يوم الفترة");
+  return `${year}-${month}-${day}`;
+}
+
 export function getHijriDateParts(value: string | number | Date): HijriDateParts | null {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return null;

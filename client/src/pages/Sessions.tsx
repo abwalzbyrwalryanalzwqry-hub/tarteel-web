@@ -15,6 +15,7 @@ export default function Sessions() {
   const isTeachingRole = role === "teacher" || role === "assistant_teacher";
   const canManageSessions = can("sessions:manage");
   const [showForm, setShowForm] = useState(false);
+  const [createConflict, setCreateConflict] = useState<string | null>(null);
   const [editItem, setEditItem] = useState<any>(null);
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
@@ -37,12 +38,13 @@ export default function Sessions() {
   const createMutation = trpc.sessions.create.useMutation({
     onSuccess: (result) => {
       toast.success("تم إنشاء الفترة بنجاح");
+      setCreateConflict(null);
       setShowForm(false);
       refetch();
       syncSharedData();
       if (result.sessionId) navigate(`/periods/${result.sessionId}`);
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => { setCreateConflict(e.message); toast.error(e.message); },
   });
 
   const updateStatusMutation = trpc.sessions.updateStatus.useMutation({
@@ -68,6 +70,7 @@ export default function Sessions() {
   const sessionDays = useMemo(() => (sessions ?? []).map((session) => new Date(session.scheduledAt)), [sessions]);
 
   function handleCreate(values: NewSessionValues) {
+    setCreateConflict(null);
     createMutation.mutate({
       ...values,
     });
@@ -136,7 +139,7 @@ export default function Sessions() {
           ))}
         </div>
       )}
-      <NewSessionComposer open={showForm} onOpenChange={setShowForm} circles={circles} teachers={teachers} seasons={seasons} isTeachingRole={isTeachingRole} isLoading={createMutation.isPending} onSubmit={handleCreate} />
+      <NewSessionComposer open={showForm} onOpenChange={(open) => { setShowForm(open); if (!open) setCreateConflict(null); }} circles={circles} teachers={teachers} seasons={seasons} isTeachingRole={isTeachingRole} isLoading={createMutation.isPending} conflictMessage={createConflict} onSubmit={handleCreate} />
       {editItem&&<EntityForm title="تعديل الفترة" onClose={()=>setEditItem(null)} onSubmit={handleUpdate} isLoading={updateMutation.isPending} submitLabel="حفظ التعديلات"><FormInput label="عنوان الفترة" name="title" defaultValue={editItem.title??""}/><div><label className="block text-sm font-medium text-foreground mb-1.5">نوع الفترة</label><select name="type" defaultValue={editItem.type} className="tarteel-input">{Object.entries(SESSION_TYPE_LABELS).map(([key, value])=><option key={key} value={key}>{value}</option>)}</select></div><FormInput label="موعد الفترة" name="scheduledAt" type="datetime-local" required defaultValue={new Date(editItem.scheduledAt).toISOString().slice(0,16)}/><div><label className="block text-sm font-medium text-foreground mb-1.5">الحالة</label><select name="status" defaultValue={editItem.status} className="tarteel-input">{Object.entries(SESSION_STATUS_LABELS).map(([key, value])=><option key={key} value={key}>{value}</option>)}</select></div><div><label className="block text-sm font-medium text-foreground mb-1.5">ملاحظات</label><textarea name="notes" defaultValue={editItem.notes??""} rows={2} className="tarteel-input resize-none"/></div></EntityForm>}
     </div>
   );

@@ -68,6 +68,11 @@ export default function SessionDetail({ sessionId }: Props) {
     { enabled: !!session?.circleId }
   );
 
+  const { data: latestProgress } = trpc.sessions.latestStudentProgress.useQuery(
+    { circleId: session?.circleId ?? 0 },
+    { enabled: !!session?.circleId }
+  );
+
   const { data: attendance, refetch: refetchAttendance } = trpc.attendance.bySession.useQuery(
     { sessionId: sessionId! },
     { enabled: !!sessionId }
@@ -114,12 +119,12 @@ export default function SessionDetail({ sessionId }: Props) {
   });
 
   const createMemorizationMutation = trpc.memorization.create.useMutation({
-    onSuccess: () => { toast.success("تم تسجيل الحفظ"); refetchMemorization(); syncSharedData(); },
+    onSuccess: () => { toast.success("تم تسجيل الحفظ"); refetchMemorization(); utils.sessions.latestStudentProgress.invalidate(); syncSharedData(); },
     onError: (e) => toast.error(e.message),
   });
 
   const createRevisionMutation = trpc.revision.create.useMutation({
-    onSuccess: () => { toast.success("تم تسجيل المراجعة"); refetchRevision(); syncSharedData(); },
+    onSuccess: () => { toast.success("تم تسجيل المراجعة"); refetchRevision(); utils.sessions.latestStudentProgress.invalidate(); syncSharedData(); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -288,6 +293,7 @@ export default function SessionDetail({ sessionId }: Props) {
                     key={student.id}
                     student={student}
                     sessionId={session.id}
+                    progress={latestProgress?.[student.id]}
                     onSubmit={(data: any) => createMemorizationMutation.mutate(data)}
                     isLoading={createMemorizationMutation.isPending}
                   />
@@ -330,6 +336,7 @@ export default function SessionDetail({ sessionId }: Props) {
                     key={student.id}
                     student={student}
                     sessionId={session.id}
+                    progress={latestProgress?.[student.id]}
                     onSubmit={(data: any) => createRevisionMutation.mutate(data)}
                     isLoading={createRevisionMutation.isPending}
                   />
@@ -386,7 +393,7 @@ export default function SessionDetail({ sessionId }: Props) {
       <Dialog open={Boolean(selectedStudent)} onOpenChange={(open) => !open && setSelectedStudent(null)}>
         <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-xl" dir="rtl">
           <DialogHeader><DialogTitle className="font-display text-xl">سجل الطالب في الجلسة</DialogTitle><DialogDescription>سجّل الحفظ أو المراجعة أو التقييم، ثم افتح موضع البداية في المصحف عند الحاجة.</DialogDescription></DialogHeader>
-          {selectedStudent && <div className="space-y-4"><div className="rounded-2xl bg-primary/5 p-3"><p className="font-semibold text-foreground">{selectedStudent.name}</p><p className="mt-1 text-xs text-muted-foreground">آخر حفظ: {getSurahName(selectedStudent.lastMemorizedSurah)} · آية {selectedStudent.lastMemorizedAyah}</p></div><div className="flex gap-1 rounded-xl bg-muted/50 p-1">{([ ["memorization", "الحفظ"], ["revision", "المراجعة"], ["evaluation", "التقييم"] ] as const).map(([id, label]) => <button key={id} onClick={() => setDialogTab(id)} className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${dialogTab === id ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`}>{label}</button>)}</div>{dialogTab === "memorization" && <MemorizationForm student={selectedStudent} sessionId={session.id} onSubmit={(data: any) => createMemorizationMutation.mutate(data)} isLoading={createMemorizationMutation.isPending} forceExpanded />}{dialogTab === "revision" && <RevisionForm student={selectedStudent} sessionId={session.id} onSubmit={(data: any) => createRevisionMutation.mutate(data)} isLoading={createRevisionMutation.isPending} forceExpanded />}{dialogTab === "evaluation" && <EvaluationForm student={selectedStudent} sessionId={session.id} existing={getStudentEvaluation(selectedStudent.id)} onSubmit={(data: any) => upsertEvaluationMutation.mutate(data)} isLoading={upsertEvaluationMutation.isPending} forceExpanded />}</div>}
+          {selectedStudent && <div className="space-y-4"><div className="rounded-2xl bg-primary/5 p-3"><p className="font-semibold text-foreground">{selectedStudent.name}</p><p className="mt-1 text-xs text-muted-foreground">آخر حفظ: {getSurahName(latestProgress?.[selectedStudent.id]?.memorization?.toSurahNumber ?? latestProgress?.[selectedStudent.id]?.memorization?.surahNumber ?? selectedStudent.lastMemorizedSurah)} · آية {latestProgress?.[selectedStudent.id]?.memorization?.toAyah ?? selectedStudent.lastMemorizedAyah}</p><p className="mt-1 text-xs text-muted-foreground">آخر مراجعة: {latestProgress?.[selectedStudent.id]?.revision ? `${getSurahName(latestProgress?.[selectedStudent.id]?.revision?.toSurahNumber ?? latestProgress?.[selectedStudent.id]?.revision?.surahNumber ?? 1)} · آية ${latestProgress?.[selectedStudent.id]?.revision?.toAyah ?? 1}` : "لم تسجل بعد"}</p></div><div className="flex gap-1 rounded-xl bg-muted/50 p-1">{([ ["memorization", "الحفظ"], ["revision", "المراجعة"], ["evaluation", "التقييم"] ] as const).map(([id, label]) => <button key={id} onClick={() => setDialogTab(id)} className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${dialogTab === id ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`}>{label}</button>)}</div>{dialogTab === "memorization" && <MemorizationForm student={selectedStudent} sessionId={session.id} progress={latestProgress?.[selectedStudent.id]} onSubmit={(data: any) => createMemorizationMutation.mutate(data)} isLoading={createMemorizationMutation.isPending} forceExpanded />}{dialogTab === "revision" && <RevisionForm student={selectedStudent} sessionId={session.id} progress={latestProgress?.[selectedStudent.id]} onSubmit={(data: any) => createRevisionMutation.mutate(data)} isLoading={createRevisionMutation.isPending} forceExpanded />}{dialogTab === "evaluation" && <EvaluationForm student={selectedStudent} sessionId={session.id} existing={getStudentEvaluation(selectedStudent.id)} onSubmit={(data: any) => upsertEvaluationMutation.mutate(data)} isLoading={upsertEvaluationMutation.isPending} forceExpanded />}</div>}
         </DialogContent>
       </Dialog>
     </div>
@@ -400,18 +407,21 @@ function SessionMetric({ label, value, tone }: { label: string; value: number; t
 function MemorizationForm(props: any) { return <QuranEntryForm {...props} kind="memorization" />; }
 function RevisionForm(props: any) { return <QuranEntryForm {...props} kind="revision" />; }
 
-function QuranEntryForm({ student, sessionId, onSubmit, isLoading, kind, forceExpanded = false }: any) {
+function QuranEntryForm({ student, sessionId, progress, onSubmit, isLoading, kind, forceExpanded = false }: any) {
   const [expanded, setExpanded] = useState(false);
-  const [fromSurah, setFromSurah] = useState(() => student.lastMemorizedSurah ?? 1);
-  const [toSurah, setToSurah] = useState(() => student.lastMemorizedSurah ?? 1);
-  const [fromAyah, setFromAyah] = useState(() => student.lastMemorizedAyah ?? 1);
-  const [toAyah, setToAyah] = useState(() => student.lastMemorizedAyah ?? 1);
+  const isMemorization = kind === "memorization";
+  const remembered = isMemorization ? progress?.memorization : progress?.revision;
+  const initialSurah = remembered?.toSurahNumber ?? remembered?.surahNumber ?? student.lastMemorizedSurah ?? 1;
+  const initialAyah = remembered?.toAyah ?? student.lastMemorizedAyah ?? 1;
+  const [fromSurah, setFromSurah] = useState(() => initialSurah);
+  const [toSurah, setToSurah] = useState(() => initialSurah);
+  const [fromAyah, setFromAyah] = useState(() => initialAyah);
+  const [toAyah, setToAyah] = useState(() => initialAyah);
   const fromMax = QURAN_SURAHS.find((surah) => surah.number === fromSurah)?.ayahs ?? 1;
   const toMax = QURAN_SURAHS.find((surah) => surah.number === toSurah)?.ayahs ?? 1;
-  const isMemorization = kind === "memorization";
   const label = isMemorization ? "الحفظ" : "المراجعة";
   const accent = isMemorization ? "bg-emerald-600/10 text-emerald-600" : "bg-purple-600/10 text-purple-600";
-  const selectSurah = (value: number, side: "from" | "to") => { if (side === "from") { setFromSurah(value); setFromAyah(1); } else { setToSurah(value); setToAyah(1); } };
+  const selectSurah = (value: number, side: "from" | "to") => { if (side === "from") { setFromSurah(value); setFromAyah(1); setToSurah(value); setToAyah(1); } else { setToSurah(value); setToAyah(1); } };
   const openMushaf = () => window.open(`/quran?surah=${fromSurah}&ayah=${fromAyah}`, "_blank", "noopener,noreferrer");
   const showForm = expanded || forceExpanded;
   return <div className="overflow-hidden rounded-xl border border-border/50">{!forceExpanded && <button onClick={() => setExpanded(!expanded)} className="flex w-full items-center gap-3 p-3 text-right transition-colors hover:bg-muted/30"><div className={`flex h-8 w-8 items-center justify-center rounded-full ${accent}`}><span className="text-sm font-bold">{student.name.charAt(0)}</span></div><span className="flex-1 font-medium text-foreground">{student.name}</span><span className="text-xs text-muted-foreground">{expanded ? "إخفاء" : `تسجيل ${label}`}</span></button>}{showForm && <form onSubmit={(event) => { event.preventDefault(); if (toSurah < fromSurah || (toSurah === fromSurah && toAyah < fromAyah)) { toast.error("يرجى اختيار نطاق صحيح من البداية إلى النهاية"); return; } onSubmit({ sessionId, studentId: student.id, surahNumber: fromSurah, toSurahNumber: toSurah, fromAyah, toAyah, pages: (new FormData(event.currentTarget).get("pages") as string) || undefined, grade: (new FormData(event.currentTarget).get("grade") as string) || undefined, notes: (new FormData(event.currentTarget).get("notes") as string) || undefined }); if (!forceExpanded) setExpanded(false); }} className="space-y-3 border-t border-border/50 p-3 pt-3"><div className="grid grid-cols-2 gap-2"><FieldSelect label="من سورة" value={fromSurah} onChange={(value) => selectSurah(value, "from")} /><FieldSelect label="إلى سورة" value={toSurah} onChange={(value) => selectSurah(value, "to")} /><AyahPicker label="من آية" value={fromAyah} max={fromMax} onChange={setFromAyah} /><AyahPicker label="إلى آية" value={toAyah} max={toMax} onChange={setToAyah} /></div><button type="button" onClick={openMushaf} className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/25 bg-primary/5 py-2 text-sm font-semibold text-primary hover:bg-primary/10"><BookOpenText className="h-4 w-4" />فتح موضع البداية في المصحف</button><div className="grid grid-cols-3 gap-2"><div><label className="mb-1 block text-xs text-muted-foreground">الصفحات</label><input name="pages" type="number" min="0" step="0.5" className="tarteel-input py-1.5 text-sm" placeholder="0" /></div><div><label className="mb-1 block text-xs text-muted-foreground">التقدير</label><select name="grade" className="tarteel-input py-1.5 text-sm"><option value="">اختر</option>{Object.entries(GRADE_LABELS).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select></div><div><label className="mb-1 block text-xs text-muted-foreground">ملاحظات</label><input name="notes" className="tarteel-input py-1.5 text-sm" placeholder="اختياري" /></div></div><button type="submit" disabled={isLoading} className="btn-gold w-full py-2 text-sm">{isLoading ? "جارٍ الحفظ..." : `تسجيل ${label}`}</button></form>}</div>;

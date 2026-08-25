@@ -28,6 +28,7 @@ import {
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { getTeacherInviteAvailability } from "../shared/teacherInvites";
+import { getRiyadhDayKey } from "../shared/dates";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -310,9 +311,10 @@ export async function getCircleMonthlyRecord(circleId: number, startDate?: Date,
     db.select().from(memorization).where(inArray(memorization.sessionId, sessionIds)).orderBy(desc(memorization.createdAt)),
     db.select().from(revision).where(inArray(revision.sessionId, sessionIds)).orderBy(desc(revision.createdAt)),
   ]);
+  const currentAttendanceRows = keepLatestAttendanceRows(attendanceRows);
 
   return studentRows.map((student) => {
-    const studentAttendance = attendanceRows.filter((row) => row.studentId === student.id);
+    const studentAttendance = currentAttendanceRows.filter((row) => row.studentId === student.id);
     const studentMemorization = memorizationRows.filter((row) => row.studentId === student.id);
     const studentRevision = revisionRows.filter((row) => row.studentId === student.id);
     return {
@@ -548,6 +550,14 @@ export async function getSessionById(id: number) {
   return result[0];
 }
 
+/** تعيد الفترة الوحيدة للحلقة في اليوم التشغيلي المحدد، إن وُجدت. */
+export async function getSessionByCircleDay(circleId: number, dayKey: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(sessions).where(and(eq(sessions.circleId, circleId), eq(sessions.dayKey, dayKey), isNull(sessions.deletedAt))).limit(1);
+  return result[0];
+}
+
 export async function createSession(data: typeof sessions.$inferInsert) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
@@ -571,7 +581,18 @@ export async function softDeleteSession(id: number) {
 export async function getAttendanceBySession(sessionId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(attendance).where(eq(attendance.sessionId, sessionId));
+  return keepLatestAttendanceRows(await db.select().from(attendance).where(eq(attendance.sessionId, sessionId)));
+}
+
+/** يبقي آخر حالة حضور فقط لكل طالب وفترة عند قراءة سجلات تاريخية متكررة. */
+export function keepLatestAttendanceRows<T extends { id: number; sessionId: number; studentId: number; updatedAt: Date }>(rows: T[]) {
+  const latest = new Map<string, T>();
+  for (const row of rows) {
+    const key = `${row.sessionId}:${row.studentId}`;
+    const current = latest.get(key);
+    if (!current || row.updatedAt.getTime() > current.updatedAt.getTime() || (row.updatedAt.getTime() === current.updatedAt.getTime() && row.id > current.id)) latest.set(key, row);
+  }
+  return Array.from(latest.values());
 }
 
 export async function upsertAttendance(data: typeof attendance.$inferInsert) {
@@ -618,13 +639,16 @@ export async function getStudentMizanProfile(studentId: number, startDate?: Date
     sessionIds.length ? db.select().from(evaluation).where(and(eq(evaluation.studentId, studentId), inArray(evaluation.sessionId, sessionIds))).orderBy(desc(evaluation.createdAt)) : Promise.resolve([]),
   ]);
   const withinRange = <T extends { createdAt: Date }>(rows: T[]) => rows.filter((row) => (!startDate || row.createdAt >= startDate) && (!endDate || row.createdAt <= endDate));
-  return { student, memorization: withinRange(memorizationRows), revision: withinRange(revisionRows), attendance: attendanceRows, evaluations: evaluationRows };
+  return { student, memorization: withinRange(memorizationRows), revision: withinRange(revisionRows), attendance: keepLatestAttendanceRows(attendanceRows), evaluations: evaluationRows };
 }
 
 export async function createMemorization(data: typeof memorization.$inferInsert) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.insert(memorization).values(data);
+  await db.insert(memorization).values(data).onDuplicateKeyUpdate({
+    set: { surahNumber: data.surahNumber, toSurahNumber: data.toSurahNumber, fromAyah: data.fromAyah, toAyah: data.toAyah, pages: data.pages, grade: data.grade, notes: data.notes, recordedBy: data.recordedBy, updatedAt: new Date() },
+  });
+  await db.update(students).set({ lastMemorizedSurah: data.toSurahNumber ?? data.surahNumber, lastMemorizedAyah: data.toAyah, updatedAt: new Date() }).where(eq(students.id, data.studentId));
 }
 
 export async function updateMemorization(id: number, data: Partial<typeof memorization.$inferInsert>) {
@@ -643,7 +667,23 @@ export async function getRevisionBySession(sessionId: number) {
 export async function createRevision(data: typeof revision.$inferInsert) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.insert(revision).values(data);
+  await db.insert(revision).values(data).onDuplicateKeyUpdate({
+    set: { surahNumber: data.surahNumber, toSurahNumber: data.toSurahNumber, fromAyah: data.fromAyah, toAyah: data.toAyah, pages: data.pages, grade: data.grade, notes: data.notes, recordedBy: data.recordedBy, updatedAt: new Date() },
+  });
+}
+
+/** آخر موضع حفظ ومراجعة لكل طالب في الحلقة، لبدء الفترة التالية من حيث انتهى. */
+export async function getLatestStudentPeriodProgress(circleId: number) {
+  const db = await getDb();
+  if (!db) return {} as Record<number, { memorization: typeof memorization.$inferSelect | null; revision: typeof revision.$inferSelect | null }>;
+  const [memorizationRows, revisionRows] = await Promise.all([
+    db.select({ record: memorization }).from(memorization).innerJoin(sessions, eq(memorization.sessionId, sessions.id)).where(and(eq(sessions.circleId, circleId), isNull(sessions.deletedAt))).orderBy(desc(sessions.scheduledAt), desc(memorization.updatedAt)),
+    db.select({ record: revision }).from(revision).innerJoin(sessions, eq(revision.sessionId, sessions.id)).where(and(eq(sessions.circleId, circleId), isNull(sessions.deletedAt))).orderBy(desc(sessions.scheduledAt), desc(revision.updatedAt)),
+  ]);
+  const progress: Record<number, { memorization: typeof memorization.$inferSelect | null; revision: typeof revision.$inferSelect | null }> = {};
+  for (const row of memorizationRows) if (!progress[row.record.studentId]?.memorization) progress[row.record.studentId] = { memorization: row.record, revision: progress[row.record.studentId]?.revision ?? null };
+  for (const row of revisionRows) if (!progress[row.record.studentId]?.revision) progress[row.record.studentId] = { memorization: progress[row.record.studentId]?.memorization ?? null, revision: row.record };
+  return progress;
 }
 
 // ===================== EVALUATION =====================

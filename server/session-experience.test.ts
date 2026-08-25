@@ -81,4 +81,24 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     expect(dashboard).toContain('href="/periods"');
     expect(dashboard).not.toContain('href="/sessions"');
   });
+
+  it("يفرض فترة واحدة للتاريخ الذي يختاره المعلم، ويمنع تكرار الحضور ويستعيد آخر إنجاز", () => {
+    const dates = source("shared/dates.ts");
+    const schema = source("drizzle/schema.ts");
+    const database = source("server/db.ts");
+    const router = source("server/routers.ts");
+    const composer = source("client/src/components/NewSessionComposer.tsx");
+    const detail = source("client/src/pages/SessionDetail.tsx");
+    expect(dates).toContain("getRiyadhDayKey");
+    expect(schema).toContain('dayKey: varchar("dayKey", { length: 10 }).notNull()');
+    expect(schema).toContain("attendance_session_student_unique");
+    expect(database).toContain("keepLatestAttendanceRows");
+    expect(database).toContain("getLatestStudentPeriodProgress");
+    expect(router).toContain("createDailyPeriod");
+    expect(router).toContain('code: "CONFLICT"');
+    expect(composer).toContain("conflictMessage");
+    expect(composer).toContain("تغيير التاريخ");
+    expect(detail).toContain("latestStudentProgress");
+    expect(detail).toContain("setToSurah(value)");
+  });
 });

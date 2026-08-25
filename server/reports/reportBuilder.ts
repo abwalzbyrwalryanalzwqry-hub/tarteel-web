@@ -1,5 +1,5 @@
 import { and, eq, gte, inArray, lte } from "drizzle-orm";
-import { getDb } from "../db";
+import { getDb, keepLatestAttendanceRows } from "../db";
 import { attendance, branches, centers, circles, evaluation, memorization, revision, sessions, students } from "../../drizzle/schema";
 import { GRADE_LABELS, QURAN_SURAHS } from "../../shared/types";
 import { scoreToStars, MIZAN_RATING_LABELS } from "../../shared/mizan";
@@ -60,15 +60,16 @@ export async function buildUnifiedReport(input: ReportBuilderInput): Promise<Uni
     sessionIds.length && studentIds.length ? db.select().from(revision).where(and(inArray(revision.sessionId, sessionIds), inArray(revision.studentId, studentIds))) : Promise.resolve([]),
     sessionIds.length && studentIds.length ? db.select().from(evaluation).where(and(inArray(evaluation.sessionId, sessionIds), inArray(evaluation.studentId, studentIds))) : Promise.resolve([]),
   ]);
+  const currentAttendanceRows = keepLatestAttendanceRows(attendanceRows);
   const reportBlocks = reportStudents.map((student) => {
-    const studentAttendance = attendanceRows.filter((row) => row.studentId === student.id);
+    const studentAttendance = currentAttendanceRows.filter((row) => row.studentId === student.id);
     const mem = memorizationRows.filter((row) => row.studentId === student.id).map((row) => ({ id: row.id, kind: "memorization" as const, from: location(row.surahNumber, row.fromAyah), to: location(row.toSurahNumber ?? row.surahNumber, row.toAyah), pages: row.pages === null ? null : Number(row.pages), grade: row.grade ? GRADE_LABELS[row.grade] : null, date: row.createdAt, notes: row.notes }));
     const rev = revisionRows.filter((row) => row.studentId === student.id).map((row) => ({ id: row.id, kind: "revision" as const, from: location(row.surahNumber, row.fromAyah), to: location(row.toSurahNumber ?? row.surahNumber, row.toAyah), pages: row.pages === null ? null : Number(row.pages), grade: row.grade ? GRADE_LABELS[row.grade] : null, date: row.createdAt, notes: row.notes }));
     const studentEvaluations = evaluationRows.filter((row) => row.studentId === student.id).map((row) => ({ id: row.id, score: row.totalScore, rating: MIZAN_RATING_LABELS[scoreToStars(row.totalScore)], date: row.createdAt, notes: row.notes }));
     const scores = studentEvaluations.map((item) => item.score).filter((score): score is number => score !== null);
     return { student: { id: student.id, name: student.name, enrollmentDate: student.enrollmentDate }, attendance: { present: studentAttendance.filter((row) => row.status === "present").length, absent: studentAttendance.filter((row) => row.status === "absent").length, late: studentAttendance.filter((row) => row.status === "late").length, excused: studentAttendance.filter((row) => row.status === "excused").length, total: studentAttendance.length }, memorization: mem.sort((a, b) => b.date.getTime() - a.date.getTime()), revision: rev.sort((a, b) => b.date.getTime() - a.date.getTime()), averageScore: scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null, evaluations: studentEvaluations.sort((a, b) => b.date.getTime() - a.date.getTime()) };
   });
-  const attendanceTotals = attendanceRows.reduce((totals, row) => ({ ...totals, [row.status]: totals[row.status] + 1 }), { present: 0, absent: 0, late: 0, excused: 0 });
+  const attendanceTotals = currentAttendanceRows.reduce((totals, row) => ({ ...totals, [row.status]: totals[row.status] + 1 }), { present: 0, absent: 0, late: 0, excused: 0 });
   const allScores = reportBlocks.map((item) => item.averageScore).filter((score): score is number => score !== null);
   const sorted = [...reportBlocks].sort((left, right) => {
     if (input.sortBy === "enrollment") return (left.student.enrollmentDate?.getTime() ?? 0) - (right.student.enrollmentDate?.getTime() ?? 0);
@@ -76,6 +77,6 @@ export async function buildUnifiedReport(input: ReportBuilderInput): Promise<Uni
     if (input.sortBy === "attendance") return (right.attendance.total ? right.attendance.present / right.attendance.total : -1) - (left.attendance.total ? left.attendance.present / left.attendance.total : -1);
     return left.student.name.localeCompare(right.student.name, "ar");
   });
-  const attendanceTotal = attendanceRows.length;
+  const attendanceTotal = currentAttendanceRows.length;
   return { meta: { title: circle.name, typeLabel: typeLabel(input.reportType), circleName: circle.name, centerName: center?.name ?? "المركز", startDate: start ?? null, endDate: end ?? null, generatedAt: new Date() }, sections: input.sections, summary: { students: reportStudents.length, ...attendanceTotals, attendanceRate: attendanceTotal ? Math.round((attendanceTotals.present / attendanceTotal) * 100) : 0, memorizationCount: memorizationRows.length, revisionCount: revisionRows.length, averageScore: allScores.length ? Math.round(allScores.reduce((sum, score) => sum + score, 0) / allScores.length) : null }, students: sorted };
 }

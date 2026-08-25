@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { protectedProcedure, router } from '../_core/trpc';
-import { getDb } from '../db';
+import { getDb, keepLatestAttendanceRows } from '../db';
 import { generateMemorizationExcel, generateAttendanceExcel } from '../export/excel';
 import { generateMemorizationPDF, generateAttendancePDF, generateStudentsReportPDF } from '../export/pdf';
 import { generateCsv, generateWordDocument } from '../export/text';
@@ -200,6 +200,10 @@ export const exportRouter = router({
 
       const attData = await db
         .select({
+          id: attendance.id,
+          sessionId: attendance.sessionId,
+          studentId: attendance.studentId,
+          updatedAt: attendance.updatedAt,
           studentName: students.name,
           sessionDate: sessions.scheduledAt,
           status: attendance.status,
@@ -219,7 +223,7 @@ export const exportRouter = router({
         );
 
       // تحويل البيانات إلى الصيغة المطلوبة
-      const formattedData = attData.map((row) => ({
+      const formattedData = keepLatestAttendanceRows(attData).map((row) => ({
         studentName: row.studentName || 'غير معروف',
         sessionDate: row.sessionDate
           ? new Date(row.sessionDate).toLocaleDateString('ar-SA')

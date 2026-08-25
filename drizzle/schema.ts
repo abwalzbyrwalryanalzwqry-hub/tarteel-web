@@ -270,13 +270,14 @@ export const sessions = mysqlTable("sessions", {
   type: mysqlEnum("type", ["regular", "exam", "review", "special"]).default("regular").notNull(),
   status: mysqlEnum("status", ["scheduled", "open", "closed", "cancelled"]).default("scheduled").notNull(),
   scheduledAt: timestamp("scheduledAt").notNull(),
+  dayKey: varchar("dayKey", { length: 10 }).notNull(),
   startedAt: timestamp("startedAt"),
   closedAt: timestamp("closedAt"),
   notes: text("notes"),
   deletedAt: timestamp("deletedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => [index("sessions_circle_day_idx").on(table.circleId, table.dayKey), index("sessions_day_key_idx").on(table.dayKey)]);
 
 export type Session = typeof sessions.$inferSelect;
 export type InsertSession = typeof sessions.$inferInsert;
@@ -292,7 +293,7 @@ export const attendance = mysqlTable("attendance", {
   recordedBy: int("recordedBy"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => [uniqueIndex("attendance_session_student_unique").on(table.sessionId, table.studentId), index("attendance_student_session_idx").on(table.studentId, table.sessionId)]);
 
 export type Attendance = typeof attendance.$inferSelect;
 export type InsertAttendance = typeof attendance.$inferInsert;
@@ -312,7 +313,7 @@ export const memorization = mysqlTable("memorization", {
   recordedBy: int("recordedBy"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => [uniqueIndex("memorization_session_student_unique").on(table.sessionId, table.studentId), index("memorization_student_session_idx").on(table.studentId, table.sessionId)]);
 
 export type Memorization = typeof memorization.$inferSelect;
 export type InsertMemorization = typeof memorization.$inferInsert;
@@ -332,7 +333,7 @@ export const revision = mysqlTable("revision", {
   recordedBy: int("recordedBy"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => [uniqueIndex("revision_session_student_unique").on(table.sessionId, table.studentId), index("revision_student_session_idx").on(table.studentId, table.sessionId)]);
 
 export type Revision = typeof revision.$inferSelect;
 export type InsertRevision = typeof revision.$inferInsert;
@@ -352,7 +353,7 @@ export const evaluation = mysqlTable("evaluation", {
   recordedBy: int("recordedBy"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => [uniqueIndex("evaluation_session_student_unique").on(table.sessionId, table.studentId), index("evaluation_student_session_idx").on(table.studentId, table.sessionId)]);
 
 export type Evaluation = typeof evaluation.$inferSelect;
 export type InsertEvaluation = typeof evaluation.$inferInsert;

@@ -5,6 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { GRANULAR_PERMISSIONS, hasTarteelPermission } from "../shared/permissions";
 import { assertCanDelegate, assertCirclePermission, assertPermission, assertScope, assertStudentPermission, getAuthorization, ROLE_PERMISSION_TEMPLATES, type AccessSubject } from "./accessControl";
 import { getQuranRangeError } from "../shared/mizan";
+import { getRiyadhDayKey } from "../shared/dates";
 import { createAccessCodeSecret, getAccessCodeHint, hashAccessCode } from "./accessCodeSecurity";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -58,6 +59,7 @@ import {
   getEvaluationBySession,
   getMemorizationBySession,
   getMemorizationByStudent,
+  getLatestStudentPeriodProgress,
   getNotificationsByUser,
   getOrganizationById,
   getParentStudentLinks,
@@ -67,6 +69,7 @@ import {
   getRecentSessionsForCenters,
   getRevisionBySession,
   getSessionById,
+  getSessionByCircleDay,
   getSessions,
   getStudentById,
   getStudentMizanProfile,
@@ -198,6 +201,16 @@ async function resolveSessionCreateInput(user: AccessSubject, input: { circleId:
   }
   if (!input.teacherId || !input.seasonId) throw new TRPCError({ code: "BAD_REQUEST", message: "يلزم اختيار المعلم والموسم الدراسي" });
   return input as Required<Pick<typeof input, "teacherId" | "seasonId">> & typeof input;
+}
+
+/** كل فترة تخص تاريخاً يحدده المعلم: يمنع السجل الثاني في الحلقة والتاريخ نفسيهما. */
+async function createDailyPeriod(user: AccessSubject, input: { circleId: number; teacherId?: number; seasonId?: number; title?: string; type: "regular" | "exam" | "review" | "special"; scheduledAt: Date; notes?: string }) {
+  const resolved = await resolveSessionCreateInput(user, input);
+  const dayKey = getRiyadhDayKey(resolved.scheduledAt);
+  const existing = await getSessionByCircleDay(resolved.circleId, dayKey);
+  if (existing) throw new TRPCError({ code: "CONFLICT", message: "توجد بالفعل فترة لهذه الحلقة في التاريخ المحدد. اختر يوماً أو تاريخاً آخر." });
+  const result = await createSession({ ...resolved, dayKey });
+  return { sessionId: Number((result as { insertId?: number | bigint }).insertId) };
 }
 
 function assertQuranRange(input: { surahNumber: number; toSurahNumber?: number; fromAyah: number; toAyah: number }) {
@@ -466,7 +479,7 @@ export const appRouter = router({
       await assertTeacherCircleAccess(ctx.user, period.circleId);
       const circle = await getCircleById(period.circleId);
       if (!circle?.teacherId) throw new TRPCError({ code: "BAD_REQUEST", message: "يلزم تعيين معلم للحَلَقة قبل إنشاء جلسة" });
-      return createSession({ circleId: circle.id, teacherId: circle.teacherId, seasonId: circle.seasonId, title: `${period.name} · ${period.sessionType}`, type: "regular", scheduledAt: input.scheduledAt });
+      return createDailyPeriod(ctx.user, { circleId: circle.id, teacherId: circle.teacherId, seasonId: circle.seasonId, title: `${period.name} · ${period.sessionType}`, type: "regular", scheduledAt: input.scheduledAt });
     }),
   }),
 
@@ -675,6 +688,10 @@ export const appRouter = router({
         return (await Promise.all(scope.map((circleId) => getSessions(circleId, input.seasonId)))).flat();
       }),
     byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => getAuthorizedSession(ctx.user, input.id)),
+    latestStudentProgress: protectedProcedure.input(z.object({ circleId: z.number() })).query(async ({ ctx, input }) => {
+      await assertTeacherCircleAccess(ctx.user, input.circleId);
+      return getLatestStudentPeriodProgress(input.circleId);
+    }),
     create: protectedProcedure
       .input(z.object({
         circleId: z.number(),
@@ -685,16 +702,19 @@ export const appRouter = router({
         scheduledAt: z.date(),
         notes: z.string().optional(),
       }))
-      .mutation(async ({ ctx, input }) => {
-        const result = await createSession(await resolveSessionCreateInput(ctx.user, input));
-        return { sessionId: Number((result as { insertId?: number | bigint }).insertId) };
-      }),
+      .mutation(async ({ ctx, input }) => createDailyPeriod(ctx.user, input)),
     update: protectedProcedure
       .input(z.object({ id: z.number(), title: z.string().nullable().optional(), type: z.enum(["regular", "exam", "review", "special"]).optional(), scheduledAt: z.date().optional(), notes: z.string().nullable().optional(), status: z.enum(["scheduled", "open", "closed", "cancelled"]).optional() }))
       .mutation(async ({ ctx, input }) => {
         const session = await getAuthorizedSession(ctx.user, input.id);
         await assertCirclePermission(ctx.user, session.circleId, "attendance.edit");
         const { id, ...data } = input;
+        if (data.scheduledAt) {
+          const dayKey = getRiyadhDayKey(data.scheduledAt);
+          const duplicate = await getSessionByCircleDay(session.circleId, dayKey);
+          if (duplicate && duplicate.id !== id) throw new TRPCError({ code: "CONFLICT", message: "توجد بالفعل فترة لهذه الحلقة في اليوم المحدد" });
+          Object.assign(data, { dayKey });
+        }
         await updateSession(id, data);
         return { success: true } as const;
       }),
