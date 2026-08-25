@@ -26,7 +26,10 @@ export function registerOAuthRoutes(app: Express) {
     const { nonce } = decodeOAuthState(state);
     const expectedNonce = parseCookieHeader(req.headers.cookie ?? "")[OAUTH_STATE_COOKIE];
     if (!nonce || nonce !== expectedNonce) {
-      res.status(403).json({ error: "invalid oauth state" });
+      // Keep the CSRF failure closed, clear any stale browser state, and return
+      // to the app's retry screen rather than leaving a mobile browser on JSON.
+      res.clearCookie(OAUTH_STATE_COOKIE, { path: "/", secure: true, sameSite: "none" });
+      res.redirect(302, "/login?authError=oauth_state");
       return;
     }
     res.clearCookie(OAUTH_STATE_COOKIE, { path: "/", secure: true, sameSite: "none" });

@@ -1,4 +1,4 @@
-import { OAUTH_STATE_COOKIE, encodeOAuthState } from "@shared/const";
+import { OAUTH_STATE_COOKIE, encodeOAuthState, isOAuthLoginAttemptLocked } from "@shared/const";
 
 export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
@@ -13,6 +13,16 @@ export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 // with "invalid oauth state". It returns void by design, so there is no URL to
 // stash across renders.
 export const startLogin = () => {
+  // Several unauthenticated queries can fail together on mobile. Keep the first
+  // navigation authoritative so a second call cannot overwrite its nonce cookie.
+  try {
+    const startedAt = sessionStorage.getItem("tarteel:oauth-login-started-at");
+    if (isOAuthLoginAttemptLocked(startedAt)) return;
+    sessionStorage.setItem("tarteel:oauth-login-started-at", String(Date.now()));
+  } catch {
+    // Storage may be blocked; the nonce guard on the server still fails closed.
+  }
+
   const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
   const appId = import.meta.env.VITE_APP_ID;
   const redirectUri = `${window.location.origin}/api/oauth/callback`;
@@ -28,4 +38,12 @@ export const startLogin = () => {
   url.searchParams.set("type", "signIn");
 
   window.location.href = url.toString();
+};
+
+export const clearPendingOAuthLoginAttempt = () => {
+  try {
+    sessionStorage.removeItem("tarteel:oauth-login-started-at");
+  } catch {
+    // Storage may be unavailable; a later attempt simply waits for the lock.
+  }
 };

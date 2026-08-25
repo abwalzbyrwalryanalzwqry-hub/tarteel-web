@@ -9,6 +9,13 @@ export const NOT_ADMIN_ERR_MSG = 'You do not have required permission (10002)';
 // Domain), so a sibling *.manus.space site cannot plant a matching value in a
 // victim's browser.
 export const OAUTH_STATE_COOKIE = "__Host-oauth_state";
+export const OAUTH_LOGIN_LOCK_MS = 15_000;
+
+/** يمنع بدء محاولتي OAuth متقاربتين من الكتابة فوق nonce نفسها. */
+export const isOAuthLoginAttemptLocked = (startedAt: string | null, now = Date.now()) => {
+  const timestamp = Number(startedAt);
+  return Number.isFinite(timestamp) && timestamp > 0 && now - timestamp >= 0 && now - timestamp < OAUTH_LOGIN_LOCK_MS;
+};
 
 // `state` carries the callback redirect URI (used at token exchange) plus the
 // CSRF nonce. Defined here so the client encoder and server decoder never drift.

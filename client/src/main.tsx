@@ -5,7 +5,6 @@ import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
-import { startLogin } from "./const";
 import { ROLE_SIMULATION_STORAGE_KEY } from "./contexts/RoleSimulationContext";
 import "./index.css";
 
@@ -19,7 +18,9 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  startLogin();
+  // Do not start OAuth from a query-cache subscription. Multiple failed queries
+  // can otherwise mint competing nonce cookies and cause "invalid oauth state".
+  if (window.location.pathname !== "/login") window.location.replace("/login");
 };
 
 queryClient.getQueryCache().subscribe(event => {

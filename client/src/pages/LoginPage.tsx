@@ -1,4 +1,4 @@
-import { startLogin } from "@/const";
+import { clearPendingOAuthLoginAttempt, startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { BookOpen, Chrome, Mail, Star } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -9,6 +9,11 @@ import { readPendingTeacherInvite } from "../../../shared/teacherInviteFlow";
 export default function LoginPage() {
   const { isAuthenticated, loading } = useAuth();
   const [, navigate] = useLocation();
+  const oauthStateFailed = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("authError") === "oauth_state";
+
+  useEffect(() => {
+    if (oauthStateFailed) clearPendingOAuthLoginAttempt();
+  }, [oauthStateFailed]);
   const [switchAccount] = useState(() => {
     try { return sessionStorage.getItem("tarteel-switch-account") === "1"; } catch { return false; }
   });
@@ -52,6 +57,12 @@ export default function LoginPage() {
             <div className="mb-5 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-right text-xs leading-6 text-muted-foreground">
               <p className="font-semibold text-foreground">تم تسجيل خروجك من ترتيل.</p>
               <p className="mt-1">إذا عاد موفر المصادقة بالحساب نفسه، فهذه جلسة خارجية مستقلة. لاستخدام حساب آخر افتح ترتيل في نافذة خاصة أو ملف متصفح مختلف، ثم سجّل الدخول بالحساب الثاني هناك.</p>
+            </div>
+          )}
+
+          {oauthStateFailed && (
+            <div className="mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-right text-xs leading-6 text-foreground">
+              انتهت محاولة الدخول السابقة أو تغيّرت نافذة المتصفح. اضغط زر الدخول مرة واحدة لإعادة المحاولة من هذه الصفحة.
             </div>
           )}
 
