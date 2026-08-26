@@ -46,6 +46,16 @@ export function VisualMushafReader({ startSurah, startAyah, selectionContext }: 
   const startIsOnPage = page?.verses.some(([surah, ayah]) => surah === startSurah && ayah === startAyah) ?? false;
   const startZones = useMemo(() => page?.zones.filter(([surah, ayah]) => surah === startSurah && ayah === startAyah) ?? [], [page, startSurah, startAyah]);
 
+  useEffect(() => {
+    if (!registry) return;
+    [pageNumber - 1, pageNumber + 1].forEach((nearbyPage) => {
+      const source = getPage(registry, nearbyPage)?.url;
+      if (!source) return;
+      const image = new Image();
+      image.src = source;
+    });
+  }, [pageNumber, registry]);
+
   const setActivePage = (next: number) => {
     setTapState(null);
     setTapHint("");
