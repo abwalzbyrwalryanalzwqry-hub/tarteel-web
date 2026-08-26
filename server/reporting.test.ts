@@ -92,4 +92,26 @@ describe("نظام التقرير الموحد", () => {
     expect(management).toContain("BarChart");
     expect(management).toContain("تنبيهات المتابعة");
   });
+
+  it("يوفر تقرير إدارة قابل للتصدير وفلاتر معلم وعمر وإجراءات تنبيه مباشرة", () => {
+    const builder = read("server/reports/reportBuilder.ts");
+    const router = read("server/routers/reporting.ts");
+    const exporter = read("server/reports/managementExport.ts");
+    const management = read("client/src/components/ManagementReport.tsx");
+    expect(builder).toContain("teacherId?: number");
+    expect(builder).toContain("ageGroup?: StudentAgeGroup");
+    expect(builder).toContain("studentAgeGroup");
+    expect(builder).toContain("teacherPhone");
+    expect(router).toContain("exportManagementPdf");
+    expect(router).toContain("exportManagementExcel");
+    expect(exporter).toContain("generateManagementReportPdf");
+    expect(exporter).toContain("generateManagementReportExcel");
+    expect(exporter).toContain("مقارنة الحلقات");
+    expect(exporter).toContain("التنبيهات");
+    expect(management).toContain("فلاتر مقارنة الحلقات");
+    expect(management).toContain("مراسلة المعلم");
+    expect(management).toContain("عرض تفاصيل الحلقة");
+    expect(management).toContain("PDF الإدارة");
+    expect(management).toContain("Excel الإدارة");
+  });
 });
