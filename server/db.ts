@@ -148,6 +148,26 @@ export async function createCenter(data: typeof centers.$inferInsert) {
   await db.insert(centers).values(data);
 }
 
+export async function provisionIndependentCenter(input: { userId: number; centerName: string; organizationName?: string; phone?: string; email?: string; address?: string; city?: string; description?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  return db.transaction(async (tx) => {
+    const now = new Date();
+    const existingMembership = await tx.select({ id: centerMemberships.id }).from(centerMemberships).where(and(eq(centerMemberships.userId, input.userId), eq(centerMemberships.status, "active"), isNull(centerMemberships.revokedAt), or(isNull(centerMemberships.expiresAt), gt(centerMemberships.expiresAt, now)))).limit(1);
+    if (existingMembership[0]) throw new Error("الحساب مفعّل بالفعل في مركز قائم");
+    const organizationResult = await tx.insert(organizations).values({ name: input.organizationName?.trim() || input.centerName, description: input.description, phone: input.phone, email: input.email || null, address: input.address, city: input.city, adminId: input.userId, isActive: true });
+    const organizationId = Number(organizationResult[0]?.insertId);
+    if (!Number.isInteger(organizationId) || organizationId < 1) throw new Error("تعذر إنشاء الجهة التابعة للمركز");
+    const centerResult = await tx.insert(centers).values({ organizationId, name: input.centerName, description: input.description, phone: input.phone, email: input.email || null, address: input.address, city: input.city, managerId: input.userId, isActive: true });
+    const centerId = Number(centerResult[0]?.insertId);
+    if (!Number.isInteger(centerId) || centerId < 1) throw new Error("تعذر إنشاء المركز");
+    await tx.insert(centerMemberships).values({ userId: input.userId, centerId, role: "center_manager", status: "active", isOwner: true, grantedBy: input.userId, grantedAt: now });
+    await tx.insert(userScopes).values({ userId: input.userId, centerId, scopeType: "center", grantedBy: input.userId });
+    await tx.update(users).set({ role: "center_manager", isActive: true, accountStatus: "active", accessRevokedAt: null, lastActiveAt: now, updatedAt: now }).where(eq(users.id, input.userId));
+    return { organizationId, centerId };
+  });
+}
+
 export async function updateCenter(id: number, data: Partial<typeof centers.$inferInsert>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");

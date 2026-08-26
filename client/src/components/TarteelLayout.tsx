@@ -97,7 +97,7 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
   }, [loading, isAuthenticated, navigate]);
 
   useEffect(() => {
-    if (needsAccessCode) navigate("/redeem-access-code");
+    if (needsAccessCode) navigate("/start");
   }, [navigate, needsAccessCode]);
 
   if (loading) {
@@ -136,9 +136,9 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
       <div className="min-h-screen flex items-center justify-center bg-background p-4" dir="rtl">
         <div className="glass-card max-w-md rounded-3xl p-8 text-center shadow-xl">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl gold-gradient text-white shadow-lg"><KeyRound className="h-8 w-8" /></div>
-          <h1 className="mt-5 font-display text-2xl font-bold text-foreground">فعّل حسابك بكود الدخول</h1>
-          <p className="mt-2 text-sm leading-7 text-muted-foreground">تم تسجيل دخولك بنجاح. أدخل كود الوصول الذي منحك إياه مدير المركز أو معلم الحلقة لتظهر صلاحياتك المناسبة.</p>
-          <button onClick={() => navigate("/redeem-access-code")} className="btn-gold mt-6 w-full py-3">استرداد كود الدخول</button>
+          <h1 className="mt-5 font-display text-2xl font-bold text-foreground">ابدأ استخدام ترتيل</h1>
+          <p className="mt-2 text-sm leading-7 text-muted-foreground">يمكنك الانضمام إلى مركز قائم بكود دخول، أو إنشاء مركز مستقل لتكون مديره الأول.</p>
+          <button onClick={() => navigate("/start")} className="btn-gold mt-6 w-full py-3">اختيار طريقة البدء</button>
         </div>
       </div>
     );

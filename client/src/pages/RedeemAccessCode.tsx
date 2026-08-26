@@ -62,6 +62,7 @@ export default function RedeemAccessCode() {
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
         <p>بعد التفعيل لا يظهر الكود في الأرشيف؛ يطلب من الإدارة إصدار كود بديل عند الحاجة.</p>
       </aside>
+      <button onClick={() => navigate("/start")} className="mt-4 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-primary hover:bg-muted">ليس لديك كود؟ أنشئ مركزاً مستقلاً</button>
     </main>
   );
 }

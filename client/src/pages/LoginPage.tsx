@@ -24,7 +24,7 @@ export default function LoginPage() {
   useEffect(() => {
     if (!loading && !membershipsLoading && isAuthenticated) {
       const pendingCode = readPendingTeacherInvite();
-      navigate(pendingCode ? `/redeem-teacher-invite?code=${pendingCode}` : hasActiveAccessMembership(memberships) ? "/dashboard" : "/redeem-access-code");
+      navigate(pendingCode ? `/redeem-teacher-invite?code=${pendingCode}` : hasActiveAccessMembership(memberships) ? "/dashboard" : "/start");
     }
   }, [isAuthenticated, loading, memberships, membershipsLoading, navigate]);
 

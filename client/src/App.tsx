@@ -33,6 +33,7 @@ import TeacherInvites from "./pages/TeacherInvites";
 import RedeemTeacherInvite from "./pages/RedeemTeacherInvite";
 import AccessManagement from "./pages/AccessManagement";
 import RedeemAccessCode from "./pages/RedeemAccessCode";
+import CenterOnboarding from "./pages/CenterOnboarding";
 import GuideDashboard from "./pages/GuideDashboard";
 
 function LegacySessionRedirect({ id }: { id?: number }) {
@@ -65,6 +66,7 @@ function Router() {
       <Route path="/access-management" component={() => <TarteelLayout><AccessManagement /></TarteelLayout>} />
       <Route path="/guide" component={() => <TarteelLayout><GuideDashboard /></TarteelLayout>} />
       <Route path="/redeem-teacher-invite" component={RedeemTeacherInvite} />
+      <Route path="/start" component={CenterOnboarding} />
       <Route path="/redeem-access-code" component={RedeemAccessCode} />
       <Route path="/reports" component={() => <TarteelLayout><Reports /></TarteelLayout>} />
       <Route path="/notifications" component={() => <TarteelLayout><Notifications /></TarteelLayout>} />

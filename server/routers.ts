@@ -24,6 +24,7 @@ import {
   createCenter,
   createCircle,
   createCirclePeriod,
+  provisionIndependentCenter,
   createMemorization,
   createNotification,
   createOrganization,
@@ -359,6 +360,30 @@ export const appRouter = router({
         await updateCenter(id, data);
       }),
     delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => { const authorization = await assertPermission(ctx.user, input.id, "center.edit"); if (!authorization.membership.isOwner) throw new TRPCError({ code: "FORBIDDEN", message: "أرشفة المركز من صلاحية مالكه فقط" }); return softDeleteCenter(input.id); }),
+  }),
+
+  onboarding: router({
+    createIndependentCenter: protectedProcedure.input(z.object({
+      centerName: z.string().trim().min(2).max(255),
+      organizationName: z.string().trim().min(2).max(255).optional(),
+      phone: z.string().trim().max(32).optional(),
+      email: z.string().trim().email().optional().or(z.literal("")),
+      address: z.string().trim().max(2000).optional(),
+      city: z.string().trim().max(100).optional(),
+      description: z.string().trim().max(5000).optional(),
+    })).mutation(async ({ ctx, input }) => {
+      const memberships = await getUserCenterMemberships(ctx.user.id);
+      const now = new Date();
+      const isActivated = memberships.some((membership) => membership.status === "active" && !membership.revokedAt && (!membership.expiresAt || membership.expiresAt > now));
+      if (isActivated) throw new TRPCError({ code: "CONFLICT", message: "حسابك مفعّل في مركز قائم، ويمكنك إدارة مراكزك من لوحة التحكم" });
+      try {
+        return await provisionIndependentCenter({ userId: ctx.user.id, ...input, email: input.email || undefined });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "تعذر إنشاء المركز المستقل";
+        if (message === "الحساب مفعّل بالفعل في مركز قائم") throw new TRPCError({ code: "CONFLICT", message });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+      }
+    }),
   }),
 
   // ===================== BRANCHES =====================
