@@ -1,0 +1,49 @@
+import { clampMushafPage, findMushafPage, MUSHAF_PAGE_COUNT, MUSHAF_SURAH_COUNT, MUSHAF_VERSE_COUNT, resolveMushafTripleTap, validateMushafRegistry, type MushafVisualRegistry } from "../shared/mushafVisual";
+import { describe, expect, it } from "vitest";
+
+const allVerseRefs = Array.from({ length: MUSHAF_VERSE_COUNT }, (_, index) => [index % MUSHAF_SURAH_COUNT + 1, Math.floor(index / MUSHAF_SURAH_COUNT) + 1] as const);
+
+const registry: MushafVisualRegistry = {
+  source: "اختبار",
+  version: "1.01",
+  pageCount: MUSHAF_PAGE_COUNT,
+  surahCount: MUSHAF_SURAH_COUNT,
+  verseCount: MUSHAF_VERSE_COUNT,
+  pages: Array.from({ length: MUSHAF_PAGE_COUNT }, (_, index) => ({
+    page: index + 1,
+    url: `/manus-storage/${String(index + 1).padStart(3, "0")}.svg`,
+    verses: allVerseRefs.filter((_, verseIndex) => verseIndex % MUSHAF_PAGE_COUNT === index),
+    zones: [[...(allVerseRefs.find((_, verseIndex) => verseIndex % MUSHAF_PAGE_COUNT === index) ?? [1, 1]), 1, 1, 1, 1, 1] as const],
+  })),
+};
+
+describe("قارئ المصحف المرئي", () => {
+  it("يرفض فهرساً لا يطابق عقد 604 صفحة و114 سورة و6236 آية", () => {
+    expect(validateMushafRegistry(registry)).toBe(true);
+    expect(validateMushafRegistry({ ...registry, pageCount: 603 })).toBe(false);
+    expect(validateMushafRegistry({ ...registry, verseCount: 6235 })).toBe(false);
+    expect(validateMushafRegistry({ ...registry, surahCount: 113 })).toBe(false);
+    expect(validateMushafRegistry({ ...registry, pages: registry.pages.map((page, index) => index === 0 ? { ...page, zones: [[114, 6236, 1, 1, 1, 1, 1]] } : page) })).toBe(false);
+  });
+
+  it("يجد صفحة البداية ويضبط التنقل داخل نطاق صفحات المصحف", () => {
+    expect(findMushafPage(registry, 1, 1)?.page).toBe(1);
+    expect(clampMushafPage(-8)).toBe(1);
+    expect(clampMushafPage(900)).toBe(604);
+    expect(clampMushafPage(17.8)).toBe(18);
+  });
+
+  it("لا يختار النهاية إلا بعد ثلاث نقرات متتابعة على الآية ذاتها", () => {
+    const first = resolveMushafTripleTap(null, { surah: 2, ayah: 255 }, 1000);
+    const second = resolveMushafTripleTap(first.state, { surah: 2, ayah: 255 }, 1500);
+    const third = resolveMushafTripleTap(second.state, { surah: 2, ayah: 255 }, 1800);
+    const reset = resolveMushafTripleTap(third.state, { surah: 2, ayah: 256 }, 1900);
+    const expired = resolveMushafTripleTap(second.state, { surah: 2, ayah: 255 }, 2400);
+
+    expect(first.selected).toBe(false);
+    expect(second.state.count).toBe(2);
+    expect(third.selected).toBe(true);
+    expect(reset.state.count).toBe(1);
+    expect(expired.state.count).toBe(1);
+  });
+});

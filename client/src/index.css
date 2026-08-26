@@ -456,6 +456,17 @@ button:active {
   100% { background-position: 200% 0; }
 }
 
+@keyframes mushafStartAttention {
+  0%, 18%, 36% { opacity: 0.18; box-shadow: 0 0 0 0.05rem oklch(0.76 0.17 76 / 0.72), 0 0 1rem oklch(0.76 0.17 76 / 0.78); }
+  9%, 27%, 45% { opacity: 0.78; box-shadow: 0 0 0 0.16rem oklch(0.76 0.17 76 / 0.7), 0 0 1.45rem oklch(0.76 0.17 76 / 0.9); }
+  100% { opacity: 0; box-shadow: 0 0 0 0 oklch(0.76 0.17 76 / 0); }
+}
+
+.mushaf-start-highlight {
+  background: oklch(0.78 0.17 76 / 0.58);
+  animation: mushafStartAttention 3s var(--ease-out) forwards;
+}
+
 .animate-fade-in-up {
   animation: fadeInUp 0.3s var(--ease-out) both;
 }
@@ -657,7 +668,10 @@ button:active {
 /* ===================== RESPONSIVE ===================== */
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in-up,
-  .animate-slide-in {
+  .animate-slide-in,
+  .mushaf-start-highlight {
     animation: none;
   }
+
+  .mushaf-start-highlight { opacity: 0.38; }
 }

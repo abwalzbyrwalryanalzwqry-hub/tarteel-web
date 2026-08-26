@@ -10,13 +10,14 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 import { AIGuidanceCard } from "@/components/AIGuidanceCard";
 import { AyahPicker } from "@/components/AyahPicker";
 import { SessionHeaderControls } from "@/components/SessionHeaderControls";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { clearMushafSelectionContext, createMushafSelectionToken, readMushafSelectionContext, saveMushafSelectionContext, type MushafSelectionContext } from "@/lib/mushafSelection";
 import { formatHijriDate } from "../../../shared/dates";
 import { getAttendanceSummary, MIZAN_RATING_LABELS, scoreToStars } from "../../../shared/mizan";
 import {
@@ -31,6 +32,16 @@ interface Props {
   sessionId?: number;
 }
 
+function readMushafReturn(sessionId?: number) {
+  const params = new URLSearchParams(window.location.search);
+  const context = readMushafSelectionContext(params.get("mushafToken"));
+  const toSurah = Number(params.get("toSurah"));
+  const toAyah = Number(params.get("toAyah"));
+  const targetSurah = QURAN_SURAHS.find((surah) => surah.number === toSurah);
+  if (!context || context.sessionId !== sessionId || !targetSurah || !Number.isInteger(toAyah) || toAyah < 1 || toAyah > targetSurah.ayahs) return null;
+  return { context, toSurah, toAyah };
+}
+
 const tabs = [
   { id: "attendance", label: "الحضور", icon: Users },
   { id: "memorization", label: "الحفظ", icon: BookOpen },
@@ -39,7 +50,8 @@ const tabs = [
 ];
 
 export default function SessionDetail({ sessionId }: Props) {
-  const [activeTab, setActiveTab] = useState("attendance");
+  const [mushafReturn] = useState(() => readMushafReturn(sessionId));
+  const [activeTab, setActiveTab] = useState(mushafReturn?.context.kind ?? "attendance");
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [dialogTab, setDialogTab] = useState<"memorization" | "revision" | "evaluation">("memorization");
   const [attendanceOverrides, setAttendanceOverrides] = useState<Record<number, "present" | "absent" | "late" | "excused" | undefined>>({});
@@ -92,6 +104,13 @@ export default function SessionDetail({ sessionId }: Props) {
     { sessionId: sessionId! },
     { enabled: !!sessionId }
   );
+
+  useEffect(() => {
+    if (!mushafReturn) return;
+    clearMushafSelectionContext(mushafReturn.context.token);
+    window.history.replaceState({}, "", `/periods/${sessionId}`);
+    toast.success("تم اختيار آية النهاية من المصحف. أكمل التقدير ثم احفظ التسجيل.");
+  }, [mushafReturn, sessionId]);
 
   const updateStatusMutation = trpc.sessions.updateStatus.useMutation({
     onSuccess: () => { toast.success("تم تحديث حالة الجلسة"); syncSharedData(); },
@@ -307,6 +326,7 @@ export default function SessionDetail({ sessionId }: Props) {
                     progress={latestProgress?.[student.id]}
                     onSubmit={(data: any) => createMemorizationMutation.mutate(data)}
                     isLoading={createMemorizationMutation.isPending}
+                    returnContext={mushafReturn?.context.kind === "memorization" && mushafReturn.context.studentId === student.id ? mushafReturn : undefined}
                   />
                 ))}
               </div>
@@ -350,6 +370,7 @@ export default function SessionDetail({ sessionId }: Props) {
                     progress={latestProgress?.[student.id]}
                     onSubmit={(data: any) => createRevisionMutation.mutate(data)}
                     isLoading={createRevisionMutation.isPending}
+                    returnContext={mushafReturn?.context.kind === "revision" && mushafReturn.context.studentId === student.id ? mushafReturn : undefined}
                   />
                 ))}
               </div>
@@ -418,7 +439,7 @@ function SessionMetric({ label, value, tone }: { label: string; value: number; t
 function MemorizationForm(props: any) { return <QuranEntryForm {...props} kind="memorization" />; }
 function RevisionForm(props: any) { return <QuranEntryForm {...props} kind="revision" />; }
 
-function QuranEntryForm({ student, sessionId, progress, onSubmit, isLoading, kind, forceExpanded = false }: any) {
+function QuranEntryForm({ student, sessionId, progress, onSubmit, isLoading, kind, forceExpanded = false, returnContext }: any) {
   const [expanded, setExpanded] = useState(false);
   const isMemorization = kind === "memorization";
   const remembered = isMemorization ? progress?.memorization : progress?.revision;
@@ -428,6 +449,7 @@ function QuranEntryForm({ student, sessionId, progress, onSubmit, isLoading, kin
   const [toSurah, setToSurah] = useState(() => initialSurah);
   const [fromAyah, setFromAyah] = useState(() => initialAyah);
   const [toAyah, setToAyah] = useState(() => initialAyah);
+  const formRef = useRef<HTMLFormElement>(null);
   useEffect(() => {
     if (!remembered) return;
     const resumedSurah = remembered.toSurahNumber ?? remembered.surahNumber;
@@ -437,14 +459,26 @@ function QuranEntryForm({ student, sessionId, progress, onSubmit, isLoading, kin
     setFromAyah(resumedAyah);
     setToAyah(resumedAyah);
   }, [remembered?.id]);
+  useEffect(() => {
+    if (!returnContext) return;
+    setExpanded(true);
+    setToSurah(returnContext.toSurah);
+    setToAyah(returnContext.toAyah);
+  }, [returnContext]);
   const fromMax = QURAN_SURAHS.find((surah) => surah.number === fromSurah)?.ayahs ?? 1;
   const toMax = QURAN_SURAHS.find((surah) => surah.number === toSurah)?.ayahs ?? 1;
   const label = isMemorization ? "الحفظ" : "المراجعة";
   const accent = isMemorization ? "bg-emerald-600/10 text-emerald-600" : "bg-purple-600/10 text-purple-600";
   const selectSurah = (value: number, side: "from" | "to") => { if (side === "from") { setFromSurah(value); setFromAyah(1); setToSurah(value); setToAyah(1); } else { setToSurah(value); setToAyah(1); } };
-  const openMushaf = () => window.open(`/quran?surah=${fromSurah}&ayah=${fromAyah}`, "_blank", "noopener,noreferrer");
+  const openMushaf = () => {
+    const fields = formRef.current ? new FormData(formRef.current) : new FormData();
+    const token = createMushafSelectionToken();
+    const context: MushafSelectionContext = { token, returnPath: `/periods/${sessionId}`, sessionId, studentId: student.id, kind, fromSurah, fromAyah, toSurah, toAyah, pages: String(fields.get("pages") ?? ""), grade: String(fields.get("grade") ?? ""), notes: String(fields.get("notes") ?? ""), createdAt: Date.now() };
+    saveMushafSelectionContext(context);
+    window.location.assign(`/quran?surah=${fromSurah}&ayah=${fromAyah}&mushafToken=${encodeURIComponent(token)}`);
+  };
   const showForm = expanded || forceExpanded;
-  return <div className="overflow-hidden rounded-xl border border-border/50">{!forceExpanded && <button onClick={() => setExpanded(!expanded)} className="flex w-full items-center gap-3 p-3 text-right transition-colors hover:bg-muted/30"><div className={`flex h-8 w-8 items-center justify-center rounded-full ${accent}`}><span className="text-sm font-bold">{student.name.charAt(0)}</span></div><span className="flex-1 font-medium text-foreground">{student.name}</span><span className="text-xs text-muted-foreground">{expanded ? "إخفاء" : `تسجيل ${label}`}</span></button>}{showForm && <form onSubmit={(event) => { event.preventDefault(); if (toSurah === fromSurah && toAyah < fromAyah) { toast.error("داخل السورة نفسها يجب أن تكون آية النهاية بعد آية البداية"); return; } onSubmit({ sessionId, studentId: student.id, surahNumber: fromSurah, toSurahNumber: toSurah, fromAyah, toAyah, pages: (new FormData(event.currentTarget).get("pages") as string) || undefined, grade: (new FormData(event.currentTarget).get("grade") as string) || undefined, notes: (new FormData(event.currentTarget).get("notes") as string) || undefined }); if (!forceExpanded) setExpanded(false); }} className="space-y-3 border-t border-border/50 p-3 pt-3"><div className="grid grid-cols-2 gap-2"><FieldSelect label="من سورة" value={fromSurah} onChange={(value) => selectSurah(value, "from")} /><FieldSelect label="إلى سورة" value={toSurah} onChange={(value) => selectSurah(value, "to")} /><AyahPicker label="من آية" value={fromAyah} max={fromMax} onChange={setFromAyah} /><AyahPicker label="إلى آية" value={toAyah} max={toMax} onChange={setToAyah} /></div><button type="button" onClick={openMushaf} className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/25 bg-primary/5 py-2 text-sm font-semibold text-primary hover:bg-primary/10"><BookOpenText className="h-4 w-4" />فتح موضع البداية في المصحف</button><div className="grid grid-cols-3 gap-2"><div><label className="mb-1 block text-xs text-muted-foreground">الصفحات</label><input name="pages" type="number" min="0" step="0.5" className="tarteel-input py-1.5 text-sm" placeholder="0" /></div><div><label className="mb-1 block text-xs text-muted-foreground">التقدير</label><select name="grade" className="tarteel-input py-1.5 text-sm"><option value="">اختر</option>{Object.entries(GRADE_LABELS).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select></div><div><label className="mb-1 block text-xs text-muted-foreground">ملاحظات</label><input name="notes" className="tarteel-input py-1.5 text-sm" placeholder="اختياري" /></div></div><button type="submit" disabled={isLoading} className="btn-gold w-full py-2 text-sm">{isLoading ? "جارٍ الحفظ..." : `تسجيل ${label}`}</button></form>}</div>;
+  return <div className="overflow-hidden rounded-xl border border-border/50">{!forceExpanded && <button onClick={() => setExpanded(!expanded)} className="flex w-full items-center gap-3 p-3 text-right transition-colors hover:bg-muted/30"><div className={`flex h-8 w-8 items-center justify-center rounded-full ${accent}`}><span className="text-sm font-bold">{student.name.charAt(0)}</span></div><span className="flex-1 font-medium text-foreground">{student.name}</span><span className="text-xs text-muted-foreground">{expanded ? "إخفاء" : `تسجيل ${label}`}</span></button>}{showForm && <form ref={formRef} onSubmit={(event) => { event.preventDefault(); if (toSurah === fromSurah && toAyah < fromAyah) { toast.error("داخل السورة نفسها يجب أن تكون آية النهاية بعد آية البداية"); return; } onSubmit({ sessionId, studentId: student.id, surahNumber: fromSurah, toSurahNumber: toSurah, fromAyah, toAyah, pages: (new FormData(event.currentTarget).get("pages") as string) || undefined, grade: (new FormData(event.currentTarget).get("grade") as string) || undefined, notes: (new FormData(event.currentTarget).get("notes") as string) || undefined }); if (!forceExpanded) setExpanded(false); }} className="space-y-3 border-t border-border/50 p-3 pt-3"><div className="grid grid-cols-2 gap-2"><FieldSelect label="من سورة" value={fromSurah} onChange={(value) => selectSurah(value, "from")} /><FieldSelect label="إلى سورة" value={toSurah} onChange={(value) => selectSurah(value, "to")} /><AyahPicker label="من آية" value={fromAyah} max={fromMax} onChange={setFromAyah} /><AyahPicker label="إلى آية" value={toAyah} max={toMax} onChange={setToAyah} /></div><button type="button" onClick={openMushaf} className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/25 bg-primary/5 py-2 text-sm font-semibold text-primary hover:bg-primary/10"><BookOpenText className="h-4 w-4" />فتح موضع البداية في المصحف المرئي</button><div className="grid grid-cols-3 gap-2"><div><label className="mb-1 block text-xs text-muted-foreground">الصفحات</label><input name="pages" defaultValue={returnContext?.context.pages} type="number" min="0" step="0.5" className="tarteel-input py-1.5 text-sm" placeholder="0" /></div><div><label className="mb-1 block text-xs text-muted-foreground">التقدير</label><select name="grade" defaultValue={returnContext?.context.grade} className="tarteel-input py-1.5 text-sm"><option value="">اختر</option>{Object.entries(GRADE_LABELS).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select></div><div><label className="mb-1 block text-xs text-muted-foreground">ملاحظات</label><input name="notes" defaultValue={returnContext?.context.notes} className="tarteel-input py-1.5 text-sm" placeholder="اختياري" /></div></div><button type="submit" disabled={isLoading} className="btn-gold w-full py-2 text-sm">{isLoading ? "جارٍ الحفظ..." : `تسجيل ${label}`}</button></form>}</div>;
 }
 
 function FieldSelect({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) { return <div><label className="mb-1 block text-xs text-muted-foreground">{label}</label><select value={value} onChange={(event) => onChange(Number(event.target.value))} className="tarteel-input py-1.5 text-sm">{QURAN_SURAHS.map((surah) => <option key={surah.number} value={surah.number}>{surah.number}. {surah.name}</option>)}</select></div>; }

@@ -18,8 +18,9 @@ describe("مواءمة الملفين الرابع والخامس", () => {
     const detail = readFileSync(path.join(root, "client/src/pages/SessionDetail.tsx"), "utf8");
     expect(circle).toContain("onMutate");
     expect(circle).toContain("حضور الفترة المفتوحة");
-    expect(detail).toContain("فتح موضع البداية في المصحف");
-    expect(detail).toContain('window.open(`/quran?surah=${fromSurah}&ayah=${fromAyah}`');
+    expect(detail).toContain("فتح موضع البداية في المصحف المرئي");
+    expect(detail).toContain("saveMushafSelectionContext(context)");
+    expect(detail).toContain('window.location.assign(`/quran?surah=${fromSurah}&ayah=${fromAyah}&mushafToken=');
     expect(detail).toContain("DialogDescription");
   });
 });
