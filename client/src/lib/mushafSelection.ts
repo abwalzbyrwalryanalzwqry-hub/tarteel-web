@@ -4,6 +4,7 @@ export interface MushafSelectionContext {
   sessionId: number;
   studentId: number;
   kind: "memorization" | "revision";
+  origin: "inline" | "dialog";
   fromSurah: number;
   fromAyah: number;
   toSurah: number;

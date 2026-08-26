@@ -112,6 +112,14 @@ export default function SessionDetail({ sessionId }: Props) {
     toast.success("تم اختيار آية النهاية من المصحف. أكمل التقدير ثم احفظ التسجيل.");
   }, [mushafReturn, sessionId]);
 
+  useEffect(() => {
+    if (!mushafReturn || mushafReturn.context.origin !== "dialog") return;
+    const targetStudent = students?.find((student) => student.id === mushafReturn.context.studentId);
+    if (!targetStudent) return;
+    setSelectedStudent(targetStudent);
+    setDialogTab(mushafReturn.context.kind);
+  }, [mushafReturn, students]);
+
   const updateStatusMutation = trpc.sessions.updateStatus.useMutation({
     onSuccess: () => { toast.success("تم تحديث حالة الجلسة"); syncSharedData(); },
     onError: (e) => toast.error(e.message),
@@ -326,7 +334,7 @@ export default function SessionDetail({ sessionId }: Props) {
                     progress={latestProgress?.[student.id]}
                     onSubmit={(data: any) => createMemorizationMutation.mutate(data)}
                     isLoading={createMemorizationMutation.isPending}
-                    returnContext={mushafReturn?.context.kind === "memorization" && mushafReturn.context.studentId === student.id ? mushafReturn : undefined}
+                    returnContext={mushafReturn?.context.kind === "memorization" && mushafReturn.context.origin !== "dialog" && mushafReturn.context.studentId === student.id ? mushafReturn : undefined}
                   />
                 ))}
               </div>
@@ -370,7 +378,7 @@ export default function SessionDetail({ sessionId }: Props) {
                     progress={latestProgress?.[student.id]}
                     onSubmit={(data: any) => createRevisionMutation.mutate(data)}
                     isLoading={createRevisionMutation.isPending}
-                    returnContext={mushafReturn?.context.kind === "revision" && mushafReturn.context.studentId === student.id ? mushafReturn : undefined}
+                    returnContext={mushafReturn?.context.kind === "revision" && mushafReturn.context.origin !== "dialog" && mushafReturn.context.studentId === student.id ? mushafReturn : undefined}
                   />
                 ))}
               </div>
@@ -425,7 +433,7 @@ export default function SessionDetail({ sessionId }: Props) {
       <Dialog open={Boolean(selectedStudent)} onOpenChange={(open) => !open && setSelectedStudent(null)}>
         <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-xl" dir="rtl">
           <DialogHeader><DialogTitle className="font-display text-xl">سجل الطالب في الجلسة</DialogTitle><DialogDescription>سجّل الحفظ أو المراجعة أو التقييم، ثم افتح موضع البداية في المصحف عند الحاجة.</DialogDescription></DialogHeader>
-          {selectedStudent && <div className="space-y-4"><div className="rounded-2xl bg-primary/5 p-3"><p className="font-semibold text-foreground">{selectedStudent.name}</p><p className="mt-1 text-xs text-muted-foreground">آخر حفظ: {getSurahName(latestProgress?.[selectedStudent.id]?.memorization?.toSurahNumber ?? latestProgress?.[selectedStudent.id]?.memorization?.surahNumber ?? selectedStudent.lastMemorizedSurah)} · آية {latestProgress?.[selectedStudent.id]?.memorization?.toAyah ?? selectedStudent.lastMemorizedAyah}</p><p className="mt-1 text-xs text-muted-foreground">آخر مراجعة: {latestProgress?.[selectedStudent.id]?.revision ? `${getSurahName(latestProgress?.[selectedStudent.id]?.revision?.toSurahNumber ?? latestProgress?.[selectedStudent.id]?.revision?.surahNumber ?? 1)} · آية ${latestProgress?.[selectedStudent.id]?.revision?.toAyah ?? 1}` : "لم تسجل بعد"}</p></div><div className="flex gap-1 rounded-xl bg-muted/50 p-1">{([ ["memorization", "الحفظ"], ["revision", "المراجعة"], ["evaluation", "التقييم"] ] as const).map(([id, label]) => <button key={id} onClick={() => setDialogTab(id)} className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${dialogTab === id ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`}>{label}</button>)}</div>{dialogTab === "memorization" && <MemorizationForm student={selectedStudent} sessionId={session.id} progress={latestProgress?.[selectedStudent.id]} onSubmit={(data: any) => createMemorizationMutation.mutate(data)} isLoading={createMemorizationMutation.isPending} forceExpanded />}{dialogTab === "revision" && <RevisionForm student={selectedStudent} sessionId={session.id} progress={latestProgress?.[selectedStudent.id]} onSubmit={(data: any) => createRevisionMutation.mutate(data)} isLoading={createRevisionMutation.isPending} forceExpanded />}{dialogTab === "evaluation" && <EvaluationForm student={selectedStudent} sessionId={session.id} existing={getStudentEvaluation(selectedStudent.id)} onSubmit={(data: any) => upsertEvaluationMutation.mutate(data)} isLoading={upsertEvaluationMutation.isPending} forceExpanded />}</div>}
+          {selectedStudent && <div className="space-y-4"><div className="rounded-2xl bg-primary/5 p-3"><p className="font-semibold text-foreground">{selectedStudent.name}</p><p className="mt-1 text-xs text-muted-foreground">آخر حفظ: {getSurahName(latestProgress?.[selectedStudent.id]?.memorization?.toSurahNumber ?? latestProgress?.[selectedStudent.id]?.memorization?.surahNumber ?? selectedStudent.lastMemorizedSurah)} · آية {latestProgress?.[selectedStudent.id]?.memorization?.toAyah ?? selectedStudent.lastMemorizedAyah}</p><p className="mt-1 text-xs text-muted-foreground">آخر مراجعة: {latestProgress?.[selectedStudent.id]?.revision ? `${getSurahName(latestProgress?.[selectedStudent.id]?.revision?.toSurahNumber ?? latestProgress?.[selectedStudent.id]?.revision?.surahNumber ?? 1)} · آية ${latestProgress?.[selectedStudent.id]?.revision?.toAyah ?? 1}` : "لم تسجل بعد"}</p></div><div className="flex gap-1 rounded-xl bg-muted/50 p-1">{([ ["memorization", "الحفظ"], ["revision", "المراجعة"], ["evaluation", "التقييم"] ] as const).map(([id, label]) => <button key={id} onClick={() => setDialogTab(id)} className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${dialogTab === id ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`}>{label}</button>)}</div>{dialogTab === "memorization" && <MemorizationForm student={selectedStudent} sessionId={session.id} progress={latestProgress?.[selectedStudent.id]} onSubmit={(data: any) => createMemorizationMutation.mutate(data)} isLoading={createMemorizationMutation.isPending} forceExpanded returnContext={mushafReturn?.context.kind === "memorization" && mushafReturn.context.origin === "dialog" && mushafReturn.context.studentId === selectedStudent.id ? mushafReturn : undefined} />}{dialogTab === "revision" && <RevisionForm student={selectedStudent} sessionId={session.id} progress={latestProgress?.[selectedStudent.id]} onSubmit={(data: any) => createRevisionMutation.mutate(data)} isLoading={createRevisionMutation.isPending} forceExpanded returnContext={mushafReturn?.context.kind === "revision" && mushafReturn.context.origin === "dialog" && mushafReturn.context.studentId === selectedStudent.id ? mushafReturn : undefined} />}{dialogTab === "evaluation" && <EvaluationForm student={selectedStudent} sessionId={session.id} existing={getStudentEvaluation(selectedStudent.id)} onSubmit={(data: any) => upsertEvaluationMutation.mutate(data)} isLoading={upsertEvaluationMutation.isPending} forceExpanded />}</div>}
         </DialogContent>
       </Dialog>
     </div>
@@ -473,7 +481,7 @@ function QuranEntryForm({ student, sessionId, progress, onSubmit, isLoading, kin
   const openMushaf = () => {
     const fields = formRef.current ? new FormData(formRef.current) : new FormData();
     const token = createMushafSelectionToken();
-    const context: MushafSelectionContext = { token, returnPath: `/periods/${sessionId}`, sessionId, studentId: student.id, kind, fromSurah, fromAyah, toSurah, toAyah, pages: String(fields.get("pages") ?? ""), grade: String(fields.get("grade") ?? ""), notes: String(fields.get("notes") ?? ""), createdAt: Date.now() };
+    const context: MushafSelectionContext = { token, returnPath: `/periods/${sessionId}`, sessionId, studentId: student.id, kind, origin: forceExpanded ? "dialog" : "inline", fromSurah, fromAyah, toSurah, toAyah, pages: String(fields.get("pages") ?? ""), grade: String(fields.get("grade") ?? ""), notes: String(fields.get("notes") ?? ""), createdAt: Date.now() };
     saveMushafSelectionContext(context);
     window.location.assign(`/quran?surah=${fromSurah}&ayah=${fromAyah}&mushafToken=${encodeURIComponent(token)}`);
   };
