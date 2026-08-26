@@ -136,4 +136,23 @@ describe("نظام التقرير الموحد", () => {
     expect(management).toContain("المؤشر المرئي");
     expect(management).toContain("comparisonMetric");
   });
+
+  it("يجعل ملف المركز مصدراً موحداً للاسم والشعار في التقرير ويوفر لوحة شاملة لمديره", () => {
+    const schema = read("drizzle/schema.ts");
+    const router = read("server/routers.ts");
+    const db = read("server/db.ts");
+    const builder = read("server/reports/reportBuilder.ts");
+    const dashboard = read("client/src/components/CenterManagerDashboard.tsx");
+    const centers = read("client/src/pages/Centers.tsx");
+    expect(schema).toContain('logoUrl: text("logoUrl")');
+    expect(schema).toContain('logoKey: text("logoKey")');
+    expect(router).toContain("uploadLogo");
+    expect(router).toContain("centerManager:");
+    expect(db).toContain("getCenterManagerOverview");
+    expect(builder).toContain("center.logoKey");
+    expect(dashboard).toContain("لوحة مدير المركز");
+    expect(dashboard).toContain("المعلمون النشطون");
+    expect(dashboard).toContain("صفحات الحفظ حسب الأيام");
+    expect(centers).toContain("شعار ملف المركز");
+  });
 });

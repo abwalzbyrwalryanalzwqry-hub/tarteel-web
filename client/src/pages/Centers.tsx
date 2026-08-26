@@ -1,6 +1,6 @@
 import EntityForm, { FormInput, FormTextarea } from "@/components/EntityForm";
 import { trpc } from "@/lib/trpc";
-import { Building2, Edit, MapPin, Phone, Plus, Search, Trash2 } from "lucide-react";
+import { Building2, Edit, ImagePlus, MapPin, Phone, Plus, Search, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -69,7 +69,7 @@ export default function Centers() {
           {filtered.map((center, i) => (
             <div key={center.id} className={`glass-card rounded-2xl p-5 animate-fade-in-up stagger-${(i%5)+1}`}>
               <div className="flex items-start justify-between mb-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center"><Building2 className="w-5 h-5 text-blue-600"/></div>
+                {center.logoUrl ? <img src={center.logoUrl} alt={`شعار ${center.name}`} className="w-10 h-10 rounded-xl border border-border bg-background object-contain p-0.5" /> : <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center"><Building2 className="w-5 h-5 text-blue-600"/></div>}
                 <div className="flex gap-1">
                   <button onClick={()=>setEditItem(center)} className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"><Edit className="w-3.5 h-3.5 text-muted-foreground"/></button>
                   <button onClick={()=>{if(confirm("نقل إلى سلة المحذوفات؟"))deleteMutation.mutate({id:center.id})}} className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center transition-colors"><Trash2 className="w-3.5 h-3.5 text-destructive"/></button>
@@ -99,7 +99,14 @@ export default function Centers() {
         <FormInput label="المدينة" name="city" defaultValue={editItem.city??""}/>
         <FormInput label="رقم الهاتف" name="phone" defaultValue={editItem.phone??""}/>
         <FormInput label="العنوان" name="address" defaultValue={editItem.address??""}/>
+        <CenterLogoUpload centerId={editItem.id} logoUrl={editItem.logoUrl} onUploaded={refetch} />
       </EntityForm>}
     </div>
   );
+}
+
+function CenterLogoUpload({ centerId, logoUrl, onUploaded }: { centerId: number; logoUrl?: string | null; onUploaded: () => void }) {
+  const upload = trpc.centers.uploadLogo.useMutation({ onSuccess: () => { toast.success("تم حفظ شعار ملف المركز، وسيظهر تلقائياً في تقارير PDF"); onUploaded(); }, onError: (error) => toast.error(error.message) });
+  const choose = (file?: File) => { if (!file) return; if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) { toast.error("اختر PNG أو JPG أو WEBP"); return; } if (file.size > 2_000_000) { toast.error("حجم الشعار يجب ألا يتجاوز 2 ميغابايت"); return; } const reader = new FileReader(); reader.onerror = () => toast.error("تعذر قراءة الشعار"); reader.onload = () => upload.mutate({ centerId, filename: file.name, contentType: file.type as "image/png" | "image/jpeg" | "image/webp", base64: String(reader.result).split(",")[1] ?? "" }); reader.readAsDataURL(file); };
+  return <div className="rounded-xl border border-border bg-muted/20 p-3"><div className="flex flex-wrap items-center justify-between gap-3">{logoUrl ? <img src={logoUrl} alt="شعار المركز" className="h-12 w-12 rounded-lg border border-border bg-background object-contain p-0.5" /> : <span className="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground"><ImagePlus className="h-5 w-5" /></span>}<div className="flex-1"><p className="text-sm font-semibold">شعار ملف المركز</p><p className="text-xs text-muted-foreground">يستخدم تلقائياً في تقرير إدارة المركز PDF.</p></div><label className="cursor-pointer rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/10"><input type="file" className="hidden" accept="image/png,image/jpeg,image/webp" onChange={(event) => choose(event.target.files?.[0])} />{upload.isPending ? "جارٍ الرفع…" : "رفع الشعار"}</label></div></div>;
 }

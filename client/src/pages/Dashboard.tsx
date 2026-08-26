@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { AIGuidanceCard } from "@/components/AIGuidanceCard";
+import { CenterManagerDashboard } from "@/components/CenterManagerDashboard";
 import { RoleSimulationControl } from "@/components/RoleSimulationControl";
 import { SESSION_STATUS_LABELS, SESSION_TYPE_LABELS } from "../../../shared/types";
 
@@ -64,6 +65,7 @@ export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = trpc.dashboard.stats.useQuery();
   const { data: recentSessions } = trpc.dashboard.recentSessions.useQuery();
   const { data: notifications } = trpc.notifications.list.useQuery();
+  const { data: accessibleCenters } = trpc.centers.list.useQuery({ orgId: undefined });
 
   const unreadCount = notifications?.filter((n) => !n.isRead).length ?? 0;
 
@@ -116,6 +118,7 @@ export default function Dashboard() {
       </div>
 
       <AIGuidanceCard context="dashboard" />
+      <CenterManagerDashboard centers={accessibleCenters ?? []} />
 
       {/* Stats Grid */}
       {statsLoading ? (

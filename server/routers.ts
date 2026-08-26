@@ -13,6 +13,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { exportRouter } from "./routers/export";
 import { aiRouter } from "./routers/ai";
 import { reportingRouter } from "./routers/reporting";
+import { storagePut } from "./storage";
 import {
   createAcademicSeason,
   createAccessCode,
@@ -44,6 +45,7 @@ import {
   getBranches,
   getCenterById,
   getCenterMemberById,
+  getCenterManagerOverview,
   getCenterMembers,
   getCenterIdForCircle,
   getCenterIdForStudent,
@@ -282,6 +284,7 @@ export const appRouter = router({
       if (centerIds.length) return getRecentSessionsForCenters(centerIds, 5);
       return getRecentSessionsForCircles(await getAccessibleDashboardCircleIds(ctx.user), 5);
     }),
+    centerManager: protectedProcedure.input(z.object({ centerId: z.number() })).query(async ({ ctx, input }) => { await assertPermission(ctx.user, input.centerId, "center.view"); return getCenterManagerOverview(input.centerId); }),
   }),
 
   // ===================== ORGANIZATIONS =====================
@@ -359,6 +362,15 @@ export const appRouter = router({
         await assertPermission(ctx.user, id, "center.edit");
         await updateCenter(id, data);
       }),
+    uploadLogo: protectedProcedure.input(z.object({ centerId: z.number(), filename: z.string().trim().min(1).max(120), contentType: z.enum(["image/png", "image/jpeg", "image/webp"]), base64: z.string().min(1).max(2_800_000) })).mutation(async ({ ctx, input }) => {
+      await assertPermission(ctx.user, input.centerId, "center.edit");
+      const bytes = Buffer.from(input.base64, "base64");
+      if (!bytes.length || bytes.length > 2_000_000) throw new TRPCError({ code: "BAD_REQUEST", message: "يجب أن يكون حجم الشعار أقل من 2 ميغابايت" });
+      const extension = input.contentType === "image/png" ? "png" : input.contentType === "image/jpeg" ? "jpg" : "webp";
+      const uploaded = await storagePut(`centers/${input.centerId}/profile-logo.${extension}`, bytes, input.contentType);
+      await updateCenter(input.centerId, { logoUrl: uploaded.url, logoKey: uploaded.key });
+      return { logoUrl: uploaded.url };
+    }),
     delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => { const authorization = await assertPermission(ctx.user, input.id, "center.edit"); if (!authorization.membership.isOwner) throw new TRPCError({ code: "FORBIDDEN", message: "أرشفة المركز من صلاحية مالكه فقط" }); return softDeleteCenter(input.id); }),
   }),
 

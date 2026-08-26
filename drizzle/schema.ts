@@ -68,6 +68,8 @@ export const centers = mysqlTable("centers", {
   email: varchar("email", { length: 320 }),
   address: text("address"),
   city: varchar("city", { length: 100 }),
+  logoUrl: text("logoUrl"),
+  logoKey: text("logoKey"),
   managerId: int("managerId"),
   isActive: boolean("isActive").default(true).notNull(),
   deletedAt: timestamp("deletedAt"),
