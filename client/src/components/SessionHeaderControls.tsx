@@ -8,11 +8,13 @@ import { formatDualCalendarDate, getHijriDateParts, hijriToGregorian } from "../
 
 type SessionRow = { id: number; type: "regular" | "exam" | "review" | "special"; title: string | null; scheduledAt: Date | string };
 
-const sessionKinds = [
-  { value: "regular" as const, label: "يومية", description: "متابعة الحفظ والمراجعة اليومية" },
-  { value: "review" as const, label: "درس", description: "درس أو متابعة تعليمية موجهة" },
-  { value: "exam" as const, label: "اختبار", description: "تقييم أو اختبار للحلقة" },
-  { value: "special" as const, label: "مخصصة", description: "اكتب اسم الجلسة كما تريد" },
+const periodNameOptions = [
+  { id: "daily", type: "regular" as const, label: "يومية", description: "متابعة يومية للحلقة" },
+  { id: "memorization-review", type: "review" as const, label: "حفظ ومراجعة", description: "تسجيل الحفظ والمراجعة" },
+  { id: "exam", type: "exam" as const, label: "اختبار", description: "تقييم مستوى الطلاب" },
+  { id: "lessons", type: "special" as const, label: "دروس", description: "درس أو متابعة تعليمية" },
+  { id: "lecture", type: "special" as const, label: "محاضرة", description: "محاضرة أو لقاء تربوي" },
+  { id: "custom", type: "special" as const, label: "تخصيص", description: "اكتب اسماً يناسب الفترة" },
 ];
 
 function toDateTimeLocal(value: Date) {
@@ -25,7 +27,8 @@ export function SessionHeaderControls({ session }: { session: SessionRow }) {
   const [typeOpen, setTypeOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [kind, setKind] = useState<SessionRow["type"]>(session.type);
-  const [customTitle, setCustomTitle] = useState(session.type === "special" ? session.title ?? "" : "");
+  const [customTitle, setCustomTitle] = useState(session.title ?? "");
+  const [nameOption, setNameOption] = useState(() => periodNameOptions.find((item) => item.label === session.title)?.id ?? "custom");
   const [selectedDate, setSelectedDate] = useState(() => new Date(session.scheduledAt));
   const [hijriDraft, setHijriDraft] = useState(() => getHijriDateParts(new Date(session.scheduledAt)) ?? { year: 1448, month: 1, day: 1 });
   const [dateConflict, setDateConflict] = useState<string | null>(null);
@@ -39,7 +42,7 @@ export function SessionHeaderControls({ session }: { session: SessionRow }) {
     onError: (error) => { if (error.data?.code === "CONFLICT") setDateConflict(error.message); else toast.error(error.message); },
   });
 
-  const currentKind = sessionKinds.find((item) => item.value === session.type) ?? sessionKinds[0];
+  const currentName = session.title || periodNameOptions.find((item) => item.type === session.type)?.label || "فترة";
   const calendars = formatDualCalendarDate(selectedDate);
   const chooseCalendarDate = (next: Date | undefined) => {
     if (!next) return;
@@ -51,9 +54,9 @@ export function SessionHeaderControls({ session }: { session: SessionRow }) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <button onClick={() => { setKind(session.type); setCustomTitle(session.type === "special" ? session.title ?? "" : ""); setTypeOpen(true); }} className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10">
+      <button onClick={() => { setKind(session.type); setCustomTitle(session.title ?? ""); setNameOption(periodNameOptions.find((item) => item.label === session.title)?.id ?? "custom"); setTypeOpen(true); }} className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10">
         <PencilLine className="h-4 w-4" />
-        <span>النوع: {currentKind.label}</span>
+        <span>اسم الفترة: {currentName}</span>
         <ChevronDown className="h-3.5 w-3.5" />
       </button>
       <button onClick={() => { setSelectedDate(new Date(session.scheduledAt)); setDateConflict(null); setDateOpen(true); }} className="inline-flex items-center gap-2 rounded-xl border border-border bg-background/70 px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted">
@@ -64,12 +67,12 @@ export function SessionHeaderControls({ session }: { session: SessionRow }) {
 
       <Dialog open={typeOpen} onOpenChange={setTypeOpen}>
         <DialogContent className="sm:max-w-lg" dir="rtl">
-          <DialogHeader><DialogTitle className="font-display text-xl">نوع الفترة</DialogTitle><DialogDescription>اختر نوع الفترة، ويمكن تسمية النوع المخصص بما يناسب الحلقة.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle className="font-display text-xl">اسم الفترة</DialogTitle><DialogDescription>اختر اسماً جاهزاً أو اكتب الاسم الذي تريد ظهوره في سجلات الحلقة.</DialogDescription></DialogHeader>
           <div className="grid gap-2 sm:grid-cols-2">
-            {sessionKinds.map((item) => <button key={item.value} type="button" onClick={() => setKind(item.value)} className={`rounded-2xl border p-4 text-right transition-colors ${kind === item.value ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted/50"}`}><span className="block font-bold">{item.label}</span><span className="mt-1 block text-xs text-muted-foreground">{item.description}</span></button>)}
+            {periodNameOptions.map((item) => <button key={item.id} type="button" onClick={() => { setNameOption(item.id); setKind(item.type); setCustomTitle(item.id === "custom" ? "" : item.label); }} className={`rounded-2xl border p-4 text-right transition-colors ${nameOption === item.id ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted/50"}`}><span className="block font-bold">{item.label}</span><span className="mt-1 block text-xs text-muted-foreground">{item.description}</span></button>)}
           </div>
-          {kind === "special" && <label className="block"><span className="mb-1.5 block text-sm font-semibold">اسم الفترة المخصص</span><input value={customTitle} onChange={(event) => setCustomTitle(event.target.value)} placeholder="مثال: زيارة الشيخ" className="tarteel-input" maxLength={120} /></label>}
-          <button disabled={update.isPending || (kind === "special" && !customTitle.trim())} onClick={() => update.mutate({ id: session.id, type: kind, title: kind === "special" ? customTitle.trim() : session.title })} className="btn-gold w-full py-3">{update.isPending ? "جارٍ الحفظ…" : "حفظ النوع"}</button>
+          <label className="block"><span className="mb-1.5 block text-sm font-semibold">اسم الفترة</span><input value={customTitle} onChange={(event) => { setCustomTitle(event.target.value); if (nameOption !== "custom" && event.target.value !== periodNameOptions.find((item) => item.id === nameOption)?.label) setNameOption("custom"); }} placeholder="مثال: زيارة الشيخ" className="tarteel-input" maxLength={120} /></label>
+          <button disabled={update.isPending || !customTitle.trim()} onClick={() => update.mutate({ id: session.id, type: kind, title: customTitle.trim() })} className="btn-gold w-full py-3">{update.isPending ? "جارٍ الحفظ…" : "حفظ اسم الفترة"}</button>
         </DialogContent>
       </Dialog>
 

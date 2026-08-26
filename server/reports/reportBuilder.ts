@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, lte, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, ne } from "drizzle-orm";
 import { getDb, keepLatestAttendanceRows } from "../db";
 import { attendance, branches, centers, circles, evaluation, memorization, revision, sessions, students } from "../../drizzle/schema";
 import { GRADE_LABELS, QURAN_SURAHS } from "../../shared/types";
@@ -23,6 +23,12 @@ export type UnifiedReport = {
   sections: ReportSections;
   summary: { students: number; present: number; absent: number; late: number; excused: number; attendanceRate: number; memorizationCount: number; revisionCount: number; averageScore: number | null };
   students: StudentReportBlock[];
+};
+
+export type ExecutiveCircleReport = {
+  meta: { circleId: number; circleName: string; startDate: Date; endDate: Date; period: "weekly" | "monthly" };
+  summary: { sessions: number; present: number; absent: number; late: number; excused: number; attendanceRate: number; memorizationEntries: number; revisionEntries: number; memorizedPages: number; reviewedPages: number };
+  buckets: { key: string; label: string; sessions: number; present: number; absent: number; late: number; excused: number; memorizationEntries: number; revisionEntries: number; memorizedPages: number; reviewedPages: number }[];
 };
 
 function asDateBoundary(value: Date | undefined, end = false) {
@@ -79,4 +85,64 @@ export async function buildUnifiedReport(input: ReportBuilderInput): Promise<Uni
   });
   const attendanceTotal = currentAttendanceRows.length;
   return { meta: { title: circle.name, typeLabel: typeLabel(input.reportType), circleName: circle.name, centerName: center?.name ?? "المركز", startDate: start ?? null, endDate: end ?? null, generatedAt: new Date() }, sections: input.sections, summary: { students: reportStudents.length, ...attendanceTotals, attendanceRate: attendanceTotal ? Math.round((attendanceTotals.present / attendanceTotal) * 100) : 0, memorizationCount: memorizationRows.length, revisionCount: revisionRows.length, averageScore: allScores.length ? Math.round(allScores.reduce((sum, score) => sum + score, 0) / allScores.length) : null }, students: sorted };
+}
+
+function periodRange(period: "weekly" | "monthly", startDate?: Date, endDate?: Date) {
+  const end = asDateBoundary(endDate ?? new Date(), true)!;
+  if (startDate) return { start: asDateBoundary(startDate)!, end };
+  const start = new Date(end);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - (period === "weekly" ? 6 : 29));
+  return { start, end };
+}
+
+function bucketFor(date: Date, period: "weekly" | "monthly") {
+  if (period === "monthly") {
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    return { key, label: new Intl.DateTimeFormat("ar-SA", { month: "long", year: "numeric" }).format(date) };
+  }
+  const weekStart = new Date(date);
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  const key = weekStart.toISOString().slice(0, 10);
+  return { key, label: `${weekStart.toLocaleDateString("ar-SA", { month: "short", day: "numeric" })} — ${weekEnd.toLocaleDateString("ar-SA", { month: "short", day: "numeric" })}` };
+}
+
+export async function buildExecutiveCircleReport(input: { circleId: number; period: "weekly" | "monthly"; startDate?: Date; endDate?: Date }): Promise<ExecutiveCircleReport> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [circle] = await db.select().from(circles).where(eq(circles.id, input.circleId)).limit(1);
+  if (!circle) throw new Error("الحلقة غير موجودة");
+  const { start, end } = periodRange(input.period, input.startDate, input.endDate);
+  const periodSessions = await db.select().from(sessions).where(and(eq(sessions.circleId, input.circleId), isNull(sessions.deletedAt), ne(sessions.status, "draft"), gte(sessions.scheduledAt, start), lte(sessions.scheduledAt, end))).orderBy(sessions.scheduledAt);
+  const sessionIds = periodSessions.map((session) => session.id);
+  const [attendanceRows, memorizationRows, revisionRows] = await Promise.all([
+    sessionIds.length ? db.select().from(attendance).where(inArray(attendance.sessionId, sessionIds)) : Promise.resolve([] as (typeof attendance.$inferSelect)[]),
+    sessionIds.length ? db.select().from(memorization).where(inArray(memorization.sessionId, sessionIds)) : Promise.resolve([] as (typeof memorization.$inferSelect)[]),
+    sessionIds.length ? db.select().from(revision).where(inArray(revision.sessionId, sessionIds)) : Promise.resolve([] as (typeof revision.$inferSelect)[]),
+  ]);
+  const currentAttendanceRows = keepLatestAttendanceRows(attendanceRows);
+  const buckets = new Map<string, ExecutiveCircleReport["buckets"][number]>();
+  for (const session of periodSessions) {
+    const bucketInfo = bucketFor(session.scheduledAt, input.period);
+    const bucket = buckets.get(bucketInfo.key) ?? { ...bucketInfo, sessions: 0, present: 0, absent: 0, late: 0, excused: 0, memorizationEntries: 0, revisionEntries: 0, memorizedPages: 0, reviewedPages: 0 };
+    bucket.sessions += 1;
+    const attendanceForSession = currentAttendanceRows.filter((row) => row.sessionId === session.id);
+    bucket.present += attendanceForSession.filter((row) => row.status === "present").length;
+    bucket.absent += attendanceForSession.filter((row) => row.status === "absent").length;
+    bucket.late += attendanceForSession.filter((row) => row.status === "late").length;
+    bucket.excused += attendanceForSession.filter((row) => row.status === "excused").length;
+    const memorizationForSession = memorizationRows.filter((row) => row.sessionId === session.id);
+    const revisionForSession = revisionRows.filter((row) => row.sessionId === session.id);
+    bucket.memorizationEntries += memorizationForSession.length;
+    bucket.revisionEntries += revisionForSession.length;
+    bucket.memorizedPages += memorizationForSession.reduce((total, row) => total + Number(row.pages ?? 0), 0);
+    bucket.reviewedPages += revisionForSession.reduce((total, row) => total + Number(row.pages ?? 0), 0);
+    buckets.set(bucketInfo.key, bucket);
+  }
+  const summary = Array.from(buckets.values()).reduce((total, bucket) => ({ sessions: total.sessions + bucket.sessions, present: total.present + bucket.present, absent: total.absent + bucket.absent, late: total.late + bucket.late, excused: total.excused + bucket.excused, memorizationEntries: total.memorizationEntries + bucket.memorizationEntries, revisionEntries: total.revisionEntries + bucket.revisionEntries, memorizedPages: total.memorizedPages + bucket.memorizedPages, reviewedPages: total.reviewedPages + bucket.reviewedPages }), { sessions: 0, present: 0, absent: 0, late: 0, excused: 0, memorizationEntries: 0, revisionEntries: 0, memorizedPages: 0, reviewedPages: 0 });
+  const attendanceTotal = summary.present + summary.absent + summary.late + summary.excused;
+  return { meta: { circleId: circle.id, circleName: circle.name, startDate: start, endDate: end, period: input.period }, summary: { ...summary, attendanceRate: attendanceTotal ? Math.round((summary.present / attendanceTotal) * 100) : 0 }, buckets: Array.from(buckets.values()) };
 }

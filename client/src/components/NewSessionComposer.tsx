@@ -19,11 +19,13 @@ type CircleOption = { id: number; name: string; seasonId?: number | null };
 type TeacherOption = { id: number; name: string };
 type SeasonOption = { id: number; name: string };
 
-const sessionKinds = [
-  { value: "regular" as const, label: "يومية", description: "متابعة الحفظ والمراجعة اليومية" },
-  { value: "review" as const, label: "درس", description: "درس أو متابعة تعليمية موجهة" },
-  { value: "exam" as const, label: "اختبار", description: "تقييم أو اختبار للحلقة" },
-  { value: "special" as const, label: "مخصصة", description: "جلسة باسم تختاره للحلقة" },
+const periodNameOptions = [
+  { id: "daily", type: "regular" as const, label: "يومية", description: "متابعة يومية للحلقة" },
+  { id: "memorization-review", type: "review" as const, label: "حفظ ومراجعة", description: "تسجيل الحفظ والمراجعة" },
+  { id: "exam", type: "exam" as const, label: "اختبار", description: "تقييم مستوى الطلاب" },
+  { id: "lessons", type: "special" as const, label: "دروس", description: "درس أو متابعة تعليمية" },
+  { id: "lecture", type: "special" as const, label: "محاضرة", description: "محاضرة أو لقاء تربوي" },
+  { id: "custom", type: "special" as const, label: "تخصيص", description: "اكتب اسماً يناسب الفترة" },
 ];
 
 function toDateTimeLocal(value: Date) {
@@ -57,8 +59,9 @@ export function NewSessionComposer({
   const [circleId, setCircleId] = useState<number | undefined>();
   const [teacherId, setTeacherId] = useState<number | undefined>();
   const [seasonId, setSeasonId] = useState<number | undefined>();
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState("يومية");
   const [kind, setKind] = useState<NewSessionValues["type"]>("regular");
+  const [nameOption, setNameOption] = useState("daily");
   const [scheduledAt, setScheduledAt] = useState(() => new Date());
   const [notes, setNotes] = useState("");
   const [showDateEditor, setShowDateEditor] = useState(false);
@@ -76,8 +79,9 @@ export function NewSessionComposer({
     setCircleId(undefined);
     setTeacherId(undefined);
     setSeasonId(undefined);
-    setTitle("");
+    setTitle("يومية");
     setKind("regular");
+    setNameOption("daily");
     const now = new Date();
     setScheduledAt(now);
     setHijriDraft(getHijriDateParts(now) ?? { year: 1448, month: 1, day: 1 });
@@ -113,8 +117,8 @@ export function NewSessionComposer({
       toast.error("اختر المعلم والموسم الدراسي");
       return;
     }
-    if (kind === "special" && !title.trim()) {
-      toast.error("اكتب اسم الجلسة المخصصة");
+    if (!title.trim()) {
+      toast.error("اكتب اسم الفترة");
       return;
     }
     onSubmit({
@@ -149,9 +153,10 @@ export function NewSessionComposer({
           </section>
 
           <section className="rounded-2xl border border-border bg-background/70 p-4">
-            <div className="mb-3 flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /><h3 className="font-display font-bold">بيانات الفترة</h3></div>
-            <label className="block"><span className="mb-1.5 block text-sm font-semibold">عنوان الفترة {kind === "special" && <span className="text-destructive">*</span>}</span><input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} placeholder={kind === "special" ? "مثال: برنامج الإتقان الأسبوعي" : "فترة الأسبوع الأول (اختياري)"} className="tarteel-input" /></label>
-            <div className="mt-4"><span className="mb-2 block text-sm font-semibold">نوع الفترة</span><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{sessionKinds.map((item) => <button type="button" key={item.value} onClick={() => setKind(item.value)} aria-pressed={kind === item.value} className={`rounded-2xl border p-3 text-right transition-all ${kind === item.value ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border bg-background hover:border-primary/35 hover:bg-primary/5"}`}><span className="block text-sm font-bold">{item.label}</span><span className={`mt-1 block text-[11px] leading-4 ${kind === item.value ? "text-primary-foreground/80" : "text-muted-foreground"}`}>{item.description}</span></button>)}</div></div>
+            <div className="mb-3 flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /><h3 className="font-display font-bold">اسم الفترة</h3></div>
+            <p className="mb-3 text-sm text-muted-foreground">اختر اسماً جاهزاً، أو اكتب الاسم الذي تريده مباشرة. الاسم هو الوصف الظاهر للفترة في كل القوائم والتقارير.</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{periodNameOptions.map((item) => <button type="button" key={item.id} onClick={() => { setNameOption(item.id); setKind(item.type); setTitle(item.id === "custom" ? "" : item.label); }} aria-pressed={nameOption === item.id} className={`rounded-2xl border p-3 text-right transition-all ${nameOption === item.id ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border bg-background hover:border-primary/35 hover:bg-primary/5"}`}><span className="block text-sm font-bold">{item.label}</span><span className={`mt-1 block text-[11px] leading-4 ${nameOption === item.id ? "text-primary-foreground/80" : "text-muted-foreground"}`}>{item.description}</span></button>)}</div>
+            <label className="mt-4 block"><span className="mb-1.5 block text-sm font-semibold">اسم الفترة <span className="text-destructive">*</span></span><input value={title} onChange={(event) => { setTitle(event.target.value); if (nameOption !== "custom" && event.target.value !== periodNameOptions.find((item) => item.id === nameOption)?.label) setNameOption("custom"); }} maxLength={120} placeholder="مثال: برنامج الإتقان الأسبوعي" className="tarteel-input" /></label>
           </section>
 
           <section className="rounded-2xl border border-border bg-background/70 p-4">

@@ -1,14 +1,22 @@
 import EntityForm, { FormInput } from "@/components/EntityForm";
 import { NewSessionComposer, type NewSessionValues } from "@/components/NewSessionComposer";
-import { trpc } from "@/lib/trpc";
-import { CalendarDays, ClipboardList, Edit, Plus, Search } from "lucide-react";
-import { useMemo, useState } from "react";
-import { toast } from "sonner";
-import { Link, useLocation } from "wouter";
-import { SESSION_STATUS_LABELS, SESSION_TYPE_LABELS } from "../../../shared/types";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Calendar } from "@/components/ui/calendar";
-import { usePermissions } from "@/hooks/usePermissions";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { trpc } from "@/lib/trpc";
+import { CalendarDays, ClipboardList, Edit, MoreVertical, Plus, Search, Trash2 } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import { useLocation } from "wouter";
+import { SESSION_STATUS_LABELS, SESSION_TYPE_LABELS } from "../../../shared/types";
+import { usePermissions } from "@/hooks/usePermissions";
+
+type PeriodRow = { id: number; title: string | null; type: "regular" | "exam" | "review" | "special"; status: "draft" | "scheduled" | "open" | "closed" | "cancelled"; scheduledAt: Date | string; notes: string | null };
+
+function periodName(period: Pick<PeriodRow, "title" | "type">) {
+  return period.title?.trim() || SESSION_TYPE_LABELS[period.type] || "فترة";
+}
 
 export default function Sessions() {
   const { can, role } = usePermissions();
@@ -16,10 +24,14 @@ export default function Sessions() {
   const canManageSessions = can("sessions:manage");
   const [showForm, setShowForm] = useState(false);
   const [createConflict, setCreateConflict] = useState<string | null>(null);
-  const [editItem, setEditItem] = useState<any>(null);
+  const [editItem, setEditItem] = useState<PeriodRow | null>(null);
+  const [actionItem, setActionItem] = useState<PeriodRow | null>(null);
+  const [deleteItem, setDeleteItem] = useState<PeriodRow | null>(null);
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdTriggered = useRef(false);
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
 
@@ -51,46 +63,52 @@ export default function Sessions() {
       refetch();
       syncSharedData();
     },
-    onError: (e) => { setCreateConflict(e.message); toast.error(e.message); },
+    onError: (error) => { setCreateConflict(error.message); toast.error(error.message); },
   });
-
   const updateStatusMutation = trpc.sessions.updateStatus.useMutation({
     onSuccess: () => { toast.success("تم تحديث حالة الفترة"); refetch(); syncSharedData(); },
-    onError: (e) => toast.error(e.message),
+    onError: (error) => toast.error(error.message),
   });
-
   const deleteMutation = trpc.sessions.delete.useMutation({
-    onSuccess: () => { toast.success("تم حذف الفترة"); refetch(); syncSharedData(); },
-    onError: (e) => toast.error(e.message),
+    onSuccess: () => { toast.success("نُقلت الفترة إلى سلة المهملات ويمكن استرجاعها لاحقاً"); setDeleteItem(null); setActionItem(null); refetch(); syncSharedData(); },
+    onError: (error) => toast.error(error.message),
   });
   const updateMutation = trpc.sessions.update.useMutation({
-    onSuccess: () => { toast.success("تم تحديث الفترة"); setEditItem(null); refetch(); syncSharedData(); },
-    onError: (e) => toast.error(e.message),
+    onSuccess: () => { toast.success("تم تحديث الفترة"); setEditItem(null); setActionItem(null); refetch(); syncSharedData(); },
+    onError: (error) => toast.error(error.message),
   });
 
-  const filtered = useMemo(() => (sessions?.filter((s) => {
-    const matchesSearch = (s.title ?? "").includes(search) || String(s.id).includes(search);
+  const filtered = useMemo(() => (sessions?.filter((session) => {
+    const matchesSearch = periodName(session as PeriodRow).includes(search) || String(session.id).includes(search);
     if (!selectedDate) return matchesSearch;
-    const sessionDate = new Date(s.scheduledAt);
+    const sessionDate = new Date(session.scheduledAt);
     return matchesSearch && sessionDate.getFullYear() === selectedDate.getFullYear() && sessionDate.getMonth() === selectedDate.getMonth() && sessionDate.getDate() === selectedDate.getDate();
-  }) ?? []), [sessions, search, selectedDate]);
+  }) ?? []) as PeriodRow[], [sessions, search, selectedDate]);
   const sessionDays = useMemo(() => (sessions ?? []).map((session) => new Date(session.scheduledAt)), [sessions]);
-  const drafts = useMemo(() => sessionsWithDrafts?.filter((session) => session.status === "draft") ?? [], [sessionsWithDrafts]);
+  const drafts = useMemo(() => (sessionsWithDrafts?.filter((session) => session.status === "draft") ?? []) as PeriodRow[], [sessionsWithDrafts]);
 
-  function handleCreate(values: NewSessionValues) {
-    setCreateConflict(null);
-    createMutation.mutate({
-      ...values,
-    });
-  }
+  const clearHold = () => { if (holdTimer.current) clearTimeout(holdTimer.current); holdTimer.current = null; };
+  const startHold = (period: PeriodRow) => {
+    if (!canManageSessions) return;
+    holdTriggered.current = false;
+    clearHold();
+    holdTimer.current = setTimeout(() => { holdTriggered.current = true; setActionItem(period); }, 600);
+  };
+  const openPeriod = (period: PeriodRow) => {
+    if (holdTriggered.current) { holdTriggered.current = false; return; }
+    navigate(`/periods/${period.id}`);
+  };
+  const handleCreate = (values: NewSessionValues) => { setCreateConflict(null); createMutation.mutate(values); };
+  const handleUpdate = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editItem) return;
+    const fields = new FormData(event.currentTarget);
+    const title = String(fields.get("title") || "").trim();
+    if (!title) { toast.error("اكتب اسم الفترة"); return; }
+    updateMutation.mutate({ id: editItem.id, title, scheduledAt: new Date(String(fields.get("scheduledAt"))), notes: String(fields.get("notes") || "") || null, status: fields.get("status") as "draft" | "scheduled" | "open" | "closed" | "cancelled" });
+  };
 
-  function handleUpdate(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    updateMutation.mutate({ id: editItem.id, title: String(fd.get("title") || "") || null, type: fd.get("type") as any, scheduledAt: new Date(String(fd.get("scheduledAt"))), notes: String(fd.get("notes") || "") || null, status: fd.get("status") as any });
-  }
-
-  const statusColors: Record<string, string> = {
+  const statusColors: Record<PeriodRow["status"], string> = {
     draft: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
     scheduled: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
     open: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
@@ -99,58 +117,18 @@ export default function Sessions() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center"><ClipboardList className="w-5 h-5 text-white"/></div>
-          <div><h1 className="page-title">الفترات</h1><p className="page-subtitle">فترات التحفيظ والحضور وسجل الطلاب</p></div>
-        </div>
-          <div className="flex items-center gap-2"><Popover open={calendarOpen} onOpenChange={setCalendarOpen}><PopoverTrigger asChild><button className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${selectedDate ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-background/70 text-foreground hover:bg-muted"}`}><CalendarDays className="ml-1 inline h-4 w-4" />{selectedDate ? selectedDate.toLocaleDateString("ar-SA", { month: "short", day: "numeric" }) : "التقويم"}</button></PopoverTrigger><PopoverContent align="end" className="w-auto p-0" dir="rtl"><Calendar mode="single" selected={selectedDate} onSelect={(date) => { setSelectedDate(date); setCalendarOpen(false); }} modifiers={{ hasSession: sessionDays }} modifiersClassNames={{ hasSession: "bg-primary/10 font-bold text-primary" }} footer={<p className="border-t border-border px-3 py-2 text-center text-xs text-muted-foreground">الأيام المظللة تحتوي فترات. {selectedDate && <button onClick={() => setSelectedDate(undefined)} className="mr-2 text-primary hover:underline">إزالة التصفية</button>}</p>} /></PopoverContent></Popover>{canManageSessions && <button onClick={()=>setShowForm(true)} className="btn-gold flex items-center gap-2 text-sm"><Plus className="w-4 h-4"/>فترة جديدة</button>}</div>
-      </div>
-      <div className="relative">
-        <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
-        <input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="بحث في الفترات..." className="tarteel-input pr-10"/>
-      </div>
-      {drafts.length > 0 && <section className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4"><div className="flex items-start justify-between gap-3"><div><h2 className="font-display text-lg font-bold text-foreground">مسودات محفوظة تلقائياً</h2><p className="mt-1 text-sm text-muted-foreground">أكمل التسجيل من حيث توقفت، ثم اضغط «حفظ الفترة» داخلها لإضافتها إلى الفترات والتقارير.</p></div><span className="rounded-full bg-background px-2.5 py-1 text-xs font-bold text-amber-800">{drafts.length}</span></div><div className="mt-3 space-y-2">{drafts.map((draft) => <Link key={draft.id} href={`/periods/${draft.id}`} className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-background/80 px-3 py-3 transition-colors hover:bg-amber-500/10"><span><strong className="block text-sm text-foreground">{draft.title ?? `فترة مسودة #${draft.id}`}</strong><span className="mt-0.5 block text-xs text-muted-foreground">{new Date(draft.scheduledAt).toLocaleDateString("ar-SA", { weekday: "long", month: "long", day: "numeric" })}</span></span><span className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">استئناف</span></Link>)}</div></section>}
-      {isLoading ? (
-        <div className="space-y-3">{[1,2,3,4].map(i=><div key={i} className="glass-card rounded-2xl p-4"><div className="skeleton h-5 w-48 mb-2"/><div className="skeleton h-4 w-32"/></div>)}</div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16"><ClipboardList className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4"/><p className="text-muted-foreground">لا توجد فترات</p>{canManageSessions && <button onClick={()=>setShowForm(true)} className="mt-4 btn-gold text-sm px-4 py-2">إنشاء أول فترة</button>}</div>
-      ) : (
-        <div className="space-y-3">
-          {filtered.map((session, i) => (
-            <div key={session.id} className={`glass-card rounded-2xl p-4 animate-fade-in-up stagger-${(i%5)+1}`}>
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center flex-shrink-0"><ClipboardList className="w-5 h-5 text-blue-600"/></div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-semibold text-foreground">{session.title ?? `فترة #${session.id}`}</h3>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[session.status]}`}>{SESSION_STATUS_LABELS[session.status]}</span>
-                    <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{SESSION_TYPE_LABELS[session.type]}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{new Date(session.scheduledAt).toLocaleDateString("ar-SA", {weekday:"long",year:"numeric",month:"long",day:"numeric",hour:"2-digit",minute:"2-digit"})}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {session.status === "scheduled" && (
-                    <button onClick={()=>updateStatusMutation.mutate({id:session.id,status:"open"})} className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">فتح</button>
-                  )}
-                  {session.status === "open" && (
-                    <button onClick={()=>updateStatusMutation.mutate({id:session.id,status:"closed"})} className="text-xs px-3 py-1.5 rounded-lg bg-gray-600 text-white hover:bg-gray-700 transition-colors">إغلاق</button>
-                  )}
-                  {canManageSessions && <button onClick={() => setEditItem(session)} className="text-xs px-3 py-1.5 rounded-lg border border-primary/25 text-primary hover:bg-primary/5 transition-colors"><Edit className="ml-1 inline w-3 h-3"/>تعديل</button>}
-                  <Link href={`/periods/${session.id}`}>
-                    <button className="text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors flex items-center gap-1">
-                      <Edit className="w-3 h-3"/>فتح الفترة
-                    </button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="space-y-6" dir="rtl">
+      <header className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600"><ClipboardList className="h-5 w-5 text-white" /></div><div><h1 className="page-title">الفترات</h1><p className="page-subtitle">انقر الفترة لفتح سجل الطلاب، واضغط مطولاً لإدارتها.</p></div></div>
+        <div className="flex items-center gap-2"><Popover open={calendarOpen} onOpenChange={setCalendarOpen}><PopoverTrigger asChild><button className={`rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${selectedDate ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-background/70 text-foreground hover:bg-muted"}`}><CalendarDays className="ml-1 inline h-4 w-4" />{selectedDate ? selectedDate.toLocaleDateString("ar-SA", { month: "short", day: "numeric" }) : "التقويم"}</button></PopoverTrigger><PopoverContent align="end" className="w-auto p-0" dir="rtl"><Calendar mode="single" selected={selectedDate} onSelect={(date) => { setSelectedDate(date); setCalendarOpen(false); }} modifiers={{ hasSession: sessionDays }} modifiersClassNames={{ hasSession: "bg-primary/10 font-bold text-primary" }} footer={<p className="border-t border-border px-3 py-2 text-center text-xs text-muted-foreground">الأيام المظللة تحتوي فترات. {selectedDate && <button onClick={() => setSelectedDate(undefined)} className="mr-2 text-primary hover:underline">إزالة التصفية</button>}</p>} /></PopoverContent></Popover>{canManageSessions && <button onClick={() => setShowForm(true)} className="btn-gold flex items-center gap-2 text-sm"><Plus className="h-4 w-4" />فترة جديدة</button>}</div>
+      </header>
+      <div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="بحث في أسماء الفترات…" className="tarteel-input pr-10" /></div>
+      {drafts.length > 0 && <section className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4"><div className="flex items-start justify-between gap-3"><div><h2 className="font-display text-lg font-bold text-foreground">مسودات محفوظة تلقائياً</h2><p className="mt-1 text-sm text-muted-foreground">أكمل التسجيل من حيث توقفت، ثم اضغط «حفظ الفترة» داخلها لإضافتها إلى الفترات والتقارير.</p></div><span className="rounded-full bg-background px-2.5 py-1 text-xs font-bold text-amber-800">{drafts.length}</span></div><div className="mt-3 space-y-2">{drafts.map((draft) => <div key={draft.id} className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-background/80 px-3 py-3"><button onClick={() => openPeriod(draft)} className="min-w-0 flex-1 text-right"><strong className="block text-sm text-foreground">{periodName(draft)}</strong><span className="mt-0.5 block text-xs text-muted-foreground">{new Date(draft.scheduledAt).toLocaleDateString("ar-SA", { weekday: "long", month: "long", day: "numeric" })}</span><span className="mt-2 inline-flex rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground">استئناف</span></button>{canManageSessions && <button onClick={() => setActionItem(draft)} aria-label={`إدارة ${periodName(draft)}`} className="rounded-lg border border-border p-2 text-muted-foreground hover:bg-muted"><MoreVertical className="h-4 w-4" /></button>}</div>)}</div></section>}
+      {isLoading ? <div className="space-y-3">{[1, 2, 3, 4].map((item) => <div key={item} className="glass-card rounded-2xl p-4"><div className="skeleton mb-2 h-5 w-48" /><div className="skeleton h-4 w-32" /></div>)}</div> : filtered.length === 0 ? <div className="py-16 text-center"><ClipboardList className="mx-auto mb-4 h-16 w-16 text-muted-foreground/30" /><p className="text-muted-foreground">لا توجد فترات</p>{canManageSessions && <button onClick={() => setShowForm(true)} className="btn-gold mt-4 px-4 py-2 text-sm">إنشاء أول فترة</button>}</div> : <div className="space-y-3">{filtered.map((period, index) => <article key={period.id} tabIndex={0} role="link" aria-label={`فتح فترة ${periodName(period)}`} onClick={() => openPeriod(period)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openPeriod(period); } }} onPointerDown={() => startHold(period)} onPointerUp={clearHold} onPointerCancel={clearHold} onPointerLeave={clearHold} className={`glass-card group cursor-pointer rounded-2xl p-4 outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-primary animate-fade-in-up stagger-${(index % 5) + 1}`}><div className="flex items-center gap-4"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600/10"><ClipboardList className="h-5 w-5 text-blue-600" /></div><div className="min-w-0 flex-1"><div className="mb-1 flex flex-wrap items-center gap-2"><h3 className="font-semibold text-foreground">{periodName(period)}</h3><span className={`rounded-full px-2 py-0.5 text-xs ${statusColors[period.status]}`}>{SESSION_STATUS_LABELS[period.status]}</span></div><p className="text-sm text-muted-foreground">{new Date(period.scheduledAt).toLocaleDateString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p></div><div className="flex shrink-0 items-center gap-1">{period.status === "scheduled" && <button onClick={(event) => { event.stopPropagation(); updateStatusMutation.mutate({ id: period.id, status: "open" }); }} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs text-white hover:bg-emerald-700">فتح</button>}{period.status === "open" && <button onClick={(event) => { event.stopPropagation(); updateStatusMutation.mutate({ id: period.id, status: "closed" }); }} className="rounded-lg bg-gray-600 px-3 py-1.5 text-xs text-white hover:bg-gray-700">إغلاق</button>}{canManageSessions && <button onClick={(event) => { event.stopPropagation(); setActionItem(period); }} aria-label={`إدارة ${periodName(period)}`} className="rounded-lg border border-border p-2 text-muted-foreground hover:bg-muted"><MoreVertical className="h-4 w-4" /></button>}</div></div></article>)}</div>}
       <NewSessionComposer open={showForm} onOpenChange={(open) => { setShowForm(open); if (!open) setCreateConflict(null); }} circles={circles} teachers={teachers} seasons={seasons} isTeachingRole={isTeachingRole} isLoading={createMutation.isPending} conflictMessage={createConflict} onClearConflict={() => setCreateConflict(null)} onSubmit={handleCreate} />
-      {editItem&&<EntityForm title="تعديل الفترة" onClose={()=>setEditItem(null)} onSubmit={handleUpdate} isLoading={updateMutation.isPending} submitLabel="حفظ التعديلات"><FormInput label="عنوان الفترة" name="title" defaultValue={editItem.title??""}/><div><label className="block text-sm font-medium text-foreground mb-1.5">نوع الفترة</label><select name="type" defaultValue={editItem.type} className="tarteel-input">{Object.entries(SESSION_TYPE_LABELS).map(([key, value])=><option key={key} value={key}>{value}</option>)}</select></div><FormInput label="موعد الفترة" name="scheduledAt" type="datetime-local" required defaultValue={new Date(editItem.scheduledAt).toISOString().slice(0,16)}/><div><label className="block text-sm font-medium text-foreground mb-1.5">الحالة</label><select name="status" defaultValue={editItem.status} className="tarteel-input">{Object.entries(SESSION_STATUS_LABELS).map(([key, value])=><option key={key} value={key}>{value}</option>)}</select></div><div><label className="block text-sm font-medium text-foreground mb-1.5">ملاحظات</label><textarea name="notes" defaultValue={editItem.notes??""} rows={2} className="tarteel-input resize-none"/></div></EntityForm>}
+      <Dialog open={Boolean(actionItem)} onOpenChange={(open) => !open && setActionItem(null)}><DialogContent className="sm:max-w-md" dir="rtl"><DialogHeader><DialogTitle className="font-display text-xl">إدارة الفترة</DialogTitle><DialogDescription>{actionItem ? `إجراءات الفترة «${periodName(actionItem)}»` : ""}</DialogDescription></DialogHeader><div className="grid gap-2"><button onClick={() => { if (!actionItem) return; setEditItem(actionItem); setActionItem(null); }} className="flex items-center gap-3 rounded-2xl border border-border p-4 text-right font-semibold text-foreground hover:bg-muted"><Edit className="h-5 w-5 text-primary" />تعديل بيانات الفترة</button><button onClick={() => { if (!actionItem) return; setDeleteItem(actionItem); setActionItem(null); }} className="flex items-center gap-3 rounded-2xl border border-destructive/25 bg-destructive/5 p-4 text-right font-semibold text-destructive hover:bg-destructive/10"><Trash2 className="h-5 w-5" />نقل إلى سلة المهملات</button></div></DialogContent></Dialog>
+      <AlertDialog open={Boolean(deleteItem)} onOpenChange={(open) => !open && setDeleteItem(null)}><AlertDialogContent dir="rtl"><AlertDialogHeader><AlertDialogTitle className="font-display">نقل الفترة إلى سلة المهملات؟</AlertDialogTitle><AlertDialogDescription>سيُنقل سجل «{deleteItem ? periodName(deleteItem) : ""}» بكل بياناته إلى السلة، ولن يظهر في التقارير. يمكنك استرجاعه من سلة المهملات لاحقاً.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>إلغاء</AlertDialogCancel><AlertDialogAction onClick={(event) => { event.preventDefault(); if (deleteItem) deleteMutation.mutate({ id: deleteItem.id }); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{deleteMutation.isPending ? "جارٍ النقل…" : "تأكيد النقل إلى السلة"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      {editItem && <EntityForm title="تعديل الفترة" onClose={() => setEditItem(null)} onSubmit={handleUpdate} isLoading={updateMutation.isPending} submitLabel="حفظ التعديلات"><FormInput label="اسم الفترة" name="title" defaultValue={periodName(editItem)} required /><FormInput label="موعد الفترة" name="scheduledAt" type="datetime-local" required defaultValue={new Date(editItem.scheduledAt).toISOString().slice(0, 16)} /><div><label className="mb-1.5 block text-sm font-medium text-foreground">الحالة</label><select name="status" defaultValue={editItem.status} className="tarteel-input">{Object.entries(SESSION_STATUS_LABELS).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select></div><div><label className="mb-1.5 block text-sm font-medium text-foreground">ملاحظات</label><textarea name="notes" defaultValue={editItem.notes ?? ""} rows={3} className="tarteel-input resize-none" /></div></EntityForm>}
     </div>
   );
 }

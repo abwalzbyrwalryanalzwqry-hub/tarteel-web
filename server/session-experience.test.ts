@@ -31,7 +31,7 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     const ayahPicker = source("client/src/components/AyahPicker.tsx");
     const detail = source("client/src/pages/SessionDetail.tsx");
     expect(header).toContain("يومية");
-    expect(header).toContain("مخصصة");
+    expect(header).toContain("تخصيص");
     expect(header).toContain("formatDualCalendarDate");
     expect(ayahPicker).toContain("Array.from({ length: max }");
     expect(ayahPicker).toContain("إدخال يدوي");
@@ -153,5 +153,41 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     expect(router).toContain("getSessionByCircleDay(input.circleId, getRiyadhDayKey(input.scheduledAt))");
     expect(periods).toContain("utils.sessions.byDay.fetch");
     expect(circle).toContain("utils.sessions.byDay.fetch");
+  });
+
+  it("يوحّد اسم الفترة مع الخيارات الجاهزة والكتابة اليدوية", () => {
+    const composer = source("client/src/components/NewSessionComposer.tsx");
+    const header = source("client/src/components/SessionHeaderControls.tsx");
+    expect(composer).toContain("حفظ ومراجعة");
+    expect(composer).toContain("محاضرة");
+    expect(composer).toContain("اسم الفترة");
+    expect(header).toContain("اسم الفترة");
+    expect(header).toContain("تخصيص");
+  });
+
+  it("يفتح الفترة بالنقر ويعرض إدارة آمنة بالضغط المطوّل مع نقل مؤكد إلى السلة", () => {
+    const periods = source("client/src/pages/Sessions.tsx");
+    const trash = source("client/src/pages/Trash.tsx");
+    const router = source("server/routers.ts");
+    const database = source("server/db.ts");
+    expect(periods).toContain("onPointerDown={() => startHold(period)}");
+    expect(periods).toContain("تأكيد النقل إلى السلة");
+    expect(periods).toContain("نقل إلى سلة المهملات");
+    expect(trash).toContain("تأكيد الحذف النهائي");
+    expect(router).toContain("permanentlyDeleteSession");
+    expect(database).toContain("permanentlyDeleteTrashedSession");
+  });
+
+  it("ينشئ تقريراً تنفيذياً للحلقة بفلاتر أسبوعية وشهرية وطباعة", () => {
+    const builder = source("server/reports/reportBuilder.ts");
+    const reportingRouter = source("server/routers/reporting.ts");
+    const executive = source("client/src/components/ExecutiveCircleReport.tsx");
+    const reports = source("client/src/pages/Reports.tsx");
+    expect(builder).toContain("buildExecutiveCircleReport");
+    expect(reportingRouter).toContain("executive: protectedProcedure");
+    expect(executive).toContain("أسبوعي");
+    expect(executive).toContain("شهري");
+    expect(executive).toContain("window.print()");
+    expect(reports).toContain("<ExecutiveCircleReport");
   });
 });
