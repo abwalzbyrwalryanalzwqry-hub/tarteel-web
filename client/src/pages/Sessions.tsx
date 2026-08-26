@@ -37,9 +37,13 @@ export default function Sessions() {
   ]);
 
   const createMutation = trpc.sessions.create.useMutation({
-    onSuccess: (result) => {
-      const periodId = result.periodId ?? result.sessionId;
-      if (!periodId) { toast.error("تعذر فتح سجل طلاب الفترة الجديدة"); return; }
+    onSuccess: async (result, values) => {
+      let periodId = Number(result?.periodId ?? result?.sessionId);
+      if (!Number.isInteger(periodId) || periodId < 1) {
+        const created = await utils.sessions.byDay.fetch({ circleId: values.circleId, scheduledAt: values.scheduledAt });
+        periodId = Number(created?.id);
+      }
+      if (!Number.isInteger(periodId) || periodId < 1) { toast.error("تم حفظ المسودة، لكن تعذر فتح سجل طلابها. افتحها من قسم المسودات المحفوظة."); return; }
       toast.success("تم إنشاء الفترة بنجاح");
       setCreateConflict(null);
       setShowForm(false);

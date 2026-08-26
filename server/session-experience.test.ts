@@ -55,7 +55,7 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     expect(composer).toContain("إدخال هجري يدوي");
     expect(composer).toContain("الحلقة");
     expect(sessions).toContain("<NewSessionComposer");
-    expect(sessions).toContain("const periodId = result.periodId ?? result.sessionId");
+    expect(sessions).toContain("let periodId = Number(result?.periodId ?? result?.sessionId)");
     expect(sessions).toContain("navigate(`/periods/${periodId}`");
   });
 
@@ -140,5 +140,15 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     expect(router).toContain("periodId: created.id");
     expect(periods).toContain("navigate(`/periods/${periodId}`");
     expect(circle).toContain("navigate(`/periods/${periodId}`");
+  });
+
+  it("يستعيد المسودة بحسب الحلقة والتاريخ إذا غاب معرّف الإنشاء من الاستجابة الحية", () => {
+    const router = source("server/routers.ts");
+    const periods = source("client/src/pages/Sessions.tsx");
+    const circle = source("client/src/pages/CircleDetail.tsx");
+    expect(router).toContain("byDay: protectedProcedure");
+    expect(router).toContain("getSessionByCircleDay(input.circleId, getRiyadhDayKey(input.scheduledAt))");
+    expect(periods).toContain("utils.sessions.byDay.fetch");
+    expect(circle).toContain("utils.sessions.byDay.fetch");
   });
 });

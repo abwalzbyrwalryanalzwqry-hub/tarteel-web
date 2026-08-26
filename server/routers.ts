@@ -690,6 +690,11 @@ export const appRouter = router({
         return (await Promise.all(scope.map((circleId) => getSessions(circleId, input.seasonId, input.includeDrafts)))).flat();
       }),
     byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => getAuthorizedSession(ctx.user, input.id)),
+    byDay: protectedProcedure.input(z.object({ circleId: z.number(), scheduledAt: z.date() })).query(async ({ ctx, input }) => {
+      await assertCirclePermission(ctx.user, input.circleId, "attendance.view");
+      const session = await getSessionByCircleDay(input.circleId, getRiyadhDayKey(input.scheduledAt));
+      return session ? getAuthorizedSession(ctx.user, session.id) : null;
+    }),
     latestStudentProgress: protectedProcedure.input(z.object({ circleId: z.number() })).query(async ({ ctx, input }) => {
       await assertTeacherCircleAccess(ctx.user, input.circleId);
       return getLatestStudentPeriodProgress(input.circleId);
