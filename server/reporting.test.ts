@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { generateUnifiedReportPDF } from "./reports/unifiedPdf";
+import { generateExecutiveCircleExcel, generateExecutiveCirclePdf } from "./reports/executiveExport";
 
 const root = path.resolve(import.meta.dirname, "..");
 const read = (relative: string) => readFileSync(path.join(root, relative), "utf8");
@@ -55,5 +56,23 @@ describe("نظام التقرير الموحد", () => {
     expect(pdf.toString("latin1").match(/\/Type \/Page\b/g)?.length).toBeGreaterThan(1);
     const compactPdf = await generateUnifiedReportPDF({ ...report, summary: { ...report.summary, students: 2, present: 4, memorizationCount: 2 }, students: students.slice(0, 2) });
     expect(compactPdf.toString("latin1").match(/\/Type \/Page\b/g)?.length).toBe(1);
+  });
+
+  it("يجهز ملفات PDF وExcel للتقرير التنفيذي مع معاينات وتنزيل ومشاركة", async () => {
+    const router = read("server/routers/reporting.ts");
+    const exporter = read("server/reports/executiveExport.ts");
+    const preview = read("client/src/components/ExecutiveCircleReport.tsx");
+    const report = { meta: { circleId: 1, circleName: "حلقة الإتقان", startDate: new Date("2026-08-01"), endDate: new Date("2026-08-31"), period: "monthly" as const }, summary: { sessions: 4, present: 12, absent: 1, late: 1, excused: 0, attendanceRate: 86, memorizationEntries: 8, revisionEntries: 6, memorizedPages: 10, reviewedPages: 7 }, buckets: [{ key: "2026-08", label: "صفر ١٤٤٨ هـ", sessions: 4, present: 12, absent: 1, late: 1, excused: 0, memorizationEntries: 8, revisionEntries: 6, memorizedPages: 10, reviewedPages: 7 }] };
+    const pdf = await generateExecutiveCirclePdf(report);
+    const excel = generateExecutiveCircleExcel(report);
+    expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
+    expect(pdf.toString("latin1")).toContain("Amiri");
+    expect(excel.subarray(0, 2).toString("latin1")).toBe("PK");
+    expect(router).toContain("exportExecutivePdf");
+    expect(router).toContain("exportExecutiveExcel");
+    expect(exporter).toContain("التفصيل الزمني");
+    expect(preview).toContain("معاينة PDF");
+    expect(preview).toContain("معاينة Excel");
+    expect(preview).toContain("navigator.share");
   });
 });
