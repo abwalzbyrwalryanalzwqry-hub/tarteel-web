@@ -136,6 +136,9 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     const router = source("server/routers.ts");
     const periods = source("client/src/pages/Sessions.tsx");
     const circle = source("client/src/pages/CircleDetail.tsx");
+    expect(router).toContain("function getInsertedSessionId");
+    expect(router).toContain("const insertedId = getInsertedSessionId(insertion)");
+    expect(router).toContain("if (insertedId) return { sessionId: insertedId, periodId: insertedId }");
     expect(router).toContain("const created = await getSessionByCircleDay");
     expect(router).toContain("periodId: created.id");
     expect(periods).toContain("navigate(`/periods/${periodId}`");

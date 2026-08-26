@@ -203,13 +203,22 @@ async function resolveSessionCreateInput(user: AccessSubject, input: { circleId:
   return input as Required<Pick<typeof input, "teacherId" | "seasonId">> & typeof input;
 }
 
+/** يستخرج معرّف الإدراج من صيغ موصل MySQL/TiDB المتوافقة. */
+function getInsertedSessionId(result: unknown) {
+  const header = Array.isArray(result) ? result[0] : result;
+  const id = Number((header as { insertId?: unknown } | undefined)?.insertId);
+  return Number.isInteger(id) && id > 0 ? id : undefined;
+}
+
 /** كل فترة تخص تاريخاً يحدده المعلم: يمنع السجل الثاني في الحلقة والتاريخ نفسيهما. */
 async function createDailyPeriod(user: AccessSubject, input: { circleId: number; teacherId?: number; seasonId?: number; title?: string; type: "regular" | "exam" | "review" | "special"; scheduledAt: Date; notes?: string }) {
   const resolved = await resolveSessionCreateInput(user, input);
   const dayKey = getRiyadhDayKey(resolved.scheduledAt);
   const existing = await getSessionByCircleDay(resolved.circleId, dayKey);
   if (existing) throw new TRPCError({ code: "CONFLICT", message: "توجد بالفعل فترة لهذه الحلقة في التاريخ المحدد. اختر يوماً أو تاريخاً آخر." });
-  await createSession({ ...resolved, dayKey });
+  const insertion = await createSession({ ...resolved, dayKey });
+  const insertedId = getInsertedSessionId(insertion);
+  if (insertedId) return { sessionId: insertedId, periodId: insertedId } as const;
   const created = await getSessionByCircleDay(resolved.circleId, dayKey);
   if (!created) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر فتح سجل طلاب الفترة الجديدة" });
   return { sessionId: created.id, periodId: created.id } as const;
