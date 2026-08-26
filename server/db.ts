@@ -18,6 +18,7 @@ import {
   organizations,
   parentStudentLinks,
   permissionGrants,
+  reportingGoals,
   revision,
   sessions,
   students,
@@ -178,6 +179,21 @@ export async function softDeleteCenter(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   await db.update(centers).set({ deletedAt: new Date(), isActive: false }).where(eq(centers.id, id));
+}
+
+export async function getReportingGoals(centerId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(reportingGoals).where(eq(reportingGoals.centerId, centerId)).limit(1);
+  return result[0];
+}
+
+export async function saveReportingGoals(input: { centerId: number; attendanceTarget?: number | null; memorizedPagesTarget?: number | null; reviewedPagesTarget?: number | null; updatedBy: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const now = new Date();
+  await db.insert(reportingGoals).values(input).onDuplicateKeyUpdate({ set: { attendanceTarget: input.attendanceTarget ?? null, memorizedPagesTarget: input.memorizedPagesTarget ?? null, reviewedPagesTarget: input.reviewedPagesTarget ?? null, updatedBy: input.updatedBy, updatedAt: now } });
+  return getReportingGoals(input.centerId);
 }
 
 // ===================== BRANCHES =====================

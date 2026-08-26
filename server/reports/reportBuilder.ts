@@ -1,5 +1,5 @@
 import { and, eq, gte, inArray, isNull, lte, ne } from "drizzle-orm";
-import { getDb, keepLatestAttendanceRows } from "../db";
+import { getDb, getReportingGoals, keepLatestAttendanceRows } from "../db";
 import { attendance, branches, centers, circles, evaluation, memorization, revision, sessions, students } from "../../drizzle/schema";
 import { GRADE_LABELS, QURAN_SURAHS } from "../../shared/types";
 import { scoreToStars, MIZAN_RATING_LABELS } from "../../shared/mizan";
@@ -29,6 +29,15 @@ export type ExecutiveCircleReport = {
   meta: { circleId: number; circleName: string; startDate: Date; endDate: Date; period: "weekly" | "monthly" };
   summary: { sessions: number; present: number; absent: number; late: number; excused: number; attendanceRate: number; memorizationEntries: number; revisionEntries: number; memorizedPages: number; reviewedPages: number };
   buckets: { key: string; label: string; sessions: number; present: number; absent: number; late: number; excused: number; memorizationEntries: number; revisionEntries: number; memorizedPages: number; reviewedPages: number }[];
+};
+
+export type CenterManagementReport = {
+  meta: { centerId: number; centerName: string; startDate: Date; endDate: Date; period: "weekly" | "monthly"; days: number };
+  summary: { sessions: number; present: number; absent: number; late: number; excused: number; attendanceRate: number; memorizedPages: number; reviewedPages: number; memorizationEntries: number; revisionEntries: number; activeCircles: number };
+  goals: { attendanceTarget: number | null; memorizedPagesTarget: number | null; reviewedPagesTarget: number | null; projectedMemorizedPagesTarget: number | null; projectedReviewedPagesTarget: number | null };
+  comparisons: { circleId: number; circleName: string; sessions: number; attendanceRate: number; memorizedPages: number; reviewedPages: number; activityEntries: number }[];
+  trend: { key: string; label: string; sessions: number; attendanceRate: number; memorizedPages: number; reviewedPages: number }[];
+  alerts: { id: string; severity: "warning" | "attention"; title: string; description: string; circleId?: number }[];
 };
 
 function asDateBoundary(value: Date | undefined, end = false) {
@@ -145,4 +154,68 @@ export async function buildExecutiveCircleReport(input: { circleId: number; peri
   const summary = Array.from(buckets.values()).reduce((total, bucket) => ({ sessions: total.sessions + bucket.sessions, present: total.present + bucket.present, absent: total.absent + bucket.absent, late: total.late + bucket.late, excused: total.excused + bucket.excused, memorizationEntries: total.memorizationEntries + bucket.memorizationEntries, revisionEntries: total.revisionEntries + bucket.revisionEntries, memorizedPages: total.memorizedPages + bucket.memorizedPages, reviewedPages: total.reviewedPages + bucket.reviewedPages }), { sessions: 0, present: 0, absent: 0, late: 0, excused: 0, memorizationEntries: 0, revisionEntries: 0, memorizedPages: 0, reviewedPages: 0 });
   const attendanceTotal = summary.present + summary.absent + summary.late + summary.excused;
   return { meta: { circleId: circle.id, circleName: circle.name, startDate: start, endDate: end, period: input.period }, summary: { ...summary, attendanceRate: attendanceTotal ? Math.round((summary.present / attendanceTotal) * 100) : 0 }, buckets: Array.from(buckets.values()) };
+}
+
+export async function buildCenterManagementReport(input: { centerId: number; period: "weekly" | "monthly"; startDate?: Date; endDate?: Date }): Promise<CenterManagementReport> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [center] = await db.select().from(centers).where(and(eq(centers.id, input.centerId), isNull(centers.deletedAt))).limit(1);
+  if (!center) throw new Error("المركز غير موجود");
+  const { start, end } = periodRange(input.period, input.startDate, input.endDate);
+  const centerCircles = await db.select({ id: circles.id, name: circles.name }).from(circles).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(eq(branches.centerId, input.centerId), isNull(branches.deletedAt), isNull(circles.deletedAt), eq(circles.isActive, true)));
+  const circleIds = centerCircles.map((circle) => circle.id);
+  const baseSessionConditions = [isNull(sessions.deletedAt), ne(sessions.status, "draft"), gte(sessions.scheduledAt, start), lte(sessions.scheduledAt, end)];
+  const periodSessions = circleIds.length ? await db.select().from(sessions).where(and(inArray(sessions.circleId, circleIds), ...baseSessionConditions)).orderBy(sessions.scheduledAt) : [];
+  const sessionIds = periodSessions.map((session) => session.id);
+  const [attendanceRows, memorizationRows, revisionRows, drafts, goals] = await Promise.all([
+    sessionIds.length ? db.select().from(attendance).where(inArray(attendance.sessionId, sessionIds)) : Promise.resolve([] as (typeof attendance.$inferSelect)[]),
+    sessionIds.length ? db.select().from(memorization).where(inArray(memorization.sessionId, sessionIds)) : Promise.resolve([] as (typeof memorization.$inferSelect)[]),
+    sessionIds.length ? db.select().from(revision).where(inArray(revision.sessionId, sessionIds)) : Promise.resolve([] as (typeof revision.$inferSelect)[]),
+    circleIds.length ? db.select({ id: sessions.id, circleId: sessions.circleId }).from(sessions).where(and(inArray(sessions.circleId, circleIds), isNull(sessions.deletedAt), eq(sessions.status, "draft"))) : Promise.resolve([] as { id: number; circleId: number }[]),
+    getReportingGoals(input.centerId),
+  ]);
+  const currentAttendanceRows = keepLatestAttendanceRows(attendanceRows);
+  const byCircle = new Map<number, CenterManagementReport["comparisons"][number]>();
+  for (const circle of centerCircles) byCircle.set(circle.id, { circleId: circle.id, circleName: circle.name, sessions: 0, attendanceRate: 0, memorizedPages: 0, reviewedPages: 0, activityEntries: 0 });
+  const trendMap = new Map<string, { key: string; label: string; sessions: number; present: number; absent: number; late: number; excused: number; memorizedPages: number; reviewedPages: number }>();
+  for (const session of periodSessions) {
+    const circle = byCircle.get(session.circleId);
+    if (!circle) continue;
+    const attendanceForSession = currentAttendanceRows.filter((row) => row.sessionId === session.id);
+    const mem = memorizationRows.filter((row) => row.sessionId === session.id);
+    const rev = revisionRows.filter((row) => row.sessionId === session.id);
+    circle.sessions += 1;
+    circle.memorizedPages += mem.reduce((total, row) => total + Number(row.pages ?? 0), 0);
+    circle.reviewedPages += rev.reduce((total, row) => total + Number(row.pages ?? 0), 0);
+    circle.activityEntries += mem.length + rev.length;
+    const bucketInfo = bucketFor(session.scheduledAt, input.period);
+    const bucket = trendMap.get(bucketInfo.key) ?? { ...bucketInfo, sessions: 0, present: 0, absent: 0, late: 0, excused: 0, memorizedPages: 0, reviewedPages: 0 };
+    bucket.sessions += 1;
+    bucket.present += attendanceForSession.filter((row) => row.status === "present").length;
+    bucket.absent += attendanceForSession.filter((row) => row.status === "absent").length;
+    bucket.late += attendanceForSession.filter((row) => row.status === "late").length;
+    bucket.excused += attendanceForSession.filter((row) => row.status === "excused").length;
+    bucket.memorizedPages += mem.reduce((total, row) => total + Number(row.pages ?? 0), 0);
+    bucket.reviewedPages += rev.reduce((total, row) => total + Number(row.pages ?? 0), 0);
+    trendMap.set(bucketInfo.key, bucket);
+  }
+  for (const circle of Array.from(byCircle.values())) {
+    const relevantSessionIds = periodSessions.filter((session) => session.circleId === circle.circleId).map((session) => session.id);
+    const circleAttendance = currentAttendanceRows.filter((row) => relevantSessionIds.includes(row.sessionId));
+    circle.attendanceRate = circleAttendance.length ? Math.round((circleAttendance.filter((row) => row.status === "present").length / circleAttendance.length) * 100) : 0;
+  }
+  const summaryBase = Array.from(trendMap.values()).reduce((total, bucket) => ({ sessions: total.sessions + bucket.sessions, present: total.present + bucket.present, absent: total.absent + bucket.absent, late: total.late + bucket.late, excused: total.excused + bucket.excused, memorizedPages: total.memorizedPages + bucket.memorizedPages, reviewedPages: total.reviewedPages + bucket.reviewedPages }), { sessions: 0, present: 0, absent: 0, late: 0, excused: 0, memorizedPages: 0, reviewedPages: 0 });
+  const attendanceTotal = summaryBase.present + summaryBase.absent + summaryBase.late + summaryBase.excused;
+  const days = Math.max(1, Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1);
+  const scaleTarget = (target: number | null | undefined) => target == null ? null : Math.round((target * Math.min(days, 30)) / 30);
+  const comparisons = Array.from(byCircle.values()).sort((left, right) => right.attendanceRate - left.attendanceRate || right.memorizedPages - left.memorizedPages);
+  const trend = Array.from(trendMap.values()).map((bucket) => { const total = bucket.present + bucket.absent + bucket.late + bucket.excused; return { key: bucket.key, label: bucket.label, sessions: bucket.sessions, attendanceRate: total ? Math.round((bucket.present / total) * 100) : 0, memorizedPages: bucket.memorizedPages, reviewedPages: bucket.reviewedPages }; });
+  const alerts: CenterManagementReport["alerts"] = [];
+  for (const circle of comparisons) {
+    if (circle.sessions === 0) alerts.push({ id: `no-activity-${circle.circleId}`, severity: "attention", circleId: circle.circleId, title: `لا توجد فترات معتمدة في ${circle.circleName}`, description: "لم تسجل الحلقة فترة معتمدة ضمن النطاق المحدد." });
+    else if (circle.attendanceRate < 75) alerts.push({ id: `attendance-${circle.circleId}`, severity: "warning", circleId: circle.circleId, title: `نسبة حضور منخفضة في ${circle.circleName}`, description: `بلغت نسبة الحضور ${circle.attendanceRate}%، وهي أقل من حد المتابعة 75%.` });
+    if (circle.sessions > 0 && circle.activityEntries === 0) alerts.push({ id: `progress-${circle.circleId}`, severity: "attention", circleId: circle.circleId, title: `لا توجد سجلات حفظ أو مراجعة في ${circle.circleName}`, description: "توجد فترات معتمدة، لكن لم تسجل لها بيانات حفظ أو مراجعة في هذا النطاق." });
+  }
+  if (drafts.length) alerts.push({ id: "drafts", severity: "attention", title: `توجد ${drafts.length} مسودات غير معتمدة`, description: "لن تدخل المسودات في تقارير الإدارة إلى أن يعتمدها المعلم من داخل الفترة." });
+  return { meta: { centerId: center.id, centerName: center.name, startDate: start, endDate: end, period: input.period, days }, summary: { ...summaryBase, attendanceRate: attendanceTotal ? Math.round((summaryBase.present / attendanceTotal) * 100) : 0, memorizationEntries: memorizationRows.length, revisionEntries: revisionRows.length, activeCircles: circleIds.length }, goals: { attendanceTarget: goals?.attendanceTarget ?? null, memorizedPagesTarget: goals?.memorizedPagesTarget ?? null, reviewedPagesTarget: goals?.reviewedPagesTarget ?? null, projectedMemorizedPagesTarget: scaleTarget(goals?.memorizedPagesTarget), projectedReviewedPagesTarget: scaleTarget(goals?.reviewedPagesTarget) }, comparisons, trend, alerts };
 }

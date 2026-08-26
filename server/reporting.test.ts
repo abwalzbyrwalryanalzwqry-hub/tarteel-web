@@ -75,4 +75,21 @@ describe("نظام التقرير الموحد", () => {
     expect(preview).toContain("معاينة Excel");
     expect(preview).toContain("navigator.share");
   });
+
+  it("يبني لوحة إدارة للمركز من الفترات المعتمدة فقط مع مقارنة الحلقات واتجاهاتها وتنبيهاتها", () => {
+    const builder = read("server/reports/reportBuilder.ts");
+    const router = read("server/routers/reporting.ts");
+    const management = read("client/src/components/ManagementReport.tsx");
+    expect(builder).toContain("buildCenterManagementReport");
+    expect(builder).toContain('ne(sessions.status, "draft")');
+    expect(builder).toContain("comparisons");
+    expect(builder).toContain("alerts");
+    expect(builder).toContain("getReportingGoals");
+    expect(router).toContain("management:");
+    expect(router).toContain("saveManagementGoals");
+    expect(management).toContain("لوحة إدارة المركز");
+    expect(management).toContain("LineChart");
+    expect(management).toContain("BarChart");
+    expect(management).toContain("تنبيهات المتابعة");
+  });
 });

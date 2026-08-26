@@ -78,6 +78,20 @@ export const centers = mysqlTable("centers", {
 export type Center = typeof centers.$inferSelect;
 export type InsertCenter = typeof centers.$inferInsert;
 
+// أهداف إدارة المركز؛ تُحفظ اختيارياً حتى تقارن لوحة التحليلات الأداء الفعلي بالهدف الشهري المحدد من الإدارة.
+export const reportingGoals = mysqlTable("reporting_goals", {
+  id: int("id").autoincrement().primaryKey(),
+  centerId: int("centerId").notNull(),
+  attendanceTarget: int("attendanceTarget"),
+  memorizedPagesTarget: int("memorizedPagesTarget"),
+  reviewedPagesTarget: int("reviewedPagesTarget"),
+  updatedBy: int("updatedBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [uniqueIndex("reporting_goals_center_unique").on(table.centerId)]);
+export type ReportingGoal = typeof reportingGoals.$inferSelect;
+export type InsertReportingGoal = typeof reportingGoals.$inferInsert;
+
 // ===================== ACCESS CONTROL =====================
 // تفصل العضوية هوية الحساب العامة عن دوره وحالته داخل كل مركز.
 export const centerMemberships = mysqlTable("center_memberships", {
