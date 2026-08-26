@@ -114,4 +114,26 @@ describe("نظام التقرير الموحد", () => {
     expect(management).toContain("PDF الإدارة");
     expect(management).toContain("Excel الإدارة");
   });
+
+  it("يدعم هوية مركز مخصصة في PDF ورسالة معلم قابلة للتعديل ورسوم مقارنة تفاعلية", () => {
+    const schema = read("drizzle/schema.ts");
+    const router = read("server/routers/reporting.ts");
+    const builder = read("server/reports/reportBuilder.ts");
+    const exporter = read("server/reports/managementExport.ts");
+    const management = read("client/src/components/ManagementReport.tsx");
+    expect(schema).toContain("reportingPreferences");
+    expect(schema).toContain("teacherMessageTemplate");
+    expect(schema).toContain("logoKey");
+    expect(router).toContain("managementPreferences");
+    expect(router).toContain("saveManagementPreferences");
+    expect(router).toContain("uploadManagementLogo");
+    expect(builder).toContain("branding");
+    expect(exporter).toContain("readLogo");
+    expect(exporter).toContain("headerTitle");
+    expect(exporter).toContain("footerText");
+    expect(management).toContain("تخصيص قالب PDF ورسالة المتابعة");
+    expect(management).toContain("teacherMessageTemplate");
+    expect(management).toContain("المؤشر المرئي");
+    expect(management).toContain("comparisonMetric");
+  });
 });

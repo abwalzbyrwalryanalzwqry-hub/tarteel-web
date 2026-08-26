@@ -92,6 +92,22 @@ export const reportingGoals = mysqlTable("reporting_goals", {
 export type ReportingGoal = typeof reportingGoals.$inferSelect;
 export type InsertReportingGoal = typeof reportingGoals.$inferInsert;
 
+// إعدادات الهوية الخاصة بملفات التقارير ورسالة متابعة المعلم داخل كل مركز.
+export const reportingPreferences = mysqlTable("reporting_preferences", {
+  id: int("id").autoincrement().primaryKey(),
+  centerId: int("centerId").notNull(),
+  headerTitle: varchar("headerTitle", { length: 255 }),
+  footerText: varchar("footerText", { length: 500 }),
+  logoUrl: text("logoUrl"),
+  logoKey: text("logoKey"),
+  teacherMessageTemplate: text("teacherMessageTemplate"),
+  updatedBy: int("updatedBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [uniqueIndex("reporting_preferences_center_unique").on(table.centerId)]);
+export type ReportingPreference = typeof reportingPreferences.$inferSelect;
+export type InsertReportingPreference = typeof reportingPreferences.$inferInsert;
+
 // ===================== ACCESS CONTROL =====================
 // تفصل العضوية هوية الحساب العامة عن دوره وحالته داخل كل مركز.
 export const centerMemberships = mysqlTable("center_memberships", {

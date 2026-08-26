@@ -1,5 +1,5 @@
 import { and, eq, gte, inArray, isNull, lte, ne, or } from "drizzle-orm";
-import { getDb, getReportingGoals, keepLatestAttendanceRows } from "../db";
+import { getDb, getReportingGoals, getReportingPreferences, keepLatestAttendanceRows } from "../db";
 import { attendance, branches, centers, circles, evaluation, memorization, revision, sessions, students, teachers } from "../../drizzle/schema";
 import { GRADE_LABELS, QURAN_SURAHS } from "../../shared/types";
 import { scoreToStars, MIZAN_RATING_LABELS } from "../../shared/mizan";
@@ -32,7 +32,7 @@ export type ExecutiveCircleReport = {
 };
 
 export type CenterManagementReport = {
-  meta: { centerId: number; centerName: string; startDate: Date; endDate: Date; period: "weekly" | "monthly"; days: number; filters: { teacherId: number | null; teacherName: string | null; ageGroup: StudentAgeGroup | null } };
+  meta: { centerId: number; centerName: string; startDate: Date; endDate: Date; period: "weekly" | "monthly"; days: number; filters: { teacherId: number | null; teacherName: string | null; ageGroup: StudentAgeGroup | null }; branding: { headerTitle: string | null; footerText: string | null; logoUrl: string | null; logoKey: string | null; teacherMessageTemplate: string | null } };
   summary: { sessions: number; present: number; absent: number; late: number; excused: number; attendanceRate: number; memorizedPages: number; reviewedPages: number; memorizationEntries: number; revisionEntries: number; activeCircles: number };
   goals: { attendanceTarget: number | null; memorizedPagesTarget: number | null; reviewedPagesTarget: number | null; projectedMemorizedPagesTarget: number | null; projectedReviewedPagesTarget: number | null };
   comparisons: { circleId: number; circleName: string; teacherName: string | null; teacherPhone: string | null; teacherEmail: string | null; sessions: number; attendanceRate: number; memorizedPages: number; reviewedPages: number; activityEntries: number }[];
@@ -185,12 +185,13 @@ export async function buildCenterManagementReport(input: { centerId: number; per
   const baseSessionConditions = [isNull(sessions.deletedAt), ne(sessions.status, "draft"), gte(sessions.scheduledAt, start), lte(sessions.scheduledAt, end)];
   const periodSessions = circleIds.length ? await db.select().from(sessions).where(and(inArray(sessions.circleId, circleIds), ...baseSessionConditions)).orderBy(sessions.scheduledAt) : [];
   const sessionIds = periodSessions.map((session) => session.id);
-  const [attendanceRows, memorizationRows, revisionRows, drafts, goals] = await Promise.all([
+  const [attendanceRows, memorizationRows, revisionRows, drafts, goals, preferences] = await Promise.all([
     sessionIds.length && studentIds.length ? db.select().from(attendance).where(and(inArray(attendance.sessionId, sessionIds), inArray(attendance.studentId, studentIds))) : Promise.resolve([] as (typeof attendance.$inferSelect)[]),
     sessionIds.length && studentIds.length ? db.select().from(memorization).where(and(inArray(memorization.sessionId, sessionIds), inArray(memorization.studentId, studentIds))) : Promise.resolve([] as (typeof memorization.$inferSelect)[]),
     sessionIds.length && studentIds.length ? db.select().from(revision).where(and(inArray(revision.sessionId, sessionIds), inArray(revision.studentId, studentIds))) : Promise.resolve([] as (typeof revision.$inferSelect)[]),
     circleIds.length ? db.select({ id: sessions.id, circleId: sessions.circleId }).from(sessions).where(and(inArray(sessions.circleId, circleIds), isNull(sessions.deletedAt), eq(sessions.status, "draft"))) : Promise.resolve([] as { id: number; circleId: number }[]),
     getReportingGoals(input.centerId),
+    getReportingPreferences(input.centerId),
   ]);
   const currentAttendanceRows = keepLatestAttendanceRows(attendanceRows);
   const byCircle = new Map<number, CenterManagementReport["comparisons"][number]>();
@@ -237,5 +238,5 @@ export async function buildCenterManagementReport(input: { centerId: number; per
   }
   if (drafts.length) alerts.push({ id: "drafts", severity: "attention", title: `توجد ${drafts.length} مسودات غير معتمدة`, description: "لن تدخل المسودات في تقارير الإدارة إلى أن يعتمدها المعلم من داخل الفترة." });
   const selectedTeacher = input.teacherId ? allCenterCircles.find((circle) => circle.teacherId === input.teacherId || circle.assistantTeacherId === input.teacherId) : undefined;
-  return { meta: { centerId: center.id, centerName: center.name, startDate: start, endDate: end, period: input.period, days, filters: { teacherId: input.teacherId ?? null, teacherName: selectedTeacher?.teacherName ?? null, ageGroup: input.ageGroup ?? null } }, summary: { ...summaryBase, attendanceRate: attendanceTotal ? Math.round((summaryBase.present / attendanceTotal) * 100) : 0, memorizationEntries: memorizationRows.length, revisionEntries: revisionRows.length, activeCircles: circleIds.length }, goals: { attendanceTarget: goals?.attendanceTarget ?? null, memorizedPagesTarget: goals?.memorizedPagesTarget ?? null, reviewedPagesTarget: goals?.reviewedPagesTarget ?? null, projectedMemorizedPagesTarget: scaleTarget(goals?.memorizedPagesTarget), projectedReviewedPagesTarget: scaleTarget(goals?.reviewedPagesTarget) }, comparisons, trend, alerts };
+  return { meta: { centerId: center.id, centerName: center.name, startDate: start, endDate: end, period: input.period, days, filters: { teacherId: input.teacherId ?? null, teacherName: selectedTeacher?.teacherName ?? null, ageGroup: input.ageGroup ?? null }, branding: { headerTitle: preferences?.headerTitle ?? null, footerText: preferences?.footerText ?? null, logoUrl: preferences?.logoUrl ?? null, logoKey: preferences?.logoKey ?? null, teacherMessageTemplate: preferences?.teacherMessageTemplate ?? null } }, summary: { ...summaryBase, attendanceRate: attendanceTotal ? Math.round((summaryBase.present / attendanceTotal) * 100) : 0, memorizationEntries: memorizationRows.length, revisionEntries: revisionRows.length, activeCircles: circleIds.length }, goals: { attendanceTarget: goals?.attendanceTarget ?? null, memorizedPagesTarget: goals?.memorizedPagesTarget ?? null, reviewedPagesTarget: goals?.reviewedPagesTarget ?? null, projectedMemorizedPagesTarget: scaleTarget(goals?.memorizedPagesTarget), projectedReviewedPagesTarget: scaleTarget(goals?.reviewedPagesTarget) }, comparisons, trend, alerts };
 }

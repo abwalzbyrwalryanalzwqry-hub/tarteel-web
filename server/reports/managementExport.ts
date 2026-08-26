@@ -2,6 +2,7 @@ import PDFDocument from "pdfkit";
 import * as XLSX from "xlsx";
 import { createRequire } from "node:module";
 import { AGE_GROUP_LABELS, type CenterManagementReport } from "./reportBuilder";
+import { storageGetSignedUrl } from "../storage";
 
 const require = createRequire(import.meta.url);
 const AMIRI_REGULAR = require.resolve("@fontsource/amiri/files/amiri-arabic-400-normal.woff");
@@ -18,14 +19,26 @@ function filters(report: CenterManagementReport) {
   return values.join(" | ");
 }
 
-export function generateManagementReportPdf(report: CenterManagementReport): Promise<Buffer> {
+async function readLogo(report: CenterManagementReport): Promise<Buffer | undefined> {
+  if (!report.meta.branding.logoKey) return undefined;
+  try {
+    const url = await storageGetSignedUrl(report.meta.branding.logoKey);
+    const response = await fetch(url);
+    if (!response.ok) return undefined;
+    const bytes = Buffer.from(await response.arrayBuffer());
+    return bytes.length ? bytes : undefined;
+  } catch { return undefined; }
+}
+
+export async function generateManagementReportPdf(report: CenterManagementReport): Promise<Buffer> {
+  const logo = await readLogo(report);
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     const doc = new PDFDocument({ size: "A4", margin: PAGE.left, bufferPages: true, info: { Title: `تقرير إدارة المركز - ${report.meta.centerName}`, Author: "Tarteel" } });
     doc.registerFont("Amiri", AMIRI_REGULAR); doc.registerFont("AmiriBold", AMIRI_BOLD);
     doc.on("data", (chunk: Buffer) => chunks.push(chunk)); doc.on("error", reject); doc.on("end", () => resolve(Buffer.concat(chunks)));
     const rule = (y: number) => doc.moveTo(PAGE.left, y).lineTo(PAGE.left + WIDTH, y).strokeColor("#D9E4DB").lineWidth(.8).stroke();
-    const header = () => { doc.fillColor("#0B4F39").font("AmiriBold").fontSize(18).text("ترتيل", { align: "right" }); doc.fillColor("#1D2B22").fontSize(15).text("تقرير إدارة المركز", { align: "right" }); doc.font("Amiri").fontSize(11).text(report.meta.centerName, { align: "right" }); doc.fillColor("#647066").fontSize(8.5).text(filters(report), { align: "right" }); rule(doc.y + 8); doc.moveDown(.9); };
+    const header = () => { const rightWidth = logo ? WIDTH - 64 : WIDTH; if (logo) { try { doc.image(logo, PAGE.left, PAGE.top, { fit: [50, 50] }); } catch { /* شعار غير قابل للعرض */ } } doc.fillColor("#0B4F39").font("AmiriBold").fontSize(18).text(report.meta.branding.headerTitle || report.meta.centerName, PAGE.left + (logo ? 64 : 0), doc.y, { width: rightWidth, align: "right" }); doc.fillColor("#1D2B22").fontSize(15).text("تقرير إدارة المركز", PAGE.left + (logo ? 64 : 0), doc.y, { width: rightWidth, align: "right" }); doc.font("Amiri").fontSize(11).text(report.meta.centerName, PAGE.left + (logo ? 64 : 0), doc.y, { width: rightWidth, align: "right" }); doc.fillColor("#647066").fontSize(8.5).text(filters(report), { align: "right" }); rule(doc.y + 8); doc.moveDown(.9); };
     const ensure = (height: number) => { if (doc.y + height > doc.page.height - PAGE.bottom) { doc.addPage(); header(); } };
     const section = (label: string) => { ensure(32); doc.fillColor("#0B4F39").font("AmiriBold").fontSize(13).text(label, { align: "right" }); doc.moveDown(.4); };
     const row = (values: string[], widths: number[], y: number, headerRow = false) => { let x = PAGE.left; values.forEach((value, index) => { doc.rect(x, y, widths[index], 20).fillAndStroke(headerRow ? "#0B4F39" : "#FFFFFF", "#D9E4DB"); doc.fillColor(headerRow ? "#FFFFFF" : "#1D2B22").font(headerRow ? "AmiriBold" : "Amiri").fontSize(7.6).text(value, x + 3, y + 6, { width: widths[index] - 6, align: index === 0 ? "right" : "center", lineBreak: false }); x += widths[index]; }); };
@@ -44,7 +57,7 @@ export function generateManagementReportPdf(report: CenterManagementReport): Pro
     section("تنبيهات المتابعة");
     if (!report.alerts.length) doc.fillColor("#1D2B22").font("Amiri").fontSize(10).text("لا توجد تنبيهات تشغيلية ضمن النطاق المحدد.", { align: "right" });
     for (const alert of report.alerts) { ensure(34); doc.fillColor(alert.severity === "warning" ? "#8A5A00" : "#0B4F39").font("AmiriBold").fontSize(10).text(alert.title, { align: "right" }); doc.fillColor("#4B5563").font("Amiri").fontSize(8.8).text(alert.description, { align: "right" }); doc.moveDown(.45); }
-    const range = doc.bufferedPageRange(); for (let index = 0; index < range.count; index++) { doc.switchToPage(index); const footerY = doc.page.height - PAGE.bottom - 16; rule(footerY - 8); doc.fillColor("#647066").font("Amiri").fontSize(8).text("تم التوليد بواسطة تطبيق ترتيل", PAGE.left, footerY, { width: WIDTH / 2, align: "right", lineBreak: false }); doc.text(`${index + 1} / ${range.count}`, PAGE.left + WIDTH / 2, footerY, { width: WIDTH / 2, align: "left", lineBreak: false }); }
+    const range = doc.bufferedPageRange(); for (let index = 0; index < range.count; index++) { doc.switchToPage(index); const footerY = doc.page.height - PAGE.bottom - 16; rule(footerY - 8); doc.fillColor("#647066").font("Amiri").fontSize(8).text(report.meta.branding.footerText || "تم التوليد بواسطة تطبيق ترتيل", PAGE.left, footerY, { width: WIDTH / 2, align: "right", lineBreak: false }); doc.text(`${index + 1} / ${range.count}`, PAGE.left + WIDTH / 2, footerY, { width: WIDTH / 2, align: "left", lineBreak: false }); }
     doc.end();
   });
 }
