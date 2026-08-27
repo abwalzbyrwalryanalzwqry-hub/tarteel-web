@@ -1,9 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { MushafIndexSheet } from "@/components/MushafIndexSheet";
+import { QuranStudySheet } from "@/components/QuranStudySheet";
+import { QuranReaderSettingsSheet } from "@/components/QuranReaderSettingsSheet";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { loadQuranReaderPreferences, saveQuranReaderPreferences, type QuranReaderPreferences } from "@/lib/quranReaderPreferences";
 import { clampMushafPage, findMushafPage, resolveMushafTripleTap, type MushafTapState, type MushafVisualManifest, type MushafVisualPageData } from "../../../shared/mushafVisual";
-import { Bookmark, BookmarkCheck, BookmarkPlus, ChevronLeft, ChevronRight, Info, ListTree, Loader2, Maximize2, Minimize2, RefreshCw, ShieldCheck, X } from "lucide-react";
+import { Bookmark, BookmarkCheck, BookmarkPlus, ChevronLeft, ChevronRight, Info, ListTree, Loader2, Maximize2, Minimize2, RefreshCw, Settings2, ShieldCheck, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { loadMushafVisualManifest, loadMushafVisualPage } from "@/lib/mushafVisual";
 import type { MushafSelectionContext } from "@/lib/mushafSelection";
@@ -39,8 +42,13 @@ export function VisualMushafReader({ startSurah, startAyah, selectionContext, fo
   const [browserFullscreen, setBrowserFullscreen] = useState(false);
   const [pageMotion, setPageMotion] = useState<"next" | "previous" | null>(null);
   const [selectedVerse, setSelectedVerse] = useState<{ surah: number; ayah: number } | null>(null);
+  const [studyVerse, setStudyVerse] = useState<{ surah: number; ayah: number; page: number } | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [readerPreferences, setReaderPreferences] = useState<QuranReaderPreferences>(() => loadQuranReaderPreferences());
   const highlightTimer = useRef<number | null>(null);
   const hintTimer = useRef<number | null>(null);
+  const longPressTimer = useRef<number | null>(null);
+  const longPressTarget = useRef<{ x: number; y: number } | null>(null);
   const pointerStart = useRef<PointerStart>(null);
   const suppressVerseClick = useRef(false);
   const focusRoot = useRef<HTMLElement>(null);
@@ -64,6 +72,7 @@ export function VisualMushafReader({ startSurah, startAyah, selectionContext, fo
   useEffect(() => () => {
     if (highlightTimer.current) window.clearTimeout(highlightTimer.current);
     if (hintTimer.current) window.clearTimeout(hintTimer.current);
+    if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
   }, []);
 
   useEffect(() => {
@@ -71,6 +80,8 @@ export function VisualMushafReader({ startSurah, startAyah, selectionContext, fo
     document.addEventListener("fullscreenchange", syncFullscreen);
     return () => document.removeEventListener("fullscreenchange", syncFullscreen);
   }, []);
+
+  useEffect(() => { saveQuranReaderPreferences(readerPreferences); }, [readerPreferences]);
 
   const page = getPage(manifest, pageNumber);
   const startIsOnPage = page?.verses.some(([surah, ayah]) => surah === startSurah && ayah === startAyah) ?? false;
@@ -107,6 +118,7 @@ export function VisualMushafReader({ startSurah, startAyah, selectionContext, fo
     if (target === pageNumber) return;
     setTapState(null);
     setSelectedVerse(null);
+    setStudyVerse(null);
     setTapHint("");
     setLoadedPage(null);
     setShowStartHighlight(false);
@@ -152,6 +164,31 @@ export function VisualMushafReader({ startSurah, startAyah, selectionContext, fo
     returnUrl.searchParams.set("toSurah", String(surah));
     returnUrl.searchParams.set("toAyah", String(ayah));
     window.location.replace(`${returnUrl.pathname}${returnUrl.search}`);
+  };
+
+  const clearLongPress = () => {
+    if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+    longPressTarget.current = null;
+  };
+
+  const handleVersePointerDown = (event: React.PointerEvent<HTMLButtonElement>, surah: number, ayah: number) => {
+    if (selectionContext) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    clearLongPress();
+    longPressTarget.current = { x: event.clientX, y: event.clientY };
+    longPressTimer.current = window.setTimeout(() => {
+      suppressVerseClick.current = true;
+      setTapState(null);
+      setStudyVerse({ surah, ayah, page: pageNumber });
+      setHint("عرض التفسير ومعاني الكلمات.");
+      clearLongPress();
+    }, 560);
+  };
+
+  const handleVersePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const start = longPressTarget.current;
+    if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 12) clearLongPress();
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -213,16 +250,16 @@ export function VisualMushafReader({ startSurah, startAyah, selectionContext, fo
     return <div className={focusMode ? "flex min-h-[100svh] flex-col items-center justify-center gap-3 bg-background text-muted-foreground" : "flex min-h-[480px] flex-col items-center justify-center gap-3 rounded-3xl border border-primary/10 bg-card/60 text-muted-foreground"} dir="rtl"><Loader2 className="h-7 w-7 animate-spin text-primary" /><p className="text-sm">جارٍ فتح صفحة المصحف…</p></div>;
   }
 
-  const pageCanvas = <div className={`relative select-none overflow-hidden rounded-[1.45rem] border border-amber-950/15 bg-[#f8f2e2] p-1 shadow-[0_18px_55px_-25px_rgba(57,42,15,0.55)] ${focusMode ? "mushaf-focus-page" : "mx-auto w-full max-w-[760px]"}`} onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel}>
+  const pageCanvas = <div className={`relative select-none overflow-hidden rounded-[1.45rem] border border-amber-950/15 bg-[#f8f2e2] p-1 shadow-[0_18px_55px_-25px_rgba(57,42,15,0.55)] mushaf-page-scale-${readerPreferences.pageScale} ${focusMode ? "mushaf-focus-page" : "mx-auto w-full max-w-[760px]"}`} onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel}>
     <div className={`relative aspect-[382.68/547.09] w-full ${pageMotion ? pageMotion === "next" ? "mushaf-page-enter-next" : "mushaf-page-enter-previous" : ""}`}>
       <img key={page.page} src={page.url} alt={`صفحة ${page.page} من مصحف المدينة`} draggable={false} decoding="async" onLoad={() => setLoadedPage(page.page)} className="absolute inset-0 h-full w-full" />
       {showStartHighlight && startZones.map(([, , , left, top, width, height], index) => <span key={`start-${highlightKey}-${index}`} aria-hidden="true" className="mushaf-start-highlight pointer-events-none absolute rounded-[0.2rem]" style={{ left: `${(left / 382.68) * 100}%`, top: `${(top / 547.09) * 100}%`, width: `${(width / 382.68) * 100}%`, height: `${Math.max((height / 547.09) * 100, 1.2)}%` }} />)}
-      {(pageData?.zones ?? []).map(([surah, ayah, line, left, top, width, height], index) => <button data-ayah-zone key={`${surah}-${ayah}-${line}-${index}`} type="button" aria-label={`الآية ${ayah} من السورة ${surah}`} onClick={() => selectVerse(surah, ayah)} className="absolute cursor-pointer rounded-[0.2rem] bg-transparent outline-none focus-visible:bg-primary/25 focus-visible:ring-2 focus-visible:ring-primary/70" style={{ left: `${(left / 382.68) * 100}%`, top: `${(top / 547.09) * 100}%`, width: `${Math.max((width / 382.68) * 100, 0.5)}%`, height: `${Math.max((height / 547.09) * 100, 1.2)}%` }} />)}
+      {(pageData?.zones ?? []).map(([surah, ayah, line, left, top, width, height], index) => <button data-ayah-zone key={`${surah}-${ayah}-${line}-${index}`} type="button" aria-label={`الآية ${ayah} من السورة ${surah}`} onPointerDown={(event) => handleVersePointerDown(event, surah, ayah)} onPointerMove={handleVersePointerMove} onPointerUp={clearLongPress} onPointerCancel={clearLongPress} onClick={() => selectVerse(surah, ayah)} className="absolute cursor-pointer rounded-[0.2rem] bg-transparent outline-none focus-visible:bg-primary/25 focus-visible:ring-2 focus-visible:ring-primary/70" style={{ left: `${(left / 382.68) * 100}%`, top: `${(top / 547.09) * 100}%`, width: `${Math.max((width / 382.68) * 100, 0.5)}%`, height: `${Math.max((height / 547.09) * 100, 1.2)}%` }} />)}
     </div>
   </div>;
 
   if (focusMode) {
-    return <section ref={focusRoot} className="relative h-[100svh] overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(225,198,118,0.2),_transparent_38%),linear-gradient(135deg,#f7f3e9,#e8efe7)]" dir="rtl">
+    return <section ref={focusRoot} className={`relative h-[100svh] overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(225,198,118,0.2),_transparent_38%),linear-gradient(135deg,#f7f3e9,#e8efe7)] ${readerPreferences.darkMode ? "mushaf-dark" : ""}`} dir="rtl">
       <div className="absolute inset-x-2 top-2 z-20 flex items-center justify-between gap-2 sm:inset-x-4 sm:top-4">
         <button type="button" onClick={onClose} aria-label="إغلاق المصحف والعودة" className="flex h-10 w-10 items-center justify-center rounded-full border border-amber-900/15 bg-white/90 text-foreground shadow-sm backdrop-blur"><X className="h-5 w-5" /></button>
         <div className="rounded-full border border-amber-900/10 bg-white/90 px-3 py-2 text-xs font-bold text-primary shadow-sm backdrop-blur">{page.page}/604</div>
@@ -233,6 +270,7 @@ export function VisualMushafReader({ startSurah, startAyah, selectionContext, fo
       <div id="mushaf-info-panel" aria-hidden={!showInfo} className={`mushaf-info-panel absolute left-4 top-32 z-20 w-[min(21rem,calc(100vw-2rem))] rounded-2xl border border-primary/15 bg-white/95 p-4 text-right text-xs leading-6 text-muted-foreground shadow-xl backdrop-blur ${showInfo ? "pointer-events-auto translate-y-0 scale-100 opacity-100" : "pointer-events-none -translate-y-3 scale-[0.97] opacity-0"}`}>{selectionContext ? `ابدأ من الآية ${startAyah}، ثم انقر ثلاث مرات متتالية على آية النهاية للعودة إلى نموذج ${selectionContext.kind === "memorization" ? "الحفظ" : "المراجعة"}.` : "مصحف المدينة المرئي بصفحات كاملة. اسحب أفقياً للتقليب بين الصفحات."}</div>
       <button type="button" onClick={() => setIndexOpen(true)} aria-label="فتح فهرس المصحف" className="mushaf-index-fab absolute right-4 top-16 z-30 flex h-12 items-center gap-2 rounded-full border border-amber-900/15 bg-white/95 px-4 text-sm font-bold text-primary shadow-[0_12px_28px_-14px_rgba(57,42,15,0.6)] backdrop-blur"><ListTree className="h-5 w-5" /><span>الفهرس</span></button>
       <button type="button" onClick={() => void toggleBrowserFullscreen()} aria-label={browserFullscreen ? "إنهاء وضع ملء الشاشة" : "تفعيل وضع ملء الشاشة"} className="absolute right-5 top-32 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-amber-900/15 bg-white/95 text-primary shadow-sm backdrop-blur"><span className="sr-only">{browserFullscreen ? "إنهاء وضع ملء الشاشة" : "تفعيل وضع ملء الشاشة"}</span>{browserFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>
+      <button type="button" onClick={() => setSettingsOpen(true)} aria-label="إعدادات القراءة" className="mushaf-settings-fab absolute right-5 top-44 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-amber-900/15 bg-white/95 text-primary shadow-sm backdrop-blur"><Settings2 className="h-4 w-4" /></button>
       <div className="absolute inset-0 grid place-items-center p-2">{pageCanvas}</div>
       {!selectionContext && selectedVerse && <button type="button" onClick={() => void toggleVerseBookmark()} className="absolute bottom-5 right-5 z-20 flex items-center gap-2 rounded-full border border-amber-900/15 bg-white/95 px-4 py-2.5 text-sm font-bold text-primary shadow-lg backdrop-blur"><Bookmark className="h-4 w-4" />{hasBookmark(`ayah:${selectedVerse.surah}:${selectedVerse.ayah}`) ? "إزالة علامة الآية" : `حفظ الآية ${selectedVerse.ayah}`}</button>}
       <button type="button" onClick={() => void togglePageBookmark()} aria-label={hasBookmark(`page:${pageNumber}`) ? "إزالة علامة الصفحة المرجعية" : "حفظ علامة الصفحة المرجعية"} className={`absolute bottom-5 left-5 z-20 flex h-11 items-center justify-center rounded-full border shadow-lg backdrop-blur ${hasBookmark(`page:${pageNumber}`) ? "border-primary bg-primary text-primary-foreground" : "border-amber-900/15 bg-white/95 text-primary"}`}>{hasBookmark(`page:${pageNumber}`) ? <BookmarkCheck className="h-5 w-5" /> : <BookmarkPlus className="h-5 w-5" />}</button>
@@ -240,6 +278,8 @@ export function VisualMushafReader({ startSurah, startAyah, selectionContext, fo
       <button type="button" aria-label="الصفحة السابقة" disabled={page.page <= 1} onClick={() => setActivePage(page.page - 1)} className="absolute right-3 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-amber-900/15 bg-white/90 text-foreground shadow-sm disabled:opacity-35"><ChevronRight className="h-5 w-5" /></button>
       <button type="button" aria-label="الصفحة التالية" disabled={page.page >= 604} onClick={() => setActivePage(page.page + 1)} className="absolute left-3 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-amber-900/15 bg-white/90 text-foreground shadow-sm disabled:opacity-35"><ChevronLeft className="h-5 w-5" /></button>
       <MushafIndexSheet open={indexOpen} onOpenChange={setIndexOpen} manifest={manifest} currentPage={page.page} onPageSelect={setActivePage} bookmarks={bookmarks} onBookmarkRemove={(bookmark) => void removeBookmark.mutateAsync(bookmark.referenceType === "page" ? { referenceType: "page", pageNumber: bookmark.pageNumber } : { referenceType: "ayah", pageNumber: bookmark.pageNumber, surahNumber: bookmark.surahNumber ?? undefined, ayahNumber: bookmark.ayahNumber ?? undefined })} />
+      <QuranStudySheet open={Boolean(studyVerse)} onOpenChange={(open) => !open && setStudyVerse(null)} pageNumber={studyVerse?.page ?? page.page} surahNumber={studyVerse?.surah ?? null} ayahNumber={studyVerse?.ayah ?? null} textScale={readerPreferences.textScale} studyFont={readerPreferences.studyFont} darkMode={readerPreferences.darkMode} />
+      <QuranReaderSettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} preferences={readerPreferences} onChange={setReaderPreferences} />
     </section>;
   }
 

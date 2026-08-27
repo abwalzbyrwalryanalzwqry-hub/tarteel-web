@@ -711,3 +711,51 @@ button:active {
   .mushaf-info-fab,
   .mushaf-info-panel { transition: none; }
 }
+
+/* قارئ المصحف: الخلفية والأدوات فقط تتغير، بينما تبقى صفحة SVG كما هي. */
+.mushaf-dark {
+  background: radial-gradient(circle at top, rgba(184, 143, 48, 0.14), transparent 34%), linear-gradient(135deg, #0a1712, #14261d) !important;
+  color: #eff8ef;
+}
+
+.mushaf-dark .mushaf-info-fab,
+.mushaf-dark .mushaf-settings-fab,
+.mushaf-dark button:not([data-ayah-zone]) {
+  border-color: rgba(224, 184, 88, 0.22);
+  background-color: rgba(19, 39, 30, 0.94);
+  color: #f4efd9;
+}
+
+.mushaf-dark button:not([data-ayah-zone]):disabled { opacity: 0.35; }
+.mushaf-dark .mushaf-info-panel {
+  border-color: rgba(224, 184, 88, 0.18);
+  background: rgba(16, 35, 26, 0.97);
+  color: #eef7ed;
+}
+.mushaf-dark .mushaf-info-panel p { color: #c8d9cc; }
+.mushaf-settings-fab { transition: transform 180ms var(--ease-out), box-shadow 180ms var(--ease-out), background-color 180ms var(--ease-out); }
+.mushaf-settings-fab:hover { transform: translateY(-2px); }
+.mushaf-settings-fab:active { transform: scale(0.97); }
+
+.mushaf-page-scale-compact { max-height: 76svh; }
+.mushaf-page-scale-comfortable { max-height: 84svh; }
+.mushaf-page-scale-large { max-height: 91svh; }
+
+.reader-sheet-dark {
+  border-color: rgba(224, 184, 88, 0.2) !important;
+  background: #11241b !important;
+  color: #f0f7ee !important;
+}
+.reader-sheet-dark .bg-primary\/5 { background-color: rgba(35, 84, 58, 0.34) !important; }
+.reader-sheet-dark .bg-muted\/55,
+.reader-sheet-dark .bg-muted\/35 { background-color: rgba(229, 239, 231, 0.09) !important; }
+.reader-sheet-dark .bg-card { background-color: rgba(22, 46, 34, 0.96) !important; }
+.reader-sheet-dark .text-foreground { color: #f0f7ee !important; }
+.reader-sheet-dark .text-muted-foreground { color: #bed0c1 !important; }
+.reader-sheet-dark .border-border\/60 { border-color: rgba(210, 231, 214, 0.15) !important; }
+.reader-sheet-dark .bg-amber-50 { background-color: rgba(99, 71, 25, 0.5) !important; }
+.reader-sheet-dark .text-amber-950 { color: #ffeec1 !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mushaf-settings-fab { transition: none; }
+}
