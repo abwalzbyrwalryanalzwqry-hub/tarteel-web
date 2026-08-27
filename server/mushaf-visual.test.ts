@@ -1,4 +1,4 @@
-import { clampMushafPage, findMushafPage, MUSHAF_PAGE_COUNT, MUSHAF_SURAH_COUNT, MUSHAF_VERSE_COUNT, resolveMushafTripleTap, validateMushafRegistry, type MushafVisualRegistry } from "../shared/mushafVisual";
+import { clampMushafPage, findMushafPage, MUSHAF_PAGE_COUNT, MUSHAF_SURAH_COUNT, MUSHAF_VERSE_COUNT, resolveMushafTripleTap, validateMushafPageData, validateMushafRegistry, validateMushafVisualManifest, type MushafVisualRegistry } from "../shared/mushafVisual";
 import { describe, expect, it } from "vitest";
 
 const allVerseRefs = Array.from({ length: MUSHAF_VERSE_COUNT }, (_, index) => [index % MUSHAF_SURAH_COUNT + 1, Math.floor(index / MUSHAF_SURAH_COUNT) + 1] as const);
@@ -24,6 +24,13 @@ describe("قارئ المصحف المرئي", () => {
     expect(validateMushafRegistry({ ...registry, verseCount: 6235 })).toBe(false);
     expect(validateMushafRegistry({ ...registry, surahCount: 113 })).toBe(false);
     expect(validateMushafRegistry({ ...registry, pages: registry.pages.map((page, index) => index === 0 ? { ...page, zones: [[114, 6236, 1, 1, 1, 1, 1]] } : page) })).toBe(false);
+  });
+
+  it("يتحقق من البيان الخفيف وملف مناطق الصفحة قبل إتاحة النقر", () => {
+    const manifest = { ...registry, pages: registry.pages.map(({ page, url, verses }) => ({ page, url, verses, zonesUrl: `/manus-storage/${String(page).padStart(3, "0")}-zones.js` })) };
+    expect(validateMushafVisualManifest(manifest)).toBe(true);
+    expect(validateMushafPageData(manifest.pages[0], { page: 1, zones: registry.pages[0].zones })).toBe(true);
+    expect(validateMushafPageData(manifest.pages[0], { page: 1, zones: [[114, 6236, 1, 1, 1, 1, 1]] })).toBe(false);
   });
 
   it("يجد صفحة البداية ويضبط التنقل داخل نطاق صفحات المصحف", () => {

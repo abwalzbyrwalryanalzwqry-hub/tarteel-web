@@ -467,6 +467,26 @@ button:active {
   animation: mushafStartAttention 3s var(--ease-out) forwards;
 }
 
+.mushaf-focus-page {
+  width: min(94vw, calc((100svh - 1rem) * 0.6995));
+  max-height: calc(100svh - 1rem);
+  touch-action: pan-y;
+  will-change: transform, opacity;
+}
+
+@keyframes mushafPageEnterNext {
+  from { opacity: 0.5; transform: translateX(-2.5%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes mushafPageEnterPrevious {
+  from { opacity: 0.5; transform: translateX(2.5%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.mushaf-page-enter-next { animation: mushafPageEnterNext 220ms var(--ease-out) both; }
+.mushaf-page-enter-previous { animation: mushafPageEnterPrevious 220ms var(--ease-out) both; }
+
 .animate-fade-in-up {
   animation: fadeInUp 0.3s var(--ease-out) both;
 }
@@ -674,4 +694,6 @@ button:active {
   }
 
   .mushaf-start-highlight { opacity: 0.38; }
+  .mushaf-page-enter-next,
+  .mushaf-page-enter-previous { animation: none; }
 }

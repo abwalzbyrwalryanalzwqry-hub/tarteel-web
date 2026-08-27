@@ -20,7 +20,7 @@ describe("مواءمة الملفين الرابع والخامس", () => {
     expect(circle).toContain("حضور الفترة المفتوحة");
     expect(detail).toContain("فتح موضع البداية في المصحف المرئي");
     expect(detail).toContain("saveMushafSelectionContext(context)");
-    expect(detail).toContain('window.location.assign(`/quran?surah=${fromSurah}&ayah=${fromAyah}&mushafToken=');
+    expect(detail).toContain('window.location.assign(`/quran/picker?surah=${fromSurah}&ayah=${fromAyah}&mushafToken=');
     expect(detail).toContain("DialogDescription");
   });
 });

@@ -28,6 +28,7 @@ import AIAssistant from "./pages/AIAssistant";
 import SplashScreen from "./pages/SplashScreen";
 import DeveloperInfo from "./pages/DeveloperInfo";
 import QuranCenter from "./pages/QuranCenter";
+import MushafPickerPage from "./pages/MushafPickerPage";
 import ParentMessages from "./pages/ParentMessages";
 import TeacherInvites from "./pages/TeacherInvites";
 import RedeemTeacherInvite from "./pages/RedeemTeacherInvite";
@@ -60,6 +61,7 @@ function Router() {
       <Route path="/sessions" component={() => <LegacySessionRedirect />} />
       <Route path="/sessions/:id" component={(props: any) => <LegacySessionRedirect id={Number(props.params?.id)} />} />
       <Route path="/assistant" component={() => <TarteelLayout><AIAssistant /></TarteelLayout>} />
+      <Route path="/quran/picker" component={MushafPickerPage} />
       <Route path="/quran" component={() => <TarteelLayout><QuranCenter /></TarteelLayout>} />
       <Route path="/parent-messages" component={() => <TarteelLayout><ParentMessages /></TarteelLayout>} />
       <Route path="/teacher-invites" component={() => <TarteelLayout><TeacherInvites /></TarteelLayout>} />
