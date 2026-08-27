@@ -63,11 +63,11 @@ export const ROLE_PERMISSIONS: Record<TarteelRole, TarteelPermission[]> = {
   org_admin: managementPermissions,
   center_manager: managementPermissions,
   supervisor: managementPermissions,
-  guide: ["circles:view", "students:view", "sessions:view", "reports:view"],
+  guide: ["circles:view", "students:view", "sessions:view", "reports:view", "quran:view"],
   teacher: ["dashboard:view", "circles:view", "students:view", "students:manage", "sessions:view", "sessions:manage", "reports:view", "notifications:view", "settings:view", "ai:use", "quran:view", "messages:manage"],
   assistant_teacher: ["dashboard:view", "circles:view", "students:view", "sessions:view", "sessions:manage", "notifications:view", "ai:use", "quran:view", "messages:manage"],
-  student: ["students:view"],
-  guardian: ["students:view"],
+  student: ["students:view", "quran:view"],
+  guardian: ["students:view", "quran:view"],
   user: ["dashboard:view", "ai:use", "quran:view"],
 };
 

@@ -6,6 +6,7 @@ import { TANZIL_UTHMANI_SOURCE_URL, loadQuranVerses, searchQuranVerses, type Qur
 import { BookOpenText, ChevronLeft, ExternalLink, Loader2, Search, SlidersHorizontal, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Link } from "wouter";
 
 function getSearchParams() {
   const params = new URLSearchParams(window.location.search);
@@ -32,7 +33,7 @@ export default function QuranCenter() {
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl gold-gradient shadow-lg"><BookOpenText className="h-7 w-7 text-white" /></div>
             <div><h1 className="font-display text-3xl font-bold text-foreground">مركز القرآن</h1><p className="mt-1 text-sm leading-7 text-muted-foreground">مصحف المدينة المرئي بصفحات كاملة، مع قراءة نصية مرجعية وبحث اختياري.</p></div>
           </div>
-          {!selectionContext && <div className="flex w-full rounded-xl bg-background/70 p-1 shadow-sm lg:w-auto"><button type="button" onClick={() => setMode("visual")} className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${mode === "visual" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>المصحف المرئي</button><button type="button" onClick={() => setMode("text")} className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${mode === "text" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>النص والبحث</button></div>}
+          {!selectionContext && <div className="flex w-full flex-col gap-2 lg:w-auto"><Link href="/quran/read" className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm transition-transform hover:-translate-y-0.5 active:scale-[0.97]"><BookOpenText className="h-4 w-4" />بدء قراءة القرآن</Link><div className="flex rounded-xl bg-background/70 p-1 shadow-sm"><button type="button" onClick={() => setMode("visual")} className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${mode === "visual" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>المصحف المرئي</button><button type="button" onClick={() => setMode("text")} className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${mode === "text" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>النص والبحث</button></div></div>}
         </div>
       </section>
 

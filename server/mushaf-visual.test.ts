@@ -1,4 +1,5 @@
 import { clampMushafPage, findMushafPage, MUSHAF_PAGE_COUNT, MUSHAF_SURAH_COUNT, MUSHAF_VERSE_COUNT, resolveMushafTripleTap, validateMushafPageData, validateMushafRegistry, validateMushafVisualManifest, type MushafVisualRegistry } from "../shared/mushafVisual";
+import { validateQuranNavigationData } from "../shared/quranNavigation";
 import { describe, expect, it } from "vitest";
 
 const allVerseRefs = Array.from({ length: MUSHAF_VERSE_COUNT }, (_, index) => [index % MUSHAF_SURAH_COUNT + 1, Math.floor(index / MUSHAF_SURAH_COUNT) + 1] as const);
@@ -52,5 +53,13 @@ describe("قارئ المصحف المرئي", () => {
     expect(third.selected).toBe(true);
     expect(reset.state.count).toBe(1);
     expect(expired.state.count).toBe(1);
+  });
+
+  it("لا يتيح فهرس الأجزاء والأحزاب إلا بالعقد الكامل ونطاق الصفحات الصحيح", () => {
+    const entry = (number: number, page: number) => ({ number, page, surah: 1, ayah: 1 });
+    const navigation = { source: "مصدر اختبار", juz: Array.from({ length: 30 }, (_, index) => entry(index + 1, index + 1)), hizbs: Array.from({ length: 60 }, (_, index) => entry(index + 1, index + 1)) };
+    expect(validateQuranNavigationData(navigation)).toBe(true);
+    expect(validateQuranNavigationData({ ...navigation, juz: navigation.juz.slice(1) })).toBe(false);
+    expect(validateQuranNavigationData({ ...navigation, hizbs: navigation.hizbs.map((item, index) => index === 59 ? { ...item, page: 605 } : item) })).toBe(false);
   });
 });

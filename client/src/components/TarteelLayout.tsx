@@ -45,7 +45,7 @@ const navItems = [
   { path: "/access-management", label: "المستخدمون والصلاحيات", icon: UserCog, permission: "settings:manage" as const },
   { path: "/students", label: "الطلاب", icon: Users, permission: "students:view" as const },
   { path: "/periods", label: "الفترات", icon: ClipboardList, permission: "sessions:view" as const },
-  { path: "/quran", label: "مركز القرآن", icon: BookOpenText, permission: "quran:view" as const },
+  { path: "/quran", label: "القرآن الكريم", icon: BookOpenText, permission: "quran:view" as const },
   { path: "/parent-messages", label: "رسائل أولياء الأمور", icon: MessageSquareText, permission: "messages:manage" as const },
   { path: "/reports", label: "التقارير", icon: BarChart3, permission: "reports:view" as const },
   { path: "/assistant", label: "المرشد الذكي", icon: Sparkles, permission: "ai:use" as const },
