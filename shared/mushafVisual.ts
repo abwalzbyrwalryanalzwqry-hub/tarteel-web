@@ -132,6 +132,16 @@ export function resolveMushafSwipeDirection(deltaX: number, deltaY: number, thre
   return deltaX < 0 ? 1 : -1;
 }
 
+export function resolveMushafPageFit(availableWidth: number, availableHeight: number) {
+  if (![availableWidth, availableHeight].every((value) => Number.isFinite(value) && value > 0)) return null;
+  const scale = Math.min(availableWidth / MUSHAF_VIEWBOX.width, availableHeight / MUSHAF_VIEWBOX.height);
+  return {
+    scale,
+    width: MUSHAF_VIEWBOX.width * scale,
+    height: MUSHAF_VIEWBOX.height * scale,
+  };
+}
+
 export function clampMushafPage(page: number) {
   return Math.max(1, Math.min(MUSHAF_PAGE_COUNT, Math.round(page)));
 }

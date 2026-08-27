@@ -1,4 +1,4 @@
-import { clampMushafPage, findMushafPage, MUSHAF_PAGE_COUNT, MUSHAF_SURAH_COUNT, MUSHAF_VERSE_COUNT, resolveMushafSwipeDirection, resolveMushafTripleTap, validateMushafPageData, validateMushafRegistry, validateMushafVisualManifest, type MushafVisualRegistry } from "../shared/mushafVisual";
+import { clampMushafPage, findMushafPage, MUSHAF_PAGE_COUNT, MUSHAF_SURAH_COUNT, MUSHAF_VERSE_COUNT, MUSHAF_VIEWBOX, resolveMushafPageFit, resolveMushafSwipeDirection, resolveMushafTripleTap, validateMushafPageData, validateMushafRegistry, validateMushafVisualManifest, type MushafVisualRegistry } from "../shared/mushafVisual";
 import { validateQuranNavigationData } from "../shared/quranNavigation";
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
@@ -63,6 +63,15 @@ describe("قارئ المصحف المرئي", () => {
     expect(resolveMushafSwipeDirection(-48, 48)).toBe(0);
   });
 
+  it("يكبر صفحة المصحف إلى أكبر مساحة متاحة من دون قص أو تمديد", () => {
+    const fit = resolveMushafPageFit(375, 812);
+    expect(fit).toBeTruthy();
+    expect(fit?.width).toBeLessThanOrEqual(375);
+    expect(fit?.height).toBeLessThanOrEqual(812);
+    expect(fit?.width && fit?.height ? fit.width / fit.height : 0).toBeCloseTo(MUSHAF_VIEWBOX.width / MUSHAF_VIEWBOX.height, 8);
+    expect(resolveMushafPageFit(0, 812)).toBeNull();
+  });
+
   it("يوحد إطار المصحف وأدواته بين القراءة العامة واختيار آية النهاية", () => {
     const reader = readFileSync("client/src/components/VisualMushafReader.tsx", "utf8");
     const picker = readFileSync("client/src/pages/MushafPickerPage.tsx", "utf8");
@@ -72,6 +81,10 @@ describe("قارئ المصحف المرئي", () => {
     expect(reader).toContain("mushaf-page-counter");
     expect(reader).toContain("shareCurrentPage");
     expect(reader).toContain("/quran/read?page=${pageNumber}");
+    expect(reader).toContain("mushaf-reader-controls");
+    expect(reader).toContain("mushaf-controls-hidden");
+    expect(reader).toContain("revealControls");
+    expect(reader).toContain("ArrowRight");
     expect(picker).toContain("<VisualMushafReader");
     expect(picker).toContain("focusMode");
   });

@@ -13,5 +13,6 @@ export default function QuranReaderPage() {
   const [, navigate] = useLocation();
   const initialPage = useMemo(readInitialPage, []);
   const handlePageChange = (page: number) => saveQuranReadingProgress(page);
-  return <VisualMushafReader startSurah={1} startAyah={1} initialPage={initialPage} onPageChange={handlePageChange} focusMode onClose={() => navigate("/quran")} />;
+  const handleVerseSelect = (position: { page: number; surah: number; ayah: number }) => saveQuranReadingProgress(position.page, position);
+  return <VisualMushafReader startSurah={1} startAyah={1} initialPage={initialPage} onPageChange={handlePageChange} onVerseSelect={handleVerseSelect} focusMode onClose={() => navigate("/quran")} />;
 }

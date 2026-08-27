@@ -487,14 +487,18 @@ button:active {
 }
 
 .mushaf-focus-page {
-  width: min(calc(100vw - 0.35rem), calc((100svh - 0.35rem) * 0.782));
-  max-height: calc(100svh - 0.35rem);
-  touch-action: pan-y;
+  width: min(
+    calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 0.35rem),
+    calc((100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 0.35rem) * 0.6995)
+  );
+  max-height: calc(100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 0.35rem);
+  touch-action: none;
   will-change: transform;
   transition: transform 180ms var(--ease-out), box-shadow 180ms var(--ease-out), filter 180ms var(--ease-out);
 }
 
 .mushaf-page-is-swiping { transition: none; }
+.mushaf-page-zoomed { box-shadow: 0 1.4rem 3.2rem -1.4rem rgba(30, 66, 43, 0.45); }
 .mushaf-page-shell {
   background: #fbf5e7;
   box-shadow: 0 1.1rem 2.8rem -1.5rem rgba(47, 74, 49, 0.33), inset 0 0 0 1px rgba(250, 246, 230, 0.82);
@@ -511,7 +515,15 @@ button:active {
   pointer-events: none;
 }
 
-.mushaf-page-artwork { --mushaf-artwork-scale: 1.34; transform: scale(var(--mushaf-artwork-scale)); transform-origin: center; }
+.mushaf-page-artwork {
+  --mushaf-artwork-scale: 1;
+  transform: none;
+  transform-origin: center;
+}
+
+.mushaf-page-artwork > img {
+  object-fit: contain;
+}
 
 .mushaf-frame-corner {
   position: absolute;
@@ -542,6 +554,22 @@ button:active {
   transition: transform 170ms var(--ease-out), box-shadow 170ms var(--ease-out), background-color 170ms var(--ease-out), color 170ms var(--ease-out);
 }
 
+.mushaf-reader-controls {
+  transition: opacity 220ms var(--ease-out), visibility 220ms linear;
+}
+
+.mushaf-controls-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.mushaf-controls-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .mushaf-reader-close:hover,
 .mushaf-reader-fab:hover,
 .mushaf-page-nav:hover { transform: translateY(-2px); box-shadow: 0 .8rem 1.45rem -1rem rgba(31, 65, 42, .52); }
@@ -555,13 +583,13 @@ button:active {
 .mushaf-page-nav { height: 2.85rem; width: 2.85rem; }
 
 @keyframes mushafPageEnterNext {
-  from { opacity: 0.58; transform: translate3d(-3.5%, 0, 0) scale(var(--mushaf-artwork-scale)); }
-  to { opacity: 1; transform: translate3d(0, 0, 0) scale(var(--mushaf-artwork-scale)); }
+  from { opacity: 0.58; transform: translate3d(-3.5%, 0, 0) scale(1); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 
 @keyframes mushafPageEnterPrevious {
-  from { opacity: 0.58; transform: translate3d(3.5%, 0, 0) scale(var(--mushaf-artwork-scale)); }
-  to { opacity: 1; transform: translate3d(0, 0, 0) scale(var(--mushaf-artwork-scale)); }
+  from { opacity: 0.58; transform: translate3d(3.5%, 0, 0) scale(1); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 
 .mushaf-page-enter-next { animation: mushafPageEnterNext 220ms var(--ease-out) both; }
@@ -817,9 +845,9 @@ button:active {
 .mushaf-settings-fab:hover { transform: translateY(-2px); }
 .mushaf-settings-fab:active { transform: scale(0.97); }
 
-.mushaf-page-scale-compact { --mushaf-artwork-scale: 1.2; }
-.mushaf-page-scale-comfortable { --mushaf-artwork-scale: 1.34; }
-.mushaf-page-scale-large { --mushaf-artwork-scale: 1.46; }
+.mushaf-page-scale-compact,
+.mushaf-page-scale-comfortable,
+.mushaf-page-scale-large { --mushaf-artwork-scale: 1; }
 
 .reader-sheet-dark {
   border-color: rgba(224, 184, 88, 0.2) !important;
@@ -881,14 +909,20 @@ button:active {
 
 @media (prefers-reduced-motion: reduce) {
   .mushaf-settings-fab,
-  .mushaf-focus-page { transition: none; }
-  .mushaf-page-artwork { transform: scale(var(--mushaf-artwork-scale)); }
+  .mushaf-focus-page,
+  .mushaf-reader-controls { transition: none; }
+  .mushaf-page-artwork { transform: none; }
   .quran-study-sheet,
   .quran-study-overlay { animation: none !important; }
 }
 
 @media (min-width: 640px) {
-  .mushaf-focus-page { width: min(calc(100vw - 2rem), calc((100svh - 1rem) * 0.76)); }
+  .mushaf-focus-page {
+    width: min(
+      calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 2rem),
+      calc((100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 1rem) * 0.6995)
+    );
+  }
   .mushaf-reader-canvas { padding-block: 0.5rem; }
   .mushaf-page-nav { height: 3.1rem; width: 3.1rem; }
 }

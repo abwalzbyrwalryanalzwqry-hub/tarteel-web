@@ -424,6 +424,24 @@ export const quranBookmarks = mysqlTable("quran_bookmarks", {
 export type QuranBookmark = typeof quranBookmarks.$inferSelect;
 export type InsertQuranBookmark = typeof quranBookmarks.$inferInsert;
 
+// ===================== QURAN VERSE PREFERENCES =====================
+// مفضلة وملاحظات شخصية؛ المرجع العددي فقط يحافظ على النص القرآني من مصدره الموثق.
+export const quranVersePreferences = mysqlTable("quran_verse_preferences", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  verseKey: varchar("verseKey", { length: 32 }).notNull(),
+  pageNumber: int("pageNumber").notNull(),
+  surahNumber: int("surahNumber").notNull(),
+  ayahNumber: int("ayahNumber").notNull(),
+  isFavorite: boolean("isFavorite").default(false).notNull(),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [uniqueIndex("quran_verse_preferences_user_verse_unique").on(table.userId, table.verseKey), index("quran_verse_preferences_user_favorite_idx").on(table.userId, table.isFavorite, table.updatedAt)]);
+
+export type QuranVersePreference = typeof quranVersePreferences.$inferSelect;
+export type InsertQuranVersePreference = typeof quranVersePreferences.$inferInsert;
+
 // ===================== AUDIT LOG =====================
 export const auditLog = mysqlTable("audit_log", {
   id: int("id").autoincrement().primaryKey(),

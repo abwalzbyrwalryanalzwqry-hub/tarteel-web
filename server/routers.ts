@@ -7,6 +7,7 @@ import { assertCanDelegate, assertCirclePermission, assertPermission, assertScop
 import { getQuranRangeError } from "../shared/mizan";
 import { QURAN_SURAHS } from "../shared/types";
 import { getQuranBookmarkReferenceKey } from "../shared/quranBookmarks";
+import { normalizeQuranVersePreference } from "../shared/quranVersePreferences";
 import { getRiyadhDayKey } from "../shared/dates";
 import { createAccessCodeSecret, getAccessCodeHint, hashAccessCode } from "./accessCodeSecurity";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -74,8 +75,11 @@ import {
   getRecentSessionsForCenters,
   getRevisionBySession,
   deleteQuranBookmarkForUser,
+  deleteQuranVersePreferenceForUser,
   getQuranBookmarksForUser,
+  getQuranVersePreferencesForUser,
   saveQuranBookmark,
+  saveQuranVersePreference,
   getSessionById,
   getSessionByCircleDay,
   getSessions,
@@ -290,6 +294,20 @@ export const appRouter = router({
       const referenceKey = getQuranBookmarkReferenceKey(input);
       await deleteQuranBookmarkForUser(ctx.user.id, referenceKey);
       return { success: true } as const;
+    }),
+  }),
+
+  quranVersePreferences: router({
+    list: protectedProcedure.query(({ ctx }) => getQuranVersePreferencesForUser(ctx.user.id)),
+    save: protectedProcedure.input(z.object({ pageNumber: z.number().int().min(1).max(604), surahNumber: z.number().int().min(1).max(114), ayahNumber: z.number().int().positive(), isFavorite: z.boolean(), note: z.string().trim().max(2400).nullable() })).mutation(async ({ ctx, input }) => {
+      const surah = QURAN_SURAHS.find((item) => item.number === input.surahNumber);
+      if (!surah || input.ayahNumber > surah.ayahs) throw new TRPCError({ code: "BAD_REQUEST", message: "مرجع الآية غير صحيح." });
+      const preference = normalizeQuranVersePreference(input);
+      if (!preference.shouldPersist) {
+        await deleteQuranVersePreferenceForUser(ctx.user.id, preference.verseKey);
+        return null;
+      }
+      return saveQuranVersePreference({ userId: ctx.user.id, verseKey: preference.verseKey, pageNumber: preference.pageNumber, surahNumber: preference.surahNumber, ayahNumber: preference.ayahNumber, isFavorite: preference.isFavorite, note: preference.note });
     }),
   }),
 
