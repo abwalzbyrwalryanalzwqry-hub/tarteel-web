@@ -1,4 +1,4 @@
-import { clampMushafPage, findMushafPage, MUSHAF_PAGE_COUNT, MUSHAF_SURAH_COUNT, MUSHAF_VERSE_COUNT, resolveMushafTripleTap, validateMushafPageData, validateMushafRegistry, validateMushafVisualManifest, type MushafVisualRegistry } from "../shared/mushafVisual";
+import { clampMushafPage, findMushafPage, MUSHAF_PAGE_COUNT, MUSHAF_SURAH_COUNT, MUSHAF_VERSE_COUNT, resolveMushafSwipeDirection, resolveMushafTripleTap, validateMushafPageData, validateMushafRegistry, validateMushafVisualManifest, type MushafVisualRegistry } from "../shared/mushafVisual";
 import { validateQuranNavigationData } from "../shared/quranNavigation";
 import { describe, expect, it } from "vitest";
 
@@ -53,6 +53,13 @@ describe("قارئ المصحف المرئي", () => {
     expect(third.selected).toBe(true);
     expect(reset.state.count).toBe(1);
     expect(expired.state.count).toBe(1);
+  });
+
+  it("يحوّل السحب الأفقي المقصود فقط إلى اتجاه تقليب واضح", () => {
+    expect(resolveMushafSwipeDirection(-72, 6)).toBe(1);
+    expect(resolveMushafSwipeDirection(72, 6)).toBe(-1);
+    expect(resolveMushafSwipeDirection(-24, 2)).toBe(0);
+    expect(resolveMushafSwipeDirection(-48, 48)).toBe(0);
   });
 
   it("لا يتيح فهرس الأجزاء والأحزاب إلا بالعقد الكامل ونطاق الصفحات الصحيح", () => {

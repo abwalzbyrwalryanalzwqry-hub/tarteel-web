@@ -126,6 +126,12 @@ export function resolveMushafTripleTap(
   return { state, selected: count >= 3 };
 }
 
+export function resolveMushafSwipeDirection(deltaX: number, deltaY: number, threshold = 36) {
+  if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) return 0;
+  if (Math.abs(deltaX) < threshold || Math.abs(deltaX) <= Math.abs(deltaY) * 1.15) return 0;
+  return deltaX < 0 ? 1 : -1;
+}
+
 export function clampMushafPage(page: number) {
   return Math.max(1, Math.min(MUSHAF_PAGE_COUNT, Math.round(page)));
 }

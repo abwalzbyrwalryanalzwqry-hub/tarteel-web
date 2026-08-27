@@ -468,20 +468,24 @@ button:active {
 }
 
 .mushaf-focus-page {
-  width: min(94vw, calc((100svh - 1rem) * 0.6995));
-  max-height: calc(100svh - 1rem);
+  width: min(100vw, calc((100svh - 0.35rem) * 0.6995));
+  max-height: calc(100svh - 0.35rem);
   touch-action: pan-y;
-  will-change: transform, opacity;
+  will-change: transform;
+  transition: transform 180ms var(--ease-out), box-shadow 180ms var(--ease-out);
 }
 
+.mushaf-page-is-swiping { transition: none; }
+.mushaf-page-artwork { --mushaf-artwork-scale: 1.22; transform: scale(var(--mushaf-artwork-scale)); transform-origin: center; }
+
 @keyframes mushafPageEnterNext {
-  from { opacity: 0.5; transform: translateX(-2.5%); }
-  to { opacity: 1; transform: translateX(0); }
+  from { opacity: 0.58; transform: translate3d(-3.5%, 0, 0) scale(var(--mushaf-artwork-scale)); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(var(--mushaf-artwork-scale)); }
 }
 
 @keyframes mushafPageEnterPrevious {
-  from { opacity: 0.5; transform: translateX(2.5%); }
-  to { opacity: 1; transform: translateX(0); }
+  from { opacity: 0.58; transform: translate3d(3.5%, 0, 0) scale(var(--mushaf-artwork-scale)); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(var(--mushaf-artwork-scale)); }
 }
 
 .mushaf-page-enter-next { animation: mushafPageEnterNext 220ms var(--ease-out) both; }
@@ -737,9 +741,9 @@ button:active {
 .mushaf-settings-fab:hover { transform: translateY(-2px); }
 .mushaf-settings-fab:active { transform: scale(0.97); }
 
-.mushaf-page-scale-compact { max-height: 76svh; }
-.mushaf-page-scale-comfortable { max-height: 84svh; }
-.mushaf-page-scale-large { max-height: 91svh; }
+.mushaf-page-scale-compact { --mushaf-artwork-scale: 1.10; }
+.mushaf-page-scale-comfortable { --mushaf-artwork-scale: 1.22; }
+.mushaf-page-scale-large { --mushaf-artwork-scale: 1.34; }
 
 .reader-sheet-dark {
   border-color: rgba(224, 184, 88, 0.2) !important;
@@ -756,6 +760,53 @@ button:active {
 .reader-sheet-dark .bg-amber-50 { background-color: rgba(99, 71, 25, 0.5) !important; }
 .reader-sheet-dark .text-amber-950 { color: #ffeec1 !important; }
 
+@keyframes quranStudySheetEnter {
+  from { opacity: 0; transform: translate3d(0, 2.25rem, 0) scale(0.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes quranStudySheetExit {
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  to { opacity: 0; transform: translate3d(0, 1.6rem, 0) scale(0.99); }
+}
+
+@keyframes quranStudyOverlayEnter {
+  from { opacity: 0; backdrop-filter: blur(0); }
+  to { opacity: 1; backdrop-filter: blur(3px); }
+}
+
+@keyframes quranStudyOverlayExit {
+  from { opacity: 1; backdrop-filter: blur(3px); }
+  to { opacity: 0; backdrop-filter: blur(0); }
+}
+
+.quran-study-sheet {
+  overflow: hidden;
+  box-shadow: 0 -1.25rem 3.5rem rgba(5, 29, 18, 0.22);
+  transform-origin: center bottom;
+}
+
+.quran-study-sheet::before {
+  content: "";
+  position: absolute;
+  top: 0.72rem;
+  left: 50%;
+  width: 2.8rem;
+  height: 0.28rem;
+  border-radius: 999px;
+  background: rgba(12, 81, 57, 0.25);
+  transform: translateX(-50%);
+}
+
+.quran-study-sheet[data-state="open"] { animation: quranStudySheetEnter 260ms var(--ease-out) both; }
+.quran-study-sheet[data-state="closed"] { animation: quranStudySheetExit 180ms var(--ease-out) both; }
+.quran-study-overlay[data-state="open"] { animation: quranStudyOverlayEnter 200ms var(--ease-out) both; }
+.quran-study-overlay[data-state="closed"] { animation: quranStudyOverlayExit 160ms var(--ease-out) both; }
+
 @media (prefers-reduced-motion: reduce) {
-  .mushaf-settings-fab { transition: none; }
+  .mushaf-settings-fab,
+  .mushaf-focus-page { transition: none; }
+  .mushaf-page-artwork { transform: scale(var(--mushaf-artwork-scale)); }
+  .quran-study-sheet,
+  .quran-study-overlay { animation: none !important; }
 }
