@@ -5,6 +5,8 @@ import { TRPCError } from "@trpc/server";
 import { GRANULAR_PERMISSIONS, hasTarteelPermission } from "../shared/permissions";
 import { assertCanDelegate, assertCirclePermission, assertPermission, assertScope, assertStudentPermission, getAuthorization, ROLE_PERMISSION_TEMPLATES, type AccessSubject } from "./accessControl";
 import { getQuranRangeError } from "../shared/mizan";
+import { QURAN_SURAHS } from "../shared/types";
+import { getQuranBookmarkReferenceKey } from "../shared/quranBookmarks";
 import { getRiyadhDayKey } from "../shared/dates";
 import { createAccessCodeSecret, getAccessCodeHint, hashAccessCode } from "./accessCodeSecurity";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -71,6 +73,9 @@ import {
   getRecentSessionsForCircles,
   getRecentSessionsForCenters,
   getRevisionBySession,
+  deleteQuranBookmarkForUser,
+  getQuranBookmarksForUser,
+  saveQuranBookmark,
   getSessionById,
   getSessionByCircleDay,
   getSessions,
@@ -268,6 +273,22 @@ export const appRouter = router({
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      return { success: true } as const;
+    }),
+  }),
+
+  quranBookmarks: router({
+    list: protectedProcedure.query(({ ctx }) => getQuranBookmarksForUser(ctx.user.id)),
+    save: protectedProcedure.input(z.object({ referenceType: z.enum(["page", "ayah"]), pageNumber: z.number().int().min(1).max(604), surahNumber: z.number().int().min(1).max(114).optional(), ayahNumber: z.number().int().positive().optional(), label: z.string().trim().max(160).optional() })).mutation(async ({ ctx, input }) => {
+      const surah = input.surahNumber ? QURAN_SURAHS.find((item) => item.number === input.surahNumber) : undefined;
+      if (input.referenceType === "ayah" && (!surah || !input.ayahNumber || input.ayahNumber > surah.ayahs)) throw new TRPCError({ code: "BAD_REQUEST", message: "مرجع الآية غير صحيح." });
+      const referenceKey = getQuranBookmarkReferenceKey(input);
+      return saveQuranBookmark({ userId: ctx.user.id, referenceType: input.referenceType, referenceKey, pageNumber: input.pageNumber, surahNumber: input.referenceType === "ayah" ? input.surahNumber : null, ayahNumber: input.referenceType === "ayah" ? input.ayahNumber : null, label: input.label || null });
+    }),
+    remove: protectedProcedure.input(z.object({ referenceType: z.enum(["page", "ayah"]), pageNumber: z.number().int().min(1).max(604), surahNumber: z.number().int().min(1).max(114).optional(), ayahNumber: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => {
+      if (input.referenceType === "ayah" && (!input.surahNumber || !input.ayahNumber)) throw new TRPCError({ code: "BAD_REQUEST", message: "مرجع الآية غير صحيح." });
+      const referenceKey = getQuranBookmarkReferenceKey(input);
+      await deleteQuranBookmarkForUser(ctx.user.id, referenceKey);
       return { success: true } as const;
     }),
   }),

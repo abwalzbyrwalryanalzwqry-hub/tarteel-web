@@ -406,6 +406,24 @@ export const notifications = mysqlTable("notifications", {
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
 
+// ===================== QURAN BOOKMARKS =====================
+// علامات مرجعية شخصية؛ لا تحمل نصاً قرآنياً وتبقى معزولة بحسب صاحب الحساب.
+export const quranBookmarks = mysqlTable("quran_bookmarks", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  referenceType: mysqlEnum("referenceType", ["page", "ayah"]).notNull(),
+  referenceKey: varchar("referenceKey", { length: 32 }).notNull(),
+  pageNumber: int("pageNumber").notNull(),
+  surahNumber: int("surahNumber"),
+  ayahNumber: int("ayahNumber"),
+  label: varchar("label", { length: 160 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [uniqueIndex("quran_bookmarks_user_reference_unique").on(table.userId, table.referenceKey), index("quran_bookmarks_user_created_idx").on(table.userId, table.createdAt)]);
+
+export type QuranBookmark = typeof quranBookmarks.$inferSelect;
+export type InsertQuranBookmark = typeof quranBookmarks.$inferInsert;
+
 // ===================== AUDIT LOG =====================
 export const auditLog = mysqlTable("audit_log", {
   id: int("id").autoincrement().primaryKey(),

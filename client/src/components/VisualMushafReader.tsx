@@ -1,7 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { MushafIndexSheet } from "@/components/MushafIndexSheet";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
 import { clampMushafPage, findMushafPage, resolveMushafTripleTap, type MushafTapState, type MushafVisualManifest, type MushafVisualPageData } from "../../../shared/mushafVisual";
-import { ChevronLeft, ChevronRight, Info, ListTree, Loader2, Maximize2, Minimize2, RefreshCw, ShieldCheck, X } from "lucide-react";
+import { Bookmark, BookmarkCheck, BookmarkPlus, ChevronLeft, ChevronRight, Info, ListTree, Loader2, Maximize2, Minimize2, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { loadMushafVisualManifest, loadMushafVisualPage } from "@/lib/mushafVisual";
 import type { MushafSelectionContext } from "@/lib/mushafSelection";
@@ -36,11 +38,17 @@ export function VisualMushafReader({ startSurah, startAyah, selectionContext, fo
   const [indexOpen, setIndexOpen] = useState(false);
   const [browserFullscreen, setBrowserFullscreen] = useState(false);
   const [pageMotion, setPageMotion] = useState<"next" | "previous" | null>(null);
+  const [selectedVerse, setSelectedVerse] = useState<{ surah: number; ayah: number } | null>(null);
   const highlightTimer = useRef<number | null>(null);
   const hintTimer = useRef<number | null>(null);
   const pointerStart = useRef<PointerStart>(null);
   const suppressVerseClick = useRef(false);
   const focusRoot = useRef<HTMLElement>(null);
+  const { isAuthenticated } = useAuth();
+  const trpcUtils = trpc.useUtils();
+  const { data: bookmarks = [] } = trpc.quranBookmarks.list.useQuery(undefined, { enabled: isAuthenticated });
+  const saveBookmark = trpc.quranBookmarks.save.useMutation({ onSuccess: () => void trpcUtils.quranBookmarks.list.invalidate() });
+  const removeBookmark = trpc.quranBookmarks.remove.useMutation({ onSuccess: () => void trpcUtils.quranBookmarks.list.invalidate() });
 
   useEffect(() => {
     let active = true;
@@ -98,6 +106,7 @@ export function VisualMushafReader({ startSurah, startAyah, selectionContext, fo
     const target = clampMushafPage(next);
     if (target === pageNumber) return;
     setTapState(null);
+    setSelectedVerse(null);
     setTapHint("");
     setLoadedPage(null);
     setShowStartHighlight(false);
@@ -130,6 +139,7 @@ export function VisualMushafReader({ startSurah, startAyah, selectionContext, fo
     const resolution = resolveMushafTripleTap(tapState, { surah, ayah }, Date.now(), 900);
     setTapState(resolution.state);
     if (!selectionContext) {
+      setSelectedVerse({ surah, ayah });
       setHint(`آية ${ayah} من السورة ${surah}`);
       return;
     }
@@ -173,6 +183,27 @@ export function VisualMushafReader({ startSurah, startAyah, selectionContext, fo
       setHint("لا يدعم المتصفح وضع ملء الشاشة في هذه اللحظة.");
     }
   };
+  const hasBookmark = (referenceKey: string) => bookmarks.some((bookmark) => bookmark.referenceKey === referenceKey);
+  const togglePageBookmark = async () => {
+    if (!isAuthenticated) { setHint("سجّل الدخول لحفظ هذه العلامة المرجعية في حسابك."); return; }
+    const existing = hasBookmark(`page:${pageNumber}`);
+    try {
+      if (existing) await removeBookmark.mutateAsync({ referenceType: "page", pageNumber });
+      else await saveBookmark.mutateAsync({ referenceType: "page", pageNumber });
+      setHint(existing ? "أزيلت علامة الصفحة." : "حُفظت علامة الصفحة.");
+    } catch { setHint("تعذر تحديث العلامة المرجعية. حاول مجدداً."); }
+  };
+  const toggleVerseBookmark = async () => {
+    if (!selectedVerse) return;
+    if (!isAuthenticated) { setHint("سجّل الدخول لحفظ هذه العلامة المرجعية في حسابك."); return; }
+    const referenceKey = `ayah:${selectedVerse.surah}:${selectedVerse.ayah}`;
+    const existing = hasBookmark(referenceKey);
+    try {
+      if (existing) await removeBookmark.mutateAsync({ referenceType: "ayah", pageNumber, surahNumber: selectedVerse.surah, ayahNumber: selectedVerse.ayah });
+      else await saveBookmark.mutateAsync({ referenceType: "ayah", pageNumber, surahNumber: selectedVerse.surah, ayahNumber: selectedVerse.ayah });
+      setHint(existing ? "أزيلت علامة الآية." : "حُفظت علامة الآية.");
+    } catch { setHint("تعذر تحديث العلامة المرجعية. حاول مجدداً."); }
+  };
 
   if (error) {
     return <div className="flex min-h-[100svh] items-center justify-center bg-background p-5" dir="rtl"><div className="rounded-3xl border border-destructive/25 bg-destructive/5 p-6 text-center"><p className="font-display text-lg font-bold text-foreground">تعذر فتح صفحات المصحف</p><p className="mt-2 text-sm text-muted-foreground">{error}</p><Button className="mt-4" type="button" onClick={() => window.location.reload()}><RefreshCw className="ml-2 h-4 w-4" />إعادة المحاولة</Button></div></div>;
@@ -203,10 +234,12 @@ export function VisualMushafReader({ startSurah, startAyah, selectionContext, fo
       <button type="button" onClick={() => setIndexOpen(true)} aria-label="فتح فهرس المصحف" className="mushaf-index-fab absolute right-4 top-16 z-30 flex h-12 items-center gap-2 rounded-full border border-amber-900/15 bg-white/95 px-4 text-sm font-bold text-primary shadow-[0_12px_28px_-14px_rgba(57,42,15,0.6)] backdrop-blur"><ListTree className="h-5 w-5" /><span>الفهرس</span></button>
       <button type="button" onClick={() => void toggleBrowserFullscreen()} aria-label={browserFullscreen ? "إنهاء وضع ملء الشاشة" : "تفعيل وضع ملء الشاشة"} className="absolute right-5 top-32 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-amber-900/15 bg-white/95 text-primary shadow-sm backdrop-blur"><span className="sr-only">{browserFullscreen ? "إنهاء وضع ملء الشاشة" : "تفعيل وضع ملء الشاشة"}</span>{browserFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>
       <div className="absolute inset-0 grid place-items-center p-2">{pageCanvas}</div>
+      {!selectionContext && selectedVerse && <button type="button" onClick={() => void toggleVerseBookmark()} className="absolute bottom-5 right-5 z-20 flex items-center gap-2 rounded-full border border-amber-900/15 bg-white/95 px-4 py-2.5 text-sm font-bold text-primary shadow-lg backdrop-blur"><Bookmark className="h-4 w-4" />{hasBookmark(`ayah:${selectedVerse.surah}:${selectedVerse.ayah}`) ? "إزالة علامة الآية" : `حفظ الآية ${selectedVerse.ayah}`}</button>}
+      <button type="button" onClick={() => void togglePageBookmark()} aria-label={hasBookmark(`page:${pageNumber}`) ? "إزالة علامة الصفحة المرجعية" : "حفظ علامة الصفحة المرجعية"} className={`absolute bottom-5 left-5 z-20 flex h-11 items-center justify-center rounded-full border shadow-lg backdrop-blur ${hasBookmark(`page:${pageNumber}`) ? "border-primary bg-primary text-primary-foreground" : "border-amber-900/15 bg-white/95 text-primary"}`}>{hasBookmark(`page:${pageNumber}`) ? <BookmarkCheck className="h-5 w-5" /> : <BookmarkPlus className="h-5 w-5" />}</button>
       {tapHint && <p role="status" aria-live="polite" className="absolute inset-x-4 bottom-5 z-20 mx-auto w-fit rounded-full bg-emerald-950/90 px-4 py-2 text-center text-sm font-semibold text-white shadow-lg">{tapHint}</p>}
       <button type="button" aria-label="الصفحة السابقة" disabled={page.page <= 1} onClick={() => setActivePage(page.page - 1)} className="absolute right-3 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-amber-900/15 bg-white/90 text-foreground shadow-sm disabled:opacity-35"><ChevronRight className="h-5 w-5" /></button>
       <button type="button" aria-label="الصفحة التالية" disabled={page.page >= 604} onClick={() => setActivePage(page.page + 1)} className="absolute left-3 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-amber-900/15 bg-white/90 text-foreground shadow-sm disabled:opacity-35"><ChevronLeft className="h-5 w-5" /></button>
-      <MushafIndexSheet open={indexOpen} onOpenChange={setIndexOpen} manifest={manifest} currentPage={page.page} onPageSelect={setActivePage} />
+      <MushafIndexSheet open={indexOpen} onOpenChange={setIndexOpen} manifest={manifest} currentPage={page.page} onPageSelect={setActivePage} bookmarks={bookmarks} onBookmarkRemove={(bookmark) => void removeBookmark.mutateAsync(bookmark.referenceType === "page" ? { referenceType: "page", pageNumber: bookmark.pageNumber } : { referenceType: "ayah", pageNumber: bookmark.pageNumber, surahNumber: bookmark.surahNumber ?? undefined, ayahNumber: bookmark.ayahNumber ?? undefined })} />
     </section>;
   }
 

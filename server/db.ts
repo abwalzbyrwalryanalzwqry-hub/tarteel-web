@@ -20,6 +20,7 @@ import {
   permissionGrants,
   reportingGoals,
   reportingPreferences,
+  quranBookmarks,
   revision,
   sessions,
   students,
@@ -210,6 +211,34 @@ export async function saveReportingPreferences(input: { centerId: number; header
   const now = new Date();
   await db.insert(reportingPreferences).values(input).onDuplicateKeyUpdate({ set: { headerTitle: input.headerTitle ?? null, footerText: input.footerText ?? null, logoUrl: input.logoUrl ?? null, logoKey: input.logoKey ?? null, teacherMessageTemplate: input.teacherMessageTemplate ?? null, updatedBy: input.updatedBy, updatedAt: now } });
   return getReportingPreferences(input.centerId);
+}
+
+// ===================== QURAN BOOKMARKS =====================
+export async function getQuranBookmarksForUser(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(quranBookmarks).where(eq(quranBookmarks.userId, userId)).orderBy(desc(quranBookmarks.updatedAt));
+}
+
+export async function getQuranBookmarkForUser(userId: number, referenceKey: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(quranBookmarks).where(and(eq(quranBookmarks.userId, userId), eq(quranBookmarks.referenceKey, referenceKey))).limit(1);
+  return result[0];
+}
+
+export async function saveQuranBookmark(input: typeof quranBookmarks.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const now = new Date();
+  await db.insert(quranBookmarks).values(input).onDuplicateKeyUpdate({ set: { pageNumber: input.pageNumber, surahNumber: input.surahNumber ?? null, ayahNumber: input.ayahNumber ?? null, label: input.label ?? null, updatedAt: now } });
+  return getQuranBookmarkForUser(input.userId, input.referenceKey);
+}
+
+export async function deleteQuranBookmarkForUser(userId: number, referenceKey: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(quranBookmarks).where(and(eq(quranBookmarks.userId, userId), eq(quranBookmarks.referenceKey, referenceKey)));
 }
 
 // ===================== BRANCHES =====================
