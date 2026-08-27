@@ -28,4 +28,10 @@ describe("أكواد القراءة والنطاق الإشرافي", () => {
     expect(db).toContain("كود الموجّه غير صالح؛ يلزم حلقات محددة واستخدام واحد");
     expect(db).toContain("نطاق حلقات الموجّه غير صالح أو خارج المركز");
   });
+
+  it("يقصر واجهة ولي الأمر على ملخص التقدم والحفظ والمراجعة والحضور والسجل", () => {
+    const profile = readFileSync(path.join(root, "client/src/pages/StudentProfile.tsx"), "utf8");
+    expect(profile).toContain('isGuardianReader ? profileTabs.filter((tab) => ["summary", "memorization", "revision", "attendance", "timeline"].includes(tab.id))');
+    expect(profile).toContain("!isStudentReader && !isGuardianReader");
+  });
 });

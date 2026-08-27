@@ -145,7 +145,7 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background flex" dir="rtl">
+    <div className="min-h-screen bg-background lg:flex" dir="rtl">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -254,7 +254,7 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex min-w-0 flex-col lg:flex-1">
         {/* Top bar */}
         <header className="h-14 border-b border-border bg-card/80 backdrop-blur-sm flex items-center gap-4 px-4 sticky top-0 z-30">
           <button

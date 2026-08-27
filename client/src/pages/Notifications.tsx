@@ -40,7 +40,7 @@ export default function Notifications() {
 
   return (
     <div dir="rtl" className="w-full min-w-0 max-w-full space-y-6 overflow-x-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-rose-600 flex items-center justify-center"><Bell className="w-5 h-5 text-white"/></div>
           <div>
@@ -49,7 +49,7 @@ export default function Notifications() {
           </div>
         </div>
         {unread.length > 0 && (
-          <button onClick={() => markAllReadMutation.mutate()} disabled={markAllReadMutation.isPending} className="flex shrink-0 items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm transition-colors hover:bg-muted">
+          <button onClick={() => markAllReadMutation.mutate()} disabled={markAllReadMutation.isPending} className="flex w-fit shrink-0 items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm transition-colors hover:bg-muted">
             <CheckCheck className="w-4 h-4"/>
             تعليم الكل كمقروء
           </button>
@@ -76,12 +76,12 @@ export default function Notifications() {
             const NotificationIcon = typeIcons[notif.type] ?? Bell;
             return <div
               key={notif.id}
-              className={`glass-card flex min-w-0 max-w-full items-start gap-4 rounded-2xl p-4 transition-all animate-fade-in-up stagger-${(i%5)+1} ${!notif.isRead ? "border-r-4 border-primary" : "opacity-70"}`}
+              className={`glass-card flex min-w-0 max-w-full flex-col gap-3 rounded-2xl p-4 transition-all animate-fade-in-up stagger-${(i%5)+1} sm:flex-row sm:items-start sm:gap-4 ${!notif.isRead ? "border-r-4 border-primary" : "opacity-70"}`}
             >
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${typeColors[notif.type] ?? typeColors.info}`}>
                 <NotificationIcon className="h-5 w-5" aria-hidden="true" />
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
                   <h3 className={`font-semibold ${!notif.isRead ? "text-foreground" : "text-muted-foreground"}`}>{notif.title}</h3>
                   <span className="text-xs text-muted-foreground flex-shrink-0">{new Date(notif.createdAt).toLocaleDateString("ar-SA", {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</span>
@@ -92,7 +92,7 @@ export default function Notifications() {
               {!notif.isRead && (
                 <button
                   onClick={() => markReadMutation.mutate({ id: notif.id })}
-                  className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center flex-shrink-0 transition-colors"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center self-start rounded-lg transition-colors hover:bg-muted sm:self-auto"
                   title="تعليم كمقروء"
                 >
                   <Check className="w-4 h-4 text-primary"/>
