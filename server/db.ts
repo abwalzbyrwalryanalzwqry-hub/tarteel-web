@@ -33,6 +33,7 @@ import {
 import { ENV } from "./_core/env";
 import { getTeacherInviteAvailability } from "../shared/teacherInvites";
 import { getRiyadhDayKey } from "../shared/dates";
+import { getUnrecordedStudentIds } from "../shared/attendance";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -705,6 +706,23 @@ export async function upsertAttendance(data: typeof attendance.$inferInsert) {
   if (!db) throw new Error("DB not available");
   await db.insert(attendance).values(data).onDuplicateKeyUpdate({
     set: { status: data.status, notes: data.notes, updatedAt: new Date() },
+  });
+}
+
+/** يسجل الحضور للطلاب غير المسجلين فقط؛ ولا يبدل غياباً أو استئذاناً سجله المعلم يدوياً. */
+export async function markUnrecordedAttendancePresent(sessionId: number, studentIds: readonly number[], recordedBy: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const uniqueStudentIds = Array.from(new Set(studentIds.filter((studentId) => Number.isInteger(studentId) && studentId > 0)));
+  if (!uniqueStudentIds.length) return { createdCount: 0, preservedCount: 0 };
+  return db.transaction(async (tx) => {
+    const existing = await tx.select({ studentId: attendance.studentId }).from(attendance)
+      .where(and(eq(attendance.sessionId, sessionId), inArray(attendance.studentId, uniqueStudentIds)));
+    const unrecordedIds = getUnrecordedStudentIds(uniqueStudentIds, existing.map((row) => row.studentId));
+    if (unrecordedIds.length) {
+      await tx.insert(attendance).values(unrecordedIds.map((studentId) => ({ sessionId, studentId, status: "present" as const, recordedBy })));
+    }
+    return { createdCount: unrecordedIds.length, preservedCount: existing.length };
   });
 }
 

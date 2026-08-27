@@ -68,6 +68,17 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     expect(router).toContain('assertCirclePermission(ctx.user, session.circleId, "attendance.edit")');
   });
 
+  it("يسجل الحضور الجماعي للطلاب غير المسجلين فقط ويحافظ على الاستثناءات الفردية", () => {
+    const detail = source("client/src/pages/SessionDetail.tsx");
+    const router = source("server/routers.ts");
+    const database = source("server/db.ts");
+    expect(detail).toContain("تسجيل الجميع حضوراً");
+    expect(detail).toContain("ستبقى حالات الغياب والاستئذان المسجلة يدوياً كما هي");
+    expect(router).toContain("markUnrecordedPresent");
+    expect(database).toContain("markUnrecordedAttendancePresent");
+    expect(database).toContain("getUnrecordedStudentIds");
+  });
+
   it("يجعل الفترات واجهة تشغيل السجل الموحد ويحوّل المسار القديم بأمان", () => {
     const app = source("client/src/App.tsx");
     const layout = source("client/src/components/TarteelLayout.tsx");
@@ -122,6 +133,9 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     expect(detail).toContain("مراجعة وحفظ الفترة");
     expect(detail).toContain("لم تسجل حالة حضور");
     expect(detail).toContain("اعتماد الفترة");
+    expect(detail).toContain("سُجل حضور");
+    expect(detail).toContain("تنبيه متابعة:");
+    expect(detail).toContain("هذا لا يمنع الاعتماد");
   });
 
   it("يعيد المعلم إلى المسودة ويقبل نطاق السور الصاعد أو النازل مع زر اعتماد واضح", () => {
@@ -147,6 +161,15 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     expect(router).toContain("periodId: created.id");
     expect(periods).toContain("navigate(`/periods/${periodId}`");
     expect(circle).toContain("navigate(`/periods/${periodId}`");
+  });
+
+  it("يعرض لوحة جلسة اليوم ويعطي أولوية للمسودة أو إجراء إنشاء واضح عند غيابها", () => {
+    const periods = source("client/src/pages/Sessions.tsx");
+    expect(periods).toContain("جلسة اليوم");
+    expect(periods).toContain("getRiyadhDayKey");
+    expect(periods).toContain("مسودة محفوظة وجاهزة للاستئناف");
+    expect(periods).toContain("إنشاء جلسة اليوم");
+    expect(periods).toContain("استئناف");
   });
 
   it("يستعيد المسودة بحسب الحلقة والتاريخ إذا غاب معرّف الإنشاء من الاستجابة الحية", () => {

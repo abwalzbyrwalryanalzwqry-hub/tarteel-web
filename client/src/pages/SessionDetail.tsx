@@ -155,6 +155,15 @@ export default function SessionDetail({ sessionId }: Props) {
     },
   });
 
+  const markUnrecordedPresentMutation = trpc.attendance.markUnrecordedPresent.useMutation({
+    onSuccess: async (result) => {
+      await refetchAttendance();
+      syncSharedData();
+      toast.success(result.createdCount ? `سُجل الحضور لـ ${result.createdCount} من الطلاب، وحُفظت ${result.preservedCount} حالة قائمة دون تغيير` : "جميع حالات الحضور مسجلة مسبقاً، ولم تُغيّر أي حالة");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
   const createMemorizationMutation = trpc.memorization.create.useMutation({
     onSuccess: () => { toast.success("تم تسجيل الحفظ"); refetchMemorization(); utils.sessions.latestStudentProgress.invalidate(); syncSharedData(); },
     onError: (e) => toast.error(e.message),
@@ -185,6 +194,7 @@ export default function SessionDetail({ sessionId }: Props) {
   const recordedAttendanceCount = attendance?.filter((row) => students?.some((student) => student.id === row.studentId)).length ?? 0;
   const incompleteAttendanceCount = Math.max(0, totalStudents - recordedAttendanceCount);
   const studentsWithProgress = new Set([...(memorization ?? []), ...(revision ?? [])].map((row) => row.studentId)).size;
+  const studentsWithoutProgress = Math.max(0, totalStudents - studentsWithProgress);
 
   if (!sessionId || sessionLoading) {
     return (
@@ -279,7 +289,7 @@ export default function SessionDetail({ sessionId }: Props) {
       {/* Tab Content */}
       {activeTab === "attendance" && (
         <div className="glass-card rounded-2xl p-5">
-          <h2 className="font-display font-bold text-foreground text-lg mb-4">تسجيل الحضور</h2>
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-display text-lg font-bold text-foreground">تسجيل الحضور</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">سُجل حضور {recordedAttendanceCount} من {totalStudents} · وسُجل إنجاز لـ {studentsWithProgress} من الطلاب. سجّل الجميع حضوراً مرة واحدة؛ ستبقى حالات الغياب والاستئذان المسجلة يدوياً كما هي.</p></div>{students && students.length > 0 && <button type="button" disabled={markUnrecordedPresentMutation.isPending} onClick={() => markUnrecordedPresentMutation.mutate({ sessionId: session.id })} className="rounded-xl border border-emerald-600/25 bg-emerald-600/10 px-3 py-2 text-sm font-bold text-emerald-800 transition-colors hover:bg-emerald-600/15 disabled:cursor-wait disabled:opacity-70 dark:text-emerald-200">{markUnrecordedPresentMutation.isPending ? "جارٍ تسجيل الحضور…" : "تسجيل الجميع حضوراً"}</button>}</div>
           {!students || students.length === 0 ? (
             <div className="text-center py-8"><Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3"/><p className="text-muted-foreground text-sm">لا يوجد طلاب في هذه الحلقة</p></div>
           ) : (
@@ -453,6 +463,7 @@ export default function SessionDetail({ sessionId }: Props) {
             <div className="rounded-xl bg-emerald-500/10 p-3"><p className="font-display text-xl font-bold text-emerald-700 dark:text-emerald-300">{studentsWithProgress}</p><p className="mt-1 text-xs text-muted-foreground">لهم إنجاز</p></div>
           </div>
           {totalStudents === 0 ? <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm leading-6 text-foreground">لا يوجد طلاب في هذه الحلقة. راجع الحلقة قبل اعتماد فترة بلا سجلات طلاب.</p> : incompleteAttendanceCount > 0 ? <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm leading-6 text-foreground">لم تسجل حالة حضور لـ {incompleteAttendanceCount} {incompleteAttendanceCount === 1 ? "طالب" : "طلاب"}. يمكنك العودة لإكمالها أو الاعتماد إذا كان ذلك مقصوداً.</p> : <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm leading-6 text-foreground">سجلت حالة حضور لجميع طلاب الحلقة.</p>}
+          {totalStudents > 0 && studentsWithoutProgress > 0 && <p className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm leading-6 text-foreground">تنبيه متابعة: لا يوجد حفظ أو مراجعة مسجل لـ {studentsWithoutProgress} {studentsWithoutProgress === 1 ? "طالب" : "طلاب"} في هذه الفترة. هذا لا يمنع الاعتماد؛ راجعه فقط إذا كانت الفترة مخصصة للحفظ أو المراجعة.</p>}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button type="button" onClick={() => setFinalizeReviewOpen(false)} className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted">العودة للتسجيل</button>
             <button type="button" disabled={finalizeMutation.isPending} onClick={() => { setFinalizeReviewOpen(false); finalizeMutation.mutate({ id: session.id }); }} className="btn-gold px-4 py-2.5 text-sm">{finalizeMutation.isPending ? "جارٍ الحفظ…" : "اعتماد الفترة"}</button>

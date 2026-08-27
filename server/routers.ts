@@ -126,6 +126,7 @@ import {
   updateStudent,
   updateTeacher,
   updateCenterMembership,
+  markUnrecordedAttendancePresent,
   upsertAttendance,
   upsertEvaluation,
   getAccessCodeByHash,
@@ -838,6 +839,12 @@ export const appRouter = router({
   // ===================== ATTENDANCE =====================
   attendance: router({
     bySession: protectedProcedure.input(z.object({ sessionId: z.number() })).query(async ({ ctx, input }) => { await getAuthorizedSession(ctx.user, input.sessionId); return getAttendanceBySession(input.sessionId); }),
+    markUnrecordedPresent: protectedProcedure.input(z.object({ sessionId: z.number() })).mutation(async ({ ctx, input }) => {
+      const session = await getAuthorizedSession(ctx.user, input.sessionId);
+      await assertCirclePermission(ctx.user, session.circleId, "attendance.edit");
+      const circleStudents = await getStudents(undefined, session.circleId);
+      return markUnrecordedAttendancePresent(session.id, circleStudents.filter((student) => student.isActive).map((student) => student.id), ctx.user.id);
+    }),
     upsert: protectedProcedure
       .input(z.object({
         sessionId: z.number(),
