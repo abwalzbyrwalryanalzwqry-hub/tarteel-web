@@ -1,8 +1,10 @@
 import { trpc } from "@/lib/trpc";
-import { Bell, BellOff, Check, CheckCheck, Filter, Search } from "lucide-react";
+import { AlertCircle, Bell, BellOff, CalendarDays, Check, CheckCheck, CheckCircle2, ClipboardCheck, Filter, Info, Search, TriangleAlert, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { filterNotifications } from "../../../shared/activityFilters";
+import { getNotificationAction } from "../../../shared/notificationActions";
+import { useLocation } from "wouter";
 
 const typeColors: Record<string, string> = {
   info: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
@@ -14,11 +16,12 @@ const typeColors: Record<string, string> = {
   memorization: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
 };
 
-const typeIcons: Record<string, string> = {
-  info: "ℹ️", warning: "⚠️", success: "✅", error: "❌", attendance: "📋", session: "📅", memorization: "📖",
+const typeIcons: Record<string, LucideIcon> = {
+  info: Info, warning: TriangleAlert, success: CheckCircle2, error: AlertCircle, attendance: ClipboardCheck, session: CalendarDays, memorization: Bell,
 };
 
 export default function Notifications() {
+  const [, navigate] = useLocation();
   const { data: notifications, isLoading, refetch } = trpc.notifications.list.useQuery();
   const [search, setSearch] = useState("");
   const [readFilter, setReadFilter] = useState<"all" | "unread" | "read">("all");
@@ -36,9 +39,9 @@ export default function Notifications() {
   const filteredNotifications = filterNotifications(notifications ?? [], { search, readFilter, dateRange });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+    <div dir="rtl" className="w-full min-w-0 max-w-full space-y-6 overflow-x-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-rose-600 flex items-center justify-center"><Bell className="w-5 h-5 text-white"/></div>
           <div>
             <h1 className="page-title">الإشعارات</h1>
@@ -46,7 +49,7 @@ export default function Notifications() {
           </div>
         </div>
         {unread.length > 0 && (
-          <button onClick={() => markAllReadMutation.mutate()} disabled={markAllReadMutation.isPending} className="flex items-center gap-2 text-sm px-4 py-2 rounded-xl border border-border hover:bg-muted transition-colors">
+          <button onClick={() => markAllReadMutation.mutate()} disabled={markAllReadMutation.isPending} className="flex shrink-0 items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm transition-colors hover:bg-muted">
             <CheckCheck className="w-4 h-4"/>
             تعليم الكل كمقروء
           </button>
@@ -68,13 +71,15 @@ export default function Notifications() {
             <select value={dateRange} onChange={(event) => setDateRange(event.target.value as typeof dateRange)} className="tarteel-input"><option value="all">كل الفترات</option><option value="today">آخر 24 ساعة</option><option value="week">آخر 7 أيام</option><option value="month">آخر 30 يوماً</option></select>
           </div>
           {filteredNotifications.length === 0 ? <div className="glass-card rounded-2xl p-10 text-center text-sm text-muted-foreground">لا توجد إشعارات مطابقة للفلاتر المحددة.</div> : <div className="space-y-2">
-          {filteredNotifications.map((notif, i) => (
-            <div
+          {filteredNotifications.map((notif, i) => {
+            const action = getNotificationAction(notif);
+            const NotificationIcon = typeIcons[notif.type] ?? Bell;
+            return <div
               key={notif.id}
-              className={`glass-card rounded-2xl p-4 flex items-start gap-4 transition-all animate-fade-in-up stagger-${(i%5)+1} ${!notif.isRead ? "border-r-4 border-primary" : "opacity-70"}`}
+              className={`glass-card flex min-w-0 max-w-full items-start gap-4 rounded-2xl p-4 transition-all animate-fade-in-up stagger-${(i%5)+1} ${!notif.isRead ? "border-r-4 border-primary" : "opacity-70"}`}
             >
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${typeColors[notif.type] ?? typeColors.info}`}>
-                {typeIcons[notif.type] ?? "🔔"}
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${typeColors[notif.type] ?? typeColors.info}`}>
+                <NotificationIcon className="h-5 w-5" aria-hidden="true" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
@@ -82,6 +87,7 @@ export default function Notifications() {
                   <span className="text-xs text-muted-foreground flex-shrink-0">{new Date(notif.createdAt).toLocaleDateString("ar-SA", {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-0.5">{notif.message}</p>
+                {action && <button type="button" onClick={() => { if (!notif.isRead) markReadMutation.mutate({ id: notif.id }); navigate(action.href); }} className="mt-3 rounded-lg border border-primary/25 bg-primary/5 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/10">{action.label}</button>}
               </div>
               {!notif.isRead && (
                 <button
@@ -92,8 +98,8 @@ export default function Notifications() {
                   <Check className="w-4 h-4 text-primary"/>
                 </button>
               )}
-            </div>
-          ))}
+            </div>;
+          })}
         </div>
           }
         </>

@@ -7,6 +7,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { readPendingTeacherInvite } from "../../../shared/teacherInviteFlow";
 import { hasActiveAccessMembership } from "../../../shared/accessMembership";
+import { AccessHelpPanel } from "@/components/AccessHelpPanel";
 
 export default function LoginPage() {
   const { isAuthenticated, loading } = useAuth();
@@ -84,13 +85,13 @@ export default function LoginPage() {
             ))}
           </div>
 
-          {/* Email / Manus OAuth */}
+          {/* الدخول المربوط فعلياً بموفر المصادقة الحالي */}
           <button
             onClick={() => startLogin()}
             className="btn-gold w-full text-base py-3 flex items-center justify-center gap-2"
           >
             <Mail className="w-5 h-5"/>
-            الدخول أو إنشاء حساب بالبريد الإلكتروني
+            الدخول الآمن إلى ترتيل
           </button>
 
           <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
@@ -99,19 +100,17 @@ export default function LoginPage() {
             <span className="h-px flex-1 bg-border" />
           </div>
 
-          <button
-            onClick={() => toast.info("تسجيل الدخول عبر Google يحتاج بيانات OAuth الآمنة قبل تفعيله.")}
-            className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted flex items-center justify-center gap-2"
-          >
+          <button disabled aria-describedby="google-auth-status" className="w-full cursor-not-allowed rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm font-semibold text-muted-foreground flex items-center justify-center gap-2">
             <Chrome className="w-5 h-5 text-blue-600"/>
-            التسجيل بحساب Google
+            التسجيل بحساب Google — غير مفعّل بعد
           </button>
 
-          <p className="mt-3 text-xs text-muted-foreground">يتطلب زر Google إكمال بيانات OAuth من Google Cloud Console، ثم يُفعّل بصورة آمنة.</p>
+          <p id="google-auth-status" className="mt-3 text-xs text-muted-foreground">يتطلب Google بيانات OAuth مستقلة واختبار تحويل حقيقياً قبل تفعيله بصورة آمنة.</p>
 
           <p className="text-xs text-muted-foreground mt-4">
             بتسجيل الدخول، أنت توافق على شروط الاستخدام وسياسة الخصوصية
           </p>
+          <AccessHelpPanel />
         </div>
 
         {/* Bottom text */}
