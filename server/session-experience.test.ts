@@ -118,6 +118,10 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     expect(detail).toContain("trpc.sessions.finalize.useMutation");
     expect(detail).toContain("حفظ الفترة");
     expect(detail).toContain("مسودة محفوظة تلقائياً");
+    expect(detail).toContain("مراجعة اعتماد الفترة");
+    expect(detail).toContain("مراجعة وحفظ الفترة");
+    expect(detail).toContain("لم تسجل حالة حضور");
+    expect(detail).toContain("اعتماد الفترة");
   });
 
   it("يعيد المعلم إلى المسودة ويقبل نطاق السور الصاعد أو النازل مع زر اعتماد واضح", () => {
@@ -129,7 +133,7 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     expect(router).toContain("includeDrafts");
     expect(periods).toContain("مسودات محفوظة تلقائياً");
     expect(periods).toContain("استئناف");
-    expect(detail).toContain("حفظ الفترة وإضافتها للتقارير");
+    expect(detail).toContain("مراجعة وحفظ الفترة");
   });
 
   it("يفتح سجل طلاب الفترة الجديدة فور إنشائها من القائمة أو من الحلقة", () => {

@@ -8,6 +8,9 @@ describe("منطق الميزان", () => {
     expect(getQuranRangeError({ surahNumber: 3, toSurahNumber: 2, fromAyah: 1, toAyah: 2 })).toBeNull();
     expect(getQuranRangeError({ surahNumber: 2, fromAyah: 40, toAyah: 8 })).toBe("نطاق الحفظ أو المراجعة غير صحيح");
     expect(getQuranRangeError({ surahNumber: 107, toSurahNumber: 109, fromAyah: 1, toAyah: 6 })).toBeNull();
+    expect(getQuranRangeError({ surahNumber: 114, fromAyah: 6, toAyah: 6 })).toBeNull();
+    expect(getQuranRangeError({ surahNumber: 114, fromAyah: 0, toAyah: 1 })).toBe("رقم الآية خارج نطاق السورة المحددة");
+    expect(getQuranRangeError({ surahNumber: 115, fromAyah: 1, toAyah: 1 })).toBe("رقم الآية خارج نطاق السورة المحددة");
   });
 
   it("يلخص حالات الحضور للحلقة والجلسة دون خلط الحالات", () => {

@@ -89,6 +89,15 @@ describe("اختبار قبول الصلاحيات متعدد الحسابات",
     await expect(assertPermission(users.supervisor, 1, "settings.edit")).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
+  it("يطبق سحب الصلاحية الدقيقة فوراً ولا يحجب صلاحيات القراءة الأخرى للمشرف", async () => {
+    dbMocks.membership.mockResolvedValue(membership(users.supervisor.id, "supervisor"));
+    dbMocks.scopes.mockResolvedValue([scope(users.supervisor.id, "center", 1)]);
+    dbMocks.grants.mockResolvedValue([{ effect: "deny", permission: "reports.export" }]);
+
+    await expect(assertPermission(users.supervisor, 1, "reports.view")).resolves.toBeDefined();
+    await expect(assertPermission(users.supervisor, 1, "reports.export")).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
   it("يحصر الموجه في الحلقات الممنوحة وفي القراءة الإشرافية فقط", async () => {
     dbMocks.membership.mockResolvedValue(membership(users.guide.id, "guide"));
     dbMocks.scopes.mockResolvedValue([scope(users.guide.id, "circle", 11)]);

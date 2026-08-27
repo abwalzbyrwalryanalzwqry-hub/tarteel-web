@@ -26,6 +26,10 @@ describe("مسار المدير الجديد والمركز المستقل", () 
     expect(layout).toContain('navigate("/start")');
     expect(onboarding).toContain("إنشاء مركز جديد");
     expect(onboarding).toContain("الانضمام إلى مركز قائم");
+    expect(onboarding).toContain("تم إنشاء مركزك بنجاح");
+    expect(onboarding).toContain("إعداد الحلقة الأولى");
+    expect(onboarding).toContain('navigate("/circles")');
+    expect(onboarding).toContain('navigate("/dashboard")');
     expect(router).toContain("createIndependentCenter");
     expect(app).toContain('path="/start"');
   });

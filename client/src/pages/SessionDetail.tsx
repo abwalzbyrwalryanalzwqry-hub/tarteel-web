@@ -54,6 +54,7 @@ export default function SessionDetail({ sessionId }: Props) {
   const [activeTab, setActiveTab] = useState(mushafReturn?.context.kind ?? "attendance");
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [dialogTab, setDialogTab] = useState<"memorization" | "revision" | "evaluation">("memorization");
+  const [finalizeReviewOpen, setFinalizeReviewOpen] = useState(false);
   const [attendanceOverrides, setAttendanceOverrides] = useState<Record<number, "present" | "absent" | "late" | "excused" | undefined>>({});
   const [pendingAttendanceStudentId, setPendingAttendanceStudentId] = useState<number | null>(null);
   const utils = trpc.useUtils();
@@ -180,6 +181,10 @@ export default function SessionDetail({ sessionId }: Props) {
     evaluation?.find((e) => e.studentId === studentId);
 
   const attendanceStats = getAttendanceSummary(attendance ?? []);
+  const totalStudents = students?.length ?? 0;
+  const recordedAttendanceCount = attendance?.filter((row) => students?.some((student) => student.id === row.studentId)).length ?? 0;
+  const incompleteAttendanceCount = Math.max(0, totalStudents - recordedAttendanceCount);
+  const studentsWithProgress = new Set([...(memorization ?? []), ...(revision ?? [])].map((row) => row.studentId)).size;
 
   if (!sessionId || sessionLoading) {
     return (
@@ -240,7 +245,7 @@ export default function SessionDetail({ sessionId }: Props) {
             )}
           </div>
         </div>
-        {session.status !== "closed" && session.status !== "cancelled" && <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-display font-bold text-foreground">{session.status === "draft" ? "مسودة محفوظة تلقائياً" : "فترة غير معتمدة بعد"}</p><p className="mt-1 text-sm text-muted-foreground">سجّل الحضور والحفظ والمراجعة بأمان، ثم اضغط الحفظ لإضافتها إلى الفترات والتقارير.</p></div><button disabled={finalizeMutation.isPending} onClick={() => finalizeMutation.mutate({ id: session.id })} className="btn-gold shrink-0 px-5 py-3 text-sm">{finalizeMutation.isPending ? "جارٍ حفظ الفترة…" : "حفظ الفترة وإضافتها للتقارير"}</button></div>}
+        {session.status !== "closed" && session.status !== "cancelled" && <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-display font-bold text-foreground">{session.status === "draft" ? "مسودة محفوظة تلقائياً" : "فترة غير معتمدة بعد"}</p><p className="mt-1 text-sm text-muted-foreground">سجّل الحضور والحفظ والمراجعة بأمان، ثم اضغط الحفظ لمراجعة البيانات قبل إضافتها إلى الفترات والتقارير.</p></div><button disabled={finalizeMutation.isPending} onClick={() => setFinalizeReviewOpen(true)} className="btn-gold shrink-0 px-5 py-3 text-sm">{finalizeMutation.isPending ? "جارٍ حفظ الفترة…" : "مراجعة وحفظ الفترة"}</button></div>}
         {session.notes && <p className="mt-3 text-sm text-muted-foreground border-t border-border/50 pt-3">{session.notes}</p>}
         <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <SessionMetric label="حاضر" value={attendanceStats.present} tone="text-emerald-700 dark:text-emerald-300" />
@@ -434,6 +439,24 @@ export default function SessionDetail({ sessionId }: Props) {
         <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-xl" dir="rtl">
           <DialogHeader><DialogTitle className="font-display text-xl">سجل الطالب في الجلسة</DialogTitle><DialogDescription>سجّل الحفظ أو المراجعة أو التقييم، ثم افتح موضع البداية في المصحف عند الحاجة.</DialogDescription></DialogHeader>
           {selectedStudent && <div className="space-y-4"><div className="rounded-2xl bg-primary/5 p-3"><p className="font-semibold text-foreground">{selectedStudent.name}</p><p className="mt-1 text-xs text-muted-foreground">آخر حفظ: {getSurahName(latestProgress?.[selectedStudent.id]?.memorization?.toSurahNumber ?? latestProgress?.[selectedStudent.id]?.memorization?.surahNumber ?? selectedStudent.lastMemorizedSurah)} · آية {latestProgress?.[selectedStudent.id]?.memorization?.toAyah ?? selectedStudent.lastMemorizedAyah}</p><p className="mt-1 text-xs text-muted-foreground">آخر مراجعة: {latestProgress?.[selectedStudent.id]?.revision ? `${getSurahName(latestProgress?.[selectedStudent.id]?.revision?.toSurahNumber ?? latestProgress?.[selectedStudent.id]?.revision?.surahNumber ?? 1)} · آية ${latestProgress?.[selectedStudent.id]?.revision?.toAyah ?? 1}` : "لم تسجل بعد"}</p></div><div className="flex gap-1 rounded-xl bg-muted/50 p-1">{([ ["memorization", "الحفظ"], ["revision", "المراجعة"], ["evaluation", "التقييم"] ] as const).map(([id, label]) => <button key={id} onClick={() => setDialogTab(id)} className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${dialogTab === id ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`}>{label}</button>)}</div>{dialogTab === "memorization" && <MemorizationForm student={selectedStudent} sessionId={session.id} progress={latestProgress?.[selectedStudent.id]} onSubmit={(data: any) => createMemorizationMutation.mutate(data)} isLoading={createMemorizationMutation.isPending} forceExpanded returnContext={mushafReturn?.context.kind === "memorization" && mushafReturn.context.origin === "dialog" && mushafReturn.context.studentId === selectedStudent.id ? mushafReturn : undefined} />}{dialogTab === "revision" && <RevisionForm student={selectedStudent} sessionId={session.id} progress={latestProgress?.[selectedStudent.id]} onSubmit={(data: any) => createRevisionMutation.mutate(data)} isLoading={createRevisionMutation.isPending} forceExpanded returnContext={mushafReturn?.context.kind === "revision" && mushafReturn.context.origin === "dialog" && mushafReturn.context.studentId === selectedStudent.id ? mushafReturn : undefined} />}{dialogTab === "evaluation" && <EvaluationForm student={selectedStudent} sessionId={session.id} existing={getStudentEvaluation(selectedStudent.id)} onSubmit={(data: any) => upsertEvaluationMutation.mutate(data)} isLoading={upsertEvaluationMutation.isPending} forceExpanded />}</div>}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={finalizeReviewOpen} onOpenChange={setFinalizeReviewOpen}>
+        <DialogContent dir="rtl" className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl">مراجعة اعتماد الفترة</DialogTitle>
+            <DialogDescription>بعد الاعتماد تظهر بيانات الفترة في القوائم والتقارير ولا تعود مسودة.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-xl bg-muted p-3"><p className="font-display text-xl font-bold text-foreground">{totalStudents}</p><p className="mt-1 text-xs text-muted-foreground">طلاب الحلقة</p></div>
+            <div className="rounded-xl bg-primary/10 p-3"><p className="font-display text-xl font-bold text-primary">{recordedAttendanceCount}</p><p className="mt-1 text-xs text-muted-foreground">حالات حضور</p></div>
+            <div className="rounded-xl bg-emerald-500/10 p-3"><p className="font-display text-xl font-bold text-emerald-700 dark:text-emerald-300">{studentsWithProgress}</p><p className="mt-1 text-xs text-muted-foreground">لهم إنجاز</p></div>
+          </div>
+          {totalStudents === 0 ? <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm leading-6 text-foreground">لا يوجد طلاب في هذه الحلقة. راجع الحلقة قبل اعتماد فترة بلا سجلات طلاب.</p> : incompleteAttendanceCount > 0 ? <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm leading-6 text-foreground">لم تسجل حالة حضور لـ {incompleteAttendanceCount} {incompleteAttendanceCount === 1 ? "طالب" : "طلاب"}. يمكنك العودة لإكمالها أو الاعتماد إذا كان ذلك مقصوداً.</p> : <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm leading-6 text-foreground">سجلت حالة حضور لجميع طلاب الحلقة.</p>}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setFinalizeReviewOpen(false)} className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted">العودة للتسجيل</button>
+            <button type="button" disabled={finalizeMutation.isPending} onClick={() => { setFinalizeReviewOpen(false); finalizeMutation.mutate({ id: session.id }); }} className="btn-gold px-4 py-2.5 text-sm">{finalizeMutation.isPending ? "جارٍ الحفظ…" : "اعتماد الفترة"}</button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
