@@ -1,6 +1,7 @@
 import { clampMushafPage, findMushafPage, MUSHAF_PAGE_COUNT, MUSHAF_SURAH_COUNT, MUSHAF_VERSE_COUNT, resolveMushafSwipeDirection, resolveMushafTripleTap, validateMushafPageData, validateMushafRegistry, validateMushafVisualManifest, type MushafVisualRegistry } from "../shared/mushafVisual";
 import { validateQuranNavigationData } from "../shared/quranNavigation";
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 
 const allVerseRefs = Array.from({ length: MUSHAF_VERSE_COUNT }, (_, index) => [index % MUSHAF_SURAH_COUNT + 1, Math.floor(index / MUSHAF_SURAH_COUNT) + 1] as const);
 
@@ -60,6 +61,19 @@ describe("قارئ المصحف المرئي", () => {
     expect(resolveMushafSwipeDirection(72, 6)).toBe(-1);
     expect(resolveMushafSwipeDirection(-24, 2)).toBe(0);
     expect(resolveMushafSwipeDirection(-48, 48)).toBe(0);
+  });
+
+  it("يوحد إطار المصحف وأدواته بين القراءة العامة واختيار آية النهاية", () => {
+    const reader = readFileSync("client/src/components/VisualMushafReader.tsx", "utf8");
+    const picker = readFileSync("client/src/pages/MushafPickerPage.tsx", "utf8");
+    expect(reader).toContain("mushaf-reader-shell");
+    expect(reader).toContain("mushaf-page-shell");
+    expect(reader).toContain("mushaf-selection-prompt");
+    expect(reader).toContain("mushaf-page-counter");
+    expect(reader).toContain("shareCurrentPage");
+    expect(reader).toContain("/quran/read?page=${pageNumber}");
+    expect(picker).toContain("<VisualMushafReader");
+    expect(picker).toContain("focusMode");
   });
 
   it("لا يتيح فهرس الأجزاء والأحزاب إلا بالعقد الكامل ونطاق الصفحات الصحيح", () => {
