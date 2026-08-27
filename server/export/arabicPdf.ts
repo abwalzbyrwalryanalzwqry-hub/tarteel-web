@@ -2,11 +2,6 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const ArabicReshaper = require("arabic-reshaper") as { convertArabic: (value: string) => string };
-const bidiFactory = require("bidi-js") as () => {
-  getEmbeddingLevels: (value: string, direction: "rtl" | "ltr") => unknown;
-  getReorderedString: (value: string, levels: unknown) => string;
-};
-const bidi = bidiFactory();
 
 export const ARABIC_PDF_PAGE = { left: 42, right: 42, top: 42, bottom: 48 };
 export const ARABIC_PDF_WIDTH = 595.28 - ARABIC_PDF_PAGE.left - ARABIC_PDF_PAGE.right;
@@ -22,8 +17,9 @@ export function truncatePdfValue(value: string | number | null | undefined, limi
 }
 
 /**
- * يعيد تسلسل العرض الذي يحتاجه PDFKit: حروف عربية مشكلة وترتيب بصري RTL
- * مع الحفاظ على الأرقام والرموز في مواضعها الصحيحة داخل النص المختلط.
+ * يرسم PDFKit المحارف بالترتيب المادي من اليسار إلى اليمين ولا يطبق خوارزمية
+ * الاتجاه الثنائي. لذلك تُشكل كل كلمة عربية أولاً، ثم يعكس ترتيب الكلمات فقط
+ * داخل السطر؛ فلا تنقلب حروف الكلمة ولا يتغير ترتيب الأرقام داخلها.
  */
 export function toArabicPdfText(value: string | number | null | undefined, limit?: number): string {
   const source = limit ? truncatePdfValue(value, limit) : normalizePdfValue(value);
@@ -33,8 +29,11 @@ export function toArabicPdfText(value: string | number | null | undefined, limit
     .replace(/[•·]/g, "؛")
     .replace(/%/g, "٪")
     .replace(/[\\/]/g, " ");
-  const shaped = ArabicReshaper.convertArabic(logicalText);
-  return bidi.getReorderedString(shaped, bidi.getEmbeddingLevels(shaped, "rtl"));
+  return logicalText
+    .split(/(\s+)/)
+    .reverse()
+    .map((token) => ArabicReshaper.convertArabic(token))
+    .join("");
 }
 
 export function isArabicPdfVisualText(value: string): boolean {

@@ -60,7 +60,7 @@ describe("نظام التقرير الموحد", () => {
     expect(compactPdf.toString("latin1").match(/\/Type \/Page\b/g)?.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("يجهز ملفات PDF وExcel للتقرير التنفيذي مع معاينات وتنزيل ومشاركة", async () => {
+  it("يجهز ملفات PDF وExcel للتقرير التنفيذي بعد معاينة حية وتنزيل ومشاركة", async () => {
     const router = read("server/routers/reporting.ts");
     const exporter = read("server/reports/executiveExport.ts");
     const preview = read("client/src/components/ExecutiveCircleReport.tsx");
@@ -73,8 +73,10 @@ describe("نظام التقرير الموحد", () => {
     expect(router).toContain("exportExecutivePdf");
     expect(router).toContain("exportExecutiveExcel");
     expect(exporter).toContain("التفصيل الزمني");
-    expect(preview).toContain("معاينة PDF");
-    expect(preview).toContain("معاينة Excel");
+    expect(preview).toContain("معاينة قبل التصدير");
+    expect(preview).toContain("تجهيز PDF");
+    expect(preview).toContain("تجهيز Excel");
+    expect(preview).toContain("previewRequested");
     expect(preview).toContain("navigator.share");
   });
 

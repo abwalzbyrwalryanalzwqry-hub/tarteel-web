@@ -6,6 +6,11 @@ describe("معالجة العربية في تصدير PDF", () => {
     expect(isArabicPdfVisualText(toArabicPdfText("تقرير الحفظ"))).toBe(true);
   });
 
+  it("يعكس ترتيب الكلمات فقط من دون قلب حروف الكلمة العربية", () => {
+    expect(toArabicPdfText("التقرير التنفيذي")).toBe("ﺍﻟﺘﻨﻔﻴﺬﻱ ﺍﻟﺘﻘﺮﻳﺮ");
+    expect(toArabicPdfText("ترتيل")).toBe("ﺗﺮﺗﻴﻞ");
+  });
+
   it("يحافظ على محتوى عربي مختلط بالأرقام ويحد النص الطويل داخل الخلية", () => {
     const visual = toArabicPdfText("صفحات الحفظ: 24", 28);
     expect(visual).toContain("٢٤");
