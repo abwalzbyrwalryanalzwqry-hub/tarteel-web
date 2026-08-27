@@ -487,6 +487,18 @@ button:active {
 .mushaf-page-enter-next { animation: mushafPageEnterNext 220ms var(--ease-out) both; }
 .mushaf-page-enter-previous { animation: mushafPageEnterPrevious 220ms var(--ease-out) both; }
 
+.mushaf-info-fab {
+  transition: transform 180ms var(--ease-out), box-shadow 180ms var(--ease-out), background-color 180ms var(--ease-out), color 180ms var(--ease-out);
+}
+
+.mushaf-info-fab:hover { transform: translateY(-2px); }
+.mushaf-info-fab:active { transform: scale(0.97); }
+
+.mushaf-info-panel {
+  transform-origin: top left;
+  transition: transform 220ms var(--ease-out), opacity 180ms var(--ease-out);
+}
+
 .animate-fade-in-up {
   animation: fadeInUp 0.3s var(--ease-out) both;
 }
@@ -696,4 +708,6 @@ button:active {
   .mushaf-start-highlight { opacity: 0.38; }
   .mushaf-page-enter-next,
   .mushaf-page-enter-previous { animation: none; }
+  .mushaf-info-fab,
+  .mushaf-info-panel { transition: none; }
 }
