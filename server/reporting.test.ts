@@ -84,6 +84,7 @@ describe("نظام التقرير الموحد", () => {
     const builder = read("server/reports/reportBuilder.ts");
     const router = read("server/routers/reporting.ts");
     const management = read("client/src/components/ManagementReport.tsx");
+    const educationSummary = read("client/src/components/ManagementEducationSummary.tsx");
     expect(builder).toContain("buildCenterManagementReport");
     expect(builder).toContain('ne(sessions.status, "draft")');
     expect(builder).toContain("comparisons");
@@ -95,6 +96,13 @@ describe("نظام التقرير الموحد", () => {
     expect(management).toContain("LineChart");
     expect(management).toContain("BarChart");
     expect(management).toContain("تنبيهات المتابعة");
+    expect(builder).toContain("studentsWithRecordedProgress");
+    expect(builder).toContain("studentsWithoutRecordedProgress");
+    expect(builder).toContain("progressCoverageRate");
+    expect(builder).toContain("progress-coverage-");
+    expect(builder).toContain("استكمل توثيق تقدم الطلاب");
+    expect(educationSummary).toContain("توثيق التقدم التعليمي");
+    expect(educationSummary).toContain("تغطية توثيق التقدم بالحلقات");
   });
 
   it("يوفر تقرير إدارة قابل للتصدير وفلاتر معلم وعمر وإجراءات تنبيه مباشرة", () => {
