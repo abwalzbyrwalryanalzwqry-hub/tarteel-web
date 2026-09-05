@@ -530,6 +530,12 @@
 
 اعتماد المستخدم لمسار التنفيذ: إنشاء غلاف Android مؤقت يفتح النسخة المنشورة من ترتيل عبر الإنترنت، مع وصف واضح بأنه ليس تطبيقاً أصلياً مستقلاً.
 
-- [ ] إصلاح مسار سير عمل GitHub Actions ليكون داخل .github/workflows الجذري حتى يكتشفه GitHub
+- [x] إصلاح مسار سير عمل GitHub Actions ليكون داخل .github/workflows الجذري حتى يكتشفه GitHub
 
-- [ ] إصلاح فشل GitHub Actions في خطوة إضافة منصة Android ثم إعادة تشغيل البناء
+- [x] إصلاح فشل GitHub Actions في خطوة إضافة منصة Android ثم إعادة تشغيل البناء
+
+## تصدير مشروع ترتيل إلى Lovable
+- [x] فحص شامل للملفات والاعتماديات وقاعدة البيانات والمصادقة والتكاملات قبل التصدير
+- [x] إنشاء حزمة project-export منظمة تستبعد الأسرار وملفات البناء والاعتماديات القابلة لإعادة التثبيت
+- [x] إنشاء PROJECT_INVENTORY وMANUS_DEPENDENCIES وLOVABLE_MIGRATION وEXPORT_LIMITATIONS وENVIRONMENT_VARIABLES وREADME
+- [x] تدقيق الحزمة وضغطها إلى project-export.zip والتحقق من اكتمال الملفات والمسارات
