@@ -6,6 +6,7 @@ vi.mock("./outbox", () => ({
   listPendingOperations: vi.fn(),
   markOperationSyncing: vi.fn(),
   markOperationSynced: vi.fn(),
+  markOperationConflict: vi.fn(),
   markOperationFailed: vi.fn(),
 }));
 
@@ -64,6 +65,7 @@ describe("syncPending", () => {
     expect(result.state).toBe("FAILED");
     expect(result.conflicts).toBe(1);
     expect(outbox.markOperationSynced).not.toHaveBeenCalled();
+    expect(outbox.markOperationConflict).toHaveBeenCalledWith("op-2");
     expect(outbox.markOperationFailed).not.toHaveBeenCalled();
   });
 

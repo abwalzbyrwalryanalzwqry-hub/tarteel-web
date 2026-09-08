@@ -6,6 +6,7 @@ let databasePromise: Promise<SQLite.SQLiteDatabase> | undefined;
 
 const schemaStatements = [
   `PRAGMA foreign_keys = ON;`,
+  `CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY NOT NULL, applied_at TEXT NOT NULL);`,
   `CREATE TABLE IF NOT EXISTS app_metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL, updated_at TEXT NOT NULL);`,
   `CREATE TABLE IF NOT EXISTS centers (id TEXT PRIMARY KEY NOT NULL, organization_id TEXT, name TEXT NOT NULL, payload_json TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL, deleted_at TEXT);`,
   `CREATE TABLE IF NOT EXISTS circles (id TEXT PRIMARY KEY NOT NULL, center_id TEXT NOT NULL, name TEXT NOT NULL, payload_json TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL, deleted_at TEXT);`,
@@ -33,7 +34,36 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 async function initializeDatabase(): Promise<SQLite.SQLiteDatabase> {
   const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
   await db.execAsync(schemaStatements.join("\n"));
+  await applyMigrations(db);
   return db;
+}
+
+async function applyMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
+  const migrations: Array<{ version: number; statements: string[] }> = [
+    {
+      version: 1,
+      statements: [
+        `CREATE INDEX IF NOT EXISTS sync_conflicts_operation_idx ON sync_conflicts(operation_id, resolution);`,
+      ],
+    },
+  ];
+
+  for (const migration of migrations) {
+    const existing = await db.getFirstAsync<{ version: number }>(
+      `SELECT version FROM schema_migrations WHERE version = ?`,
+      migration.version,
+    );
+    if (existing) continue;
+    await db.execAsync("BEGIN IMMEDIATE;");
+    try {
+      await db.execAsync(migration.statements.join("\n"));
+      await db.runAsync(`INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`, migration.version, new Date().toISOString());
+      await db.execAsync("COMMIT;");
+    } catch (error) {
+      await db.execAsync("ROLLBACK;");
+      throw error;
+    }
+  }
 }
 
 export async function withTransaction<T>(work: (db: SQLite.SQLiteDatabase) => Promise<T>): Promise<T> {

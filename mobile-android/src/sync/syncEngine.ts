@@ -1,4 +1,4 @@
-import { listPendingOperations, markOperationFailed, markOperationSynced, markOperationSyncing, type OutboxOperation } from "./outbox";
+import { listPendingOperations, markOperationConflict, markOperationFailed, markOperationSynced, markOperationSyncing, type OutboxOperation } from "./outbox";
 
 export type SyncState = "IDLE" | "SYNCING" | "COMPLETED" | "FAILED";
 
@@ -32,6 +32,7 @@ export async function syncPending(adapter: SyncAdapter, limit = 50): Promise<Syn
         if (accepted.has(operation.operationId)) {
           await markOperationSynced(operation.operationId);
         } else if (conflicts.has(operation.operationId)) {
+          await markOperationConflict(operation.operationId);
           return;
         } else {
           await markOperationFailed(operation.operationId, "لم يؤكد الخادم العملية", operation.retryCount);

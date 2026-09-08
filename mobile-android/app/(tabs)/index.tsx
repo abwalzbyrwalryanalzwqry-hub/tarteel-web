@@ -1,4 +1,5 @@
 import { Text, View, Pressable } from "react-native";
+import { router } from "expo-router";
 import { ScreenContainer } from "../../components/screen-container";
 import { useNetworkStatus } from "../../src/network/useNetworkStatus";
 
@@ -31,7 +32,7 @@ export default function HomeScreen() {
             opacity: pressed ? 0.86 : 1,
             padding: 16,
           })}
-          onPress={() => undefined}
+          onPress={() => router.push("/(tabs)/quran")}
         >
           <Text className="text-center text-base font-bold text-white">حالة المزامنة</Text>
         </Pressable>

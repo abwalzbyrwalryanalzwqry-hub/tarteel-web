@@ -68,6 +68,11 @@ export async function markOperationSynced(operationId: string): Promise<void> {
   await db.runAsync(`UPDATE sync_outbox SET status = 'SYNCED', last_error = NULL WHERE operation_id = ?`, operationId);
 }
 
+export async function markOperationConflict(operationId: string, message = "تعارض في نسخة السجل"): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(`UPDATE sync_outbox SET status = 'CONFLICT', last_error = ? WHERE operation_id = ?`, message.slice(0, 1000), operationId);
+}
+
 export async function markOperationFailed(operationId: string, errorMessage: string, retryCount: number): Promise<void> {
   const db = await getDatabase();
   const delayMs = Math.min(30 * 60 * 1000, 1000 * 2 ** Math.min(retryCount, 10));

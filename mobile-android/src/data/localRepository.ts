@@ -81,6 +81,29 @@ export async function upsertLocalEntity(
   });
 }
 
+export async function getLocalEntity(entity: LocalEntity, id: string): Promise<LocalEntityRecord | null> {
+  const records = await listLocalEntities(entity, 1000);
+  return records.find((record) => record.id === id) ?? null;
+}
+
+export async function deleteLocalEntity(
+  entity: LocalEntity,
+  id: string,
+  actor: { userId: string; deviceId: string },
+): Promise<void> {
+  const existing = await getLocalEntity(entity, id);
+  if (!existing) return;
+  await upsertLocalEntity(entity, { ...existing, deletedAt: new Date().toISOString() }, actor, "DELETE");
+}
+
+export async function countLocalEntities(entity: LocalEntity): Promise<number> {
+  const table = tableByEntity[entity];
+  assertSafeIdentifier(table);
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) AS count FROM ${table} WHERE deleted_at IS NULL`);
+  return row?.count ?? 0;
+}
+
 export async function listLocalEntities(entity: LocalEntity, limit = 100): Promise<LocalEntityRecord[]> {
   const table = tableByEntity[entity];
   assertSafeIdentifier(table);

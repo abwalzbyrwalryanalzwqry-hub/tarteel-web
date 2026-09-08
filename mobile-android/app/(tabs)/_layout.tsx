@@ -9,6 +9,7 @@ export default function TabsLayout() {
       tabBarStyle: { backgroundColor: "#F6F3EA", borderTopColor: "#D7DDCF" },
     }}>
       <Tabs.Screen name="index" options={{ title: "الرئيسية" }} />
+      <Tabs.Screen name="quran" options={{ title: "المصحف" }} />
     </Tabs>
   );
 }
