@@ -1,0 +1,73 @@
+name: Build Tarteel native Android
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "mobile-android/**"
+      - ".github/workflows/android-native.yml"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: mobile-android
+
+jobs:
+  verify-and-build-debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: mobile-android/pnpm-lock.yaml
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Typecheck
+        run: ./node_modules/.bin/tsc --noEmit
+
+      - name: Sync tests
+        run: ./node_modules/.bin/vitest run --config vitest.config.ts
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Build debug APK
+        working-directory: mobile-android/android
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      - name: Build debug AAB
+        working-directory: mobile-android/android
+        run: ./gradlew :app:bundleDebug --no-daemon
+
+      - name: Upload native Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarteel-native-android-debug-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            mobile-android/android/app/build/outputs/apk/debug/app-debug.apk
+            mobile-android/android/app/build/outputs/bundle/debug/app-debug.aab

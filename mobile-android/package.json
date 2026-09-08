@@ -1,0 +1,38 @@
+{
+  "name": "tarteel-android",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "expo lint",
+    "prebuild": "expo prebuild --no-install",
+    "ios": "expo run:ios"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.2",
+    "expo": "~54.0.0",
+    "expo-crypto": "~14.1.0",
+    "expo-file-system": "~19.0.0",
+    "expo-linking": "~8.0.0",
+    "expo-network": "~8.0.0",
+    "expo-router": "~6.0.0",
+    "expo-secure-store": "~15.0.0",
+    "expo-sharing": "~14.0.0",
+    "expo-sqlite": "~16.0.0",
+    "nativewind": "^4.2.1",
+    "react": "19.1.0",
+    "react-native": "0.81.4",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.10",
+    "typescript": "~5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

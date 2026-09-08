@@ -539,3 +539,13 @@
 - [x] إنشاء حزمة project-export منظمة تستبعد الأسرار وملفات البناء والاعتماديات القابلة لإعادة التثبيت
 - [x] إنشاء PROJECT_INVENTORY وMANUS_DEPENDENCIES وLOVABLE_MIGRATION وEXPORT_LIMITATIONS وENVIRONMENT_VARIABLES وREADME
 - [x] تدقيق الحزمة وضغطها إلى project-export.zip والتحقق من اكتمال الملفات والمسارات
+
+## تحويل Android Offline‑First
+- [x] إكمال تدقيق معماري موثق يثبت الفجوة بين تطبيق الويب الحالي وتطبيق Android الأصلي
+- [x] تصميم معمارية Local‑First وقاعدة SQLite وRepository وOutbox والمزامنة والتعارض
+- [x] إنشاء مشروع Android أصلي مستقل دون WebView أو server.url مع الحفاظ على نسخة الويب
+- [ ] تنفيذ قاعدة محلية ومصادقة محلية وصلاحيات ومزامنة واختبارات Offline
+- [ ] نقل الوظائف الأساسية والمصحف والتقارير والتصدير والنسخ الاحتياطي إلى التطبيق المحلي
+- [ ] إضافة تكامل Android والأمان والاستجابة للهاتف واللوحي واختبارات القبول
+- [ ] تجهيز GitHub Actions لـ Debug وRelease APK وRelease AAB والتوقيع الآمن
+- [ ] إعداد ANDROID-OFFLINE-RELEASE-REPORT.md بعد اكتمال الاختبارات الفعلية

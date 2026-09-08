@@ -1,0 +1,13 @@
+node_modules/
+.expo/
+.expo-shared/
+android/.gradle/
+android/local.properties
+android/**/build/
+android/app/debug.keystore
+android/app/release.keystore
+*.jks
+*.keystore
+.env
+.env.*
+!.env.example

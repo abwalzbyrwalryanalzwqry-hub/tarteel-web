@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-background: 246 243 234;
+    --color-foreground: 18 61 42;
+  }
+}
