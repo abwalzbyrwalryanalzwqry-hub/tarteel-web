@@ -10,6 +10,7 @@ export default function TabsLayout() {
     }}>
       <Tabs.Screen name="index" options={{ title: "الرئيسية" }} />
       <Tabs.Screen name="quran" options={{ title: "المصحف" }} />
+      <Tabs.Screen name="sync" options={{ title: "المزامنة" }} />
     </Tabs>
   );
 }
