@@ -551,3 +551,5 @@
 - [ ] إعداد ANDROID-OFFLINE-RELEASE-REPORT.md بعد اكتمال الاختبارات الفعلية
 
 - [ ] إصلاح ترتيب إعداد pnpm وNode في Android Native workflow بعد فشل CI في Setup Node
+
+- [ ] توحيد نسخة pnpm في Android Native workflow مع packageManager بعد ظهور ERR_PNPM_BAD_PM_VERSION
