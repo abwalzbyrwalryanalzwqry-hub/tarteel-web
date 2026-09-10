@@ -63,11 +63,21 @@ jobs:
         working-directory: mobile-android/android
         run: ./gradlew :app:bundleDebug --no-daemon
 
+      - name: Build unsigned release APK
+        working-directory: mobile-android/android
+        run: ./gradlew :app:assembleReleaseUnsigned --no-daemon
+
+      - name: Build unsigned release AAB
+        working-directory: mobile-android/android
+        run: ./gradlew :app:bundleReleaseUnsigned --no-daemon
+
       - name: Upload native Android artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: tarteel-native-android-debug-${{ github.sha }}
+          name: tarteel-native-android-${{ github.sha }}
           if-no-files-found: error
           path: |
             mobile-android/android/app/build/outputs/apk/debug/app-debug.apk
             mobile-android/android/app/build/outputs/bundle/debug/app-debug.aab
+            mobile-android/android/app/build/outputs/apk/releaseUnsigned/app-releaseUnsigned.apk
+            mobile-android/android/app/build/outputs/bundle/releaseUnsigned/app-releaseUnsigned.aab

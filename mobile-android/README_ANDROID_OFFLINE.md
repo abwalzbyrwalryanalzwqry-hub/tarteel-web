@@ -20,7 +20,7 @@ pnpm prebuild
 pnpm android
 ```
 
-يتطلب تشغيل `pnpm android` جهاز Android أو محاكياً وAndroid SDK. عند البناء في بيئة CI يجب توفير JDK وAndroid SDK وقراءة `android/local.properties` من البيئة المحلية فقط؛ لا تُرفع كلمات المرور أو keystore إلى المستودع.
+يتطلب تشغيل `pnpm android` جهاز Android أو محاكياً وAndroid SDK. عند البناء في بيئة CI يجب توفير JDK وAndroid SDK وقراءة `android/local.properties` من البيئة المحلية فقط؛ لا تُرفع كلمات المرور أو keystore إلى المستودع. سير GitHub Actions يبني Debug APK/AAB و`releaseUnsigned` APK/AAB، بينما لا يُبنى Release موقّع إلا بعد توفير أسرار Keystore في GitHub Secrets. فشل البناء المحلي في بيئة لا تحتوي Android SDK متوقع، ولا يدل وحده على فشل إعداد Gradle.
 
 ## قواعد الأمان
 

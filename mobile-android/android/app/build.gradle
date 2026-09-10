@@ -104,21 +104,34 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (System.getenv('ANDROID_KEYSTORE_PATH')) {
+            tarteelRelease {
+                storeFile file(System.getenv('ANDROID_KEYSTORE_PATH'))
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // A production build is signed only when the CI keystore variables exist.
+            // Without them, use the explicit releaseUnsigned variant below.
+            if (System.getenv('ANDROID_KEYSTORE_PATH')) signingConfig signingConfigs.tarteelRelease
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             def enablePngCrunchInRelease = findProperty('android.enablePngCrunchInReleaseBuilds') ?: 'true'
             crunchPngs enablePngCrunchInRelease.toBoolean()
+        }
+        releaseUnsigned {
+            initWith release
+            signingConfig null
+            matchingFallbacks = ['release']
         }
     }
     packagingOptions {
