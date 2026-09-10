@@ -549,3 +549,5 @@
 - [ ] إضافة تكامل Android والأمان والاستجابة للهاتف واللوحي واختبارات القبول
 - [ ] تجهيز GitHub Actions لـ Debug وRelease APK وRelease AAB والتوقيع الآمن
 - [ ] إعداد ANDROID-OFFLINE-RELEASE-REPORT.md بعد اكتمال الاختبارات الفعلية
+
+- [ ] إصلاح ترتيب إعداد pnpm وNode في Android Native workflow بعد فشل CI في Setup Node
