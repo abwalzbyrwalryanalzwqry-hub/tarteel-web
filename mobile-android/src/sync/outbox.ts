@@ -68,9 +68,39 @@ export async function markOperationSynced(operationId: string): Promise<void> {
   await db.runAsync(`UPDATE sync_outbox SET status = 'SYNCED', last_error = NULL WHERE operation_id = ?`, operationId);
 }
 
-export async function markOperationConflict(operationId: string, message = "تعارض في نسخة السجل"): Promise<void> {
+export async function markOperationConflict(
+  operationId: string,
+  details: { entity: string; entityId: string; localJson: string; remoteJson: string; message?: string },
+): Promise<void> {
   const db = await getDatabase();
-  await db.runAsync(`UPDATE sync_outbox SET status = 'CONFLICT', last_error = ? WHERE operation_id = ?`, message.slice(0, 1000), operationId);
+  const detectedAt = new Date().toISOString();
+  await db.execAsync("BEGIN IMMEDIATE;");
+  try {
+    await db.runAsync(`UPDATE sync_outbox SET status = 'CONFLICT', last_error = ? WHERE operation_id = ?`, (details.message ?? "تعارض في نسخة السجل").slice(0, 1000), operationId);
+    await db.runAsync(
+      `INSERT OR REPLACE INTO sync_conflicts (conflict_id, operation_id, entity, entity_id, local_json, remote_json, detected_at, resolution)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')`,
+      `${operationId}:conflict`, operationId, details.entity, details.entityId, details.localJson, details.remoteJson, detectedAt,
+    );
+    await db.execAsync("COMMIT;");
+  } catch (error) {
+    await db.execAsync("ROLLBACK;");
+    throw error;
+  }
+}
+
+export async function resolveOperationConflict(operationId: string, resolution: "LOCAL" | "REMOTE"): Promise<void> {
+  const db = await getDatabase();
+  const resolvedAt = new Date().toISOString();
+  await db.execAsync("BEGIN IMMEDIATE;");
+  try {
+    await db.runAsync(`UPDATE sync_conflicts SET resolution = ?, resolved_at = ? WHERE operation_id = ? AND resolution = 'PENDING'`, resolution, resolvedAt, operationId);
+    await db.runAsync(`UPDATE sync_outbox SET status = ?, last_error = NULL WHERE operation_id = ?`, resolution === "LOCAL" ? "PENDING" : "SYNCED", operationId);
+    await db.execAsync("COMMIT;");
+  } catch (error) {
+    await db.execAsync("ROLLBACK;");
+    throw error;
+  }
 }
 
 export async function markOperationFailed(operationId: string, errorMessage: string, retryCount: number): Promise<void> {

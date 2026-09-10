@@ -2,8 +2,17 @@ import { listPendingOperations, markOperationConflict, markOperationFailed, mark
 
 export type SyncState = "IDLE" | "SYNCING" | "COMPLETED" | "FAILED";
 
+export type SyncConflict = {
+  operationId: string;
+  entity: string;
+  entityId: string;
+  localJson: string;
+  remoteJson: string;
+  remoteVersion: number;
+};
+
 export type SyncAdapter = {
-  push: (operations: OutboxOperation[]) => Promise<{ acceptedOperationIds: string[]; conflictOperationIds: string[] }>;
+  push: (operations: OutboxOperation[]) => Promise<{ acceptedOperationIds: string[]; conflicts: SyncConflict[] }>;
 };
 
 export type SyncResult = {
@@ -27,12 +36,13 @@ export async function syncPending(adapter: SyncAdapter, limit = 50): Promise<Syn
     try {
       const result = await adapter.push(operations);
       const accepted = new Set(result.acceptedOperationIds);
-      const conflicts = new Set(result.conflictOperationIds);
+      const conflicts = new Map(result.conflicts.map((conflict) => [conflict.operationId, conflict]));
       await Promise.all(operations.map(async (operation) => {
         if (accepted.has(operation.operationId)) {
           await markOperationSynced(operation.operationId);
         } else if (conflicts.has(operation.operationId)) {
-          await markOperationConflict(operation.operationId);
+          const conflict = conflicts.get(operation.operationId)!;
+          await markOperationConflict(operation.operationId, conflict);
           return;
         } else {
           await markOperationFailed(operation.operationId, "لم يؤكد الخادم العملية", operation.retryCount);
