@@ -41,6 +41,9 @@ jobs:
 
       - name: Configure Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # الحزمة الافتراضية «tools» أُزيلت من مستودع Google فيفشل sdkmanager بها.
+          packages: platform-tools
 
       - name: Build debug APK
         working-directory: android-wrapper/android
