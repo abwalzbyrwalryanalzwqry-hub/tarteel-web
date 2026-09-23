@@ -56,6 +56,16 @@ jobs:
       - name: Install Android SDK packages
         run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
+      # مفتاح Debug مستبعد من git (.gitignore) كما ينبغي؛ نولّده في كل تشغيل
+      # بالقيم القياسية التي يتوقعها build.gradle. الإصدار الموقّع لا يتأثر.
+      - name: Create debug keystore
+        working-directory: mobile-android/android/app
+        run: |
+          test -f debug.keystore || keytool -genkeypair -v -keystore debug.keystore \
+            -storepass android -alias androiddebugkey -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
       - name: Build debug APK
         working-directory: mobile-android/android
         run: ./gradlew :app:assembleDebug --no-daemon
