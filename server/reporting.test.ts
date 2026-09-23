@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { generateUnifiedReportPDF } from "./reports/unifiedPdf";
 import { generateExecutiveCircleExcel, generateExecutiveCirclePdf } from "./reports/executiveExport";
+import { readDataLayerSource } from "./testing/dataLayerSource";
 
 const root = path.resolve(import.meta.dirname, "..");
 const read = (relative: string) => readFileSync(path.join(root, relative), "utf8");
@@ -152,7 +153,7 @@ describe("نظام التقرير الموحد", () => {
   it("يجعل ملف المركز مصدراً موحداً للاسم والشعار في التقرير ويوفر لوحة شاملة لمديره", () => {
     const schema = read("drizzle/schema.ts");
     const router = read("server/routers.ts");
-    const db = read("server/db.ts");
+    const db = readDataLayerSource();
     const builder = read("server/reports/reportBuilder.ts");
     const dashboard = read("client/src/components/CenterManagerDashboard.tsx");
     const centers = read("client/src/pages/Centers.tsx");

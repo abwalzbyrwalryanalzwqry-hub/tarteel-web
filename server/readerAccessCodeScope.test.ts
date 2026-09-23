@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { readDataLayerSource } from "./testing/dataLayerSource";
 
 const root = process.cwd();
 
@@ -13,7 +14,7 @@ describe("أكواد القراءة والنطاق الإشرافي", () => {
   });
 
   it("يرفض الاسترداد الذري لبيانات النطاق المتعددة أو الارتباط بحساب آخر", () => {
-    const db = readFileSync(path.join(root, "server/db.ts"), "utf8");
+    const db = readDataLayerSource(root);
     expect(db).toContain("كود الطالب أو ولي الأمر لا يمكن أن يمنح سوى طالب واحد");
     expect(db).toContain("هذا الحساب مرتبط بطالب آخر ولا يمكن منحه طالباً إضافياً");
     expect(db).toContain("هذا الحساب مرتبط بابن آخر ولا يمكن منحه نطاقاً إضافياً");
@@ -22,7 +23,7 @@ describe("أكواد القراءة والنطاق الإشرافي", () => {
 
   it("يلزم الموجّه بحلقات صريحة داخل المركز ويمنع نطاق المركز", () => {
     const router = readFileSync(path.join(root, "server/routers.ts"), "utf8");
-    const db = readFileSync(path.join(root, "server/db.ts"), "utf8");
+    const db = readDataLayerSource(root);
     expect(router).toContain("يلزم تحديد حلقة واحدة أو أكثر للموجّه ولا يقبل كود الموجّه نطاقات أخرى");
     expect(router).toContain("كود الموجّه مخصص لحساب واحد واستخدام واحد فقط");
     expect(db).toContain("كود الموجّه غير صالح؛ يلزم حلقات محددة واستخدام واحد");

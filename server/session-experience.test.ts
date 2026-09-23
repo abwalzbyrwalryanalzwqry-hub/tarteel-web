@@ -2,13 +2,14 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { QURAN_SURAHS } from "../shared/types";
+import { readDataLayerSource } from "./testing/dataLayerSource";
 
 const root = process.cwd();
 const source = (file: string) => readFileSync(path.join(root, file), "utf8");
 
 describe("تزامن البيانات وتجربة جلسة المعلم", () => {
   it("يعزل إحصاءات لوحة التحكم وجلساتها بحلقات الحساب عند غياب صلاحية المركز", () => {
-    const database = source("server/db.ts");
+    const database = readDataLayerSource();
     const router = source("server/routers.ts");
     expect(database).toContain("getDashboardStatsForCircles");
     expect(database).toContain("getRecentSessionsForCircles");
@@ -71,7 +72,7 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
   it("يسجل الحضور الجماعي للطلاب غير المسجلين فقط ويحافظ على الاستثناءات الفردية", () => {
     const detail = source("client/src/pages/SessionDetail.tsx");
     const router = source("server/routers.ts");
-    const database = source("server/db.ts");
+    const database = readDataLayerSource();
     expect(detail).toContain("تسجيل الجميع حضوراً");
     expect(detail).toContain("ستبقى حالات الغياب والاستئذان المسجلة يدوياً كما هي");
     expect(router).toContain("markUnrecordedPresent");
@@ -97,7 +98,7 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
   it("يفرض فترة واحدة للتاريخ الذي يختاره المعلم، ويمنع تكرار الحضور ويستعيد آخر إنجاز", () => {
     const dates = source("shared/dates.ts");
     const schema = source("drizzle/schema.ts");
-    const database = source("server/db.ts");
+    const database = readDataLayerSource();
     const router = source("server/routers.ts");
     const composer = source("client/src/components/NewSessionComposer.tsx");
     const detail = source("client/src/pages/SessionDetail.tsx");
@@ -116,7 +117,7 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
 
   it("يحفظ الفترة كمسودة تلقائية ثم يعرضها للتقارير بعد الاعتماد النهائي فقط", () => {
     const schema = source("drizzle/schema.ts");
-    const database = source("server/db.ts");
+    const database = readDataLayerSource();
     const router = source("server/routers.ts");
     const composer = source("client/src/components/NewSessionComposer.tsx");
     const header = source("client/src/components/SessionHeaderControls.tsx");
@@ -196,7 +197,7 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     const periods = source("client/src/pages/Sessions.tsx");
     const trash = source("client/src/pages/Trash.tsx");
     const router = source("server/routers.ts");
-    const database = source("server/db.ts");
+    const database = readDataLayerSource();
     expect(periods).toContain("onPointerDown={() => startHold(period)}");
     expect(periods).toContain("تأكيد النقل إلى السلة");
     expect(periods).toContain("نقل إلى سلة المهملات");

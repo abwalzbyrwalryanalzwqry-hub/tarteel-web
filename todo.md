@@ -553,3 +553,7 @@
 - [ ] إصلاح ترتيب إعداد pnpm وNode في Android Native workflow بعد فشل CI في Setup Node
 
 - [ ] توحيد نسخة pnpm في Android Native workflow مع packageManager بعد ظهور ERR_PNPM_BAD_PM_VERSION
+
+## صيانة المستودع
+- [x] إخراج حزمة APK التجريبية من المستودع (محفوظة في الوسم `archive/android-wrapper-debug-apk` وفي آثار `build-apk.yml`) ومنع حفظ ملفات APK وAAB مستقبلاً
+- [x] تقسيم `server/db.ts` (1378 سطراً) إلى 23 وحدة في `server/data/` بنقل حرفي، مع إبقاء `./db` واجهةً موحّدة

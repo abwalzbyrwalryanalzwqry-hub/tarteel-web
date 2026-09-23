@@ -1,13 +1,14 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { readDataLayerSource } from "./testing/dataLayerSource";
 
 const root = path.resolve(import.meta.dirname, "..");
 const read = (relative: string) => readFileSync(path.join(root, relative), "utf8");
 
 describe("مسار المدير الجديد والمركز المستقل", () => {
   it("ينشئ المركز ومنظمته وعضوية المالك والنطاق ضمن معاملة واحدة", () => {
-    const database = read("server/db.ts");
+    const database = readDataLayerSource();
     expect(database).toContain("provisionIndependentCenter");
     expect(database).toContain("db.transaction");
     expect(database).toContain('role: "center_manager"');
