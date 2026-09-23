@@ -49,6 +49,9 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # الحزمة الافتراضية «tools» أُزيلت من مستودع Google فيفشل sdkmanager بها.
+          packages: platform-tools
 
       - name: Install Android SDK packages
         run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
