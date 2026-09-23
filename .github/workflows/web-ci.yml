@@ -1,0 +1,56 @@
+name: فحص نسخة الويب
+
+# نسخة الويب (client + server + shared) بلا أي فحص آلي حتى الآن؛ اختبار فاشل أو
+# خطأ أنواع يصل إلى main دون أن يلاحظه أحد. هذا الملف يشغّل فحص الأنواع
+# واختبارات الخادم والبناء مع كل دفع إلى main ومع كل طلب دمج.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "mobile-android/**"
+      - "android-wrapper/**"
+      - "docs/**"
+      - "**/*.md"
+  pull_request:
+    paths-ignore:
+      - "mobile-android/**"
+      - "android-wrapper/**"
+      - "docs/**"
+      - "**/*.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: الأنواع والاختبارات والبناء
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # النسخة تُقرأ من packageManager في package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: تثبيت الحزم
+        run: pnpm install --frozen-lockfile
+
+      - name: فحص الأنواع
+        run: pnpm check
+
+      - name: الاختبارات
+        run: pnpm test
+
+      - name: البناء
+        run: pnpm build
