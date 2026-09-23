@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { protectedProcedure, router } from '../_core/trpc';
+import { assertCirclePermission } from '../accessControl';
 import { getDb, keepLatestAttendanceRows } from '../db';
 import { generateMemorizationExcel, generateAttendanceExcel } from '../export/excel';
 import { generateMemorizationPDF, generateAttendancePDF, generateStudentsReportPDF } from '../export/pdf';
@@ -29,9 +30,6 @@ export const exportRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error('Database not available');
-
       // التحقق من صلاحيات المستخدم
       if (
         ctx.user.role !== 'super_admin' &&
@@ -41,6 +39,13 @@ export const exportRouter = router({
       ) {
         throw new Error('Unauthorized');
       }
+
+      // الدور وحده لا يكفي: يجب أن تقع الحلقة ضمن مركز المستخدم ونطاقه، وإلا
+      // صدّر أي معلّم تقارير حلقات مراكز أخرى برقمها.
+      await assertCirclePermission(ctx.user, input.circleId, 'reports.export');
+
+      const db = await getDb();
+      if (!db) throw new Error('Database not available');
 
       // جلب بيانات الحلقة
       const circleData = await db
@@ -150,9 +155,6 @@ export const exportRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error('Database not available');
-
       // التحقق من صلاحيات المستخدم
       if (
         ctx.user.role !== 'super_admin' &&
@@ -162,6 +164,13 @@ export const exportRouter = router({
       ) {
         throw new Error('Unauthorized');
       }
+
+      // الدور وحده لا يكفي: يجب أن تقع الحلقة ضمن مركز المستخدم ونطاقه، وإلا
+      // صدّر أي معلّم تقارير حلقات مراكز أخرى برقمها.
+      await assertCirclePermission(ctx.user, input.circleId, 'reports.export');
+
+      const db = await getDb();
+      if (!db) throw new Error('Database not available');
 
       // جلب بيانات الحلقة
       const circleData = await db
@@ -275,9 +284,6 @@ export const exportRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const db = await getDb();
-      if (!db) throw new Error('Database not available');
-
       // التحقق من صلاحيات المستخدم
       if (
         ctx.user.role !== 'super_admin' &&
@@ -287,6 +293,13 @@ export const exportRouter = router({
       ) {
         throw new Error('Unauthorized');
       }
+
+      // الدور وحده لا يكفي: يجب أن تقع الحلقة ضمن مركز المستخدم ونطاقه، وإلا
+      // صدّر أي معلّم تقارير حلقات مراكز أخرى برقمها.
+      await assertCirclePermission(ctx.user, input.circleId, 'reports.export');
+
+      const db = await getDb();
+      if (!db) throw new Error('Database not available');
 
       // جلب بيانات الحلقة
       const circleData = await db
