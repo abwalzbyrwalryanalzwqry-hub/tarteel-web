@@ -550,6 +550,7 @@
 - [ ] تجهيز GitHub Actions لـ Debug وRelease APK وRelease AAB والتوقيع الآمن
 - [ ] إعداد ANDROID-OFFLINE-RELEASE-REPORT.md بعد اكتمال الاختبارات الفعلية
 
-- [ ] إصلاح ترتيب إعداد pnpm وNode في Android Native workflow بعد فشل CI في Setup Node
+- [x] إصلاح ترتيب إعداد pnpm وNode في Android Native workflow بعد فشل CI في Setup Node
 
-- [ ] توحيد نسخة pnpm في Android Native workflow مع packageManager بعد ظهور ERR_PNPM_BAD_PM_VERSION
+- [x] توحيد نسخة pnpm في Android Native workflow مع packageManager بعد ظهور ERR_PNPM_BAD_PM_VERSION
+- [x] حذف mobile-android/pnpm-workspace.yaml غير المكتمل الذي أوقف التثبيت بخطأ `packages field missing or empty` (السبب الفعلي لفشل البناء)
