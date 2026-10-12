@@ -1,0 +1,22 @@
+# تحديثات أسبوعية للاعتماديات؛ التحديثات الثانوية والتصحيحية مجمّعة في طلب دمج واحد
+# حتى لا تغرق المستودع بطلبات كثيرة. التحديثات الكبرى (major) تأتي منفصلة لمراجعتها.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Aden
+    open-pull-requests-limit: 5
+    groups:
+      web-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]

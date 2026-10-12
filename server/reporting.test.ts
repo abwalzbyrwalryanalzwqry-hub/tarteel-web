@@ -59,7 +59,8 @@ describe("نظام التقرير الموحد", () => {
     expect(pdf.toString("latin1").match(/\/Type \/Page\b/g)?.length).toBeGreaterThan(1);
     const compactPdf = await generateUnifiedReportPDF({ ...report, summary: { ...report.summary, students: 2, present: 4, memorizationCount: 2 }, students: students.slice(0, 2) });
     expect(compactPdf.toString("latin1").match(/\/Type \/Page\b/g)?.length).toBeGreaterThanOrEqual(1);
-  });
+    // توليد PDF بخط عربي مضمّن يستغرق ~3 ثوانٍ لكل ملف؛ الاختبار يولد ملفين.
+  }, 20_000);
 
   it("يجهز ملفات PDF وExcel للتقرير التنفيذي بعد معاينة حية وتنزيل ومشاركة", async () => {
     const router = read("server/routers/reporting.ts");
