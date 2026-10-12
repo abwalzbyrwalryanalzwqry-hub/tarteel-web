@@ -1,7 +1,7 @@
 import { type QuranNavigationData, validateQuranNavigationData } from "../../../shared/quranNavigation";
 
 const SCRIPT_ID = "tarteel-quran-navigation";
-export const QURAN_NAVIGATION_URL = "/manus-storage/quran-navigation_d0a44e59.js";
+export const QURAN_NAVIGATION_URL = "/storage/quran-navigation_d0a44e59.js";
 
 declare global {
   interface Window {

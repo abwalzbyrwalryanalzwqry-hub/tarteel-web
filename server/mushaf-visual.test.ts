@@ -13,7 +13,7 @@ const registry: MushafVisualRegistry = {
   verseCount: MUSHAF_VERSE_COUNT,
   pages: Array.from({ length: MUSHAF_PAGE_COUNT }, (_, index) => ({
     page: index + 1,
-    url: `/manus-storage/${String(index + 1).padStart(3, "0")}.svg`,
+    url: `/storage/${String(index + 1).padStart(3, "0")}.svg`,
     verses: allVerseRefs.filter((_, verseIndex) => verseIndex % MUSHAF_PAGE_COUNT === index),
     zones: [[...(allVerseRefs.find((_, verseIndex) => verseIndex % MUSHAF_PAGE_COUNT === index) ?? [1, 1]), 1, 1, 1, 1, 1] as const],
   })),
@@ -29,7 +29,7 @@ describe("قارئ المصحف المرئي", () => {
   });
 
   it("يتحقق من البيان الخفيف وملف مناطق الصفحة قبل إتاحة النقر", () => {
-    const manifest = { ...registry, pages: registry.pages.map(({ page, url, verses }) => ({ page, url, verses, zonesUrl: `/manus-storage/${String(page).padStart(3, "0")}-zones.js` })) };
+    const manifest = { ...registry, pages: registry.pages.map(({ page, url, verses }) => ({ page, url, verses, zonesUrl: `/storage/${String(page).padStart(3, "0")}-zones.js` })) };
     expect(validateMushafVisualManifest(manifest)).toBe(true);
     expect(validateMushafPageData(manifest.pages[0], { page: 1, zones: registry.pages[0].zones })).toBe(true);
     expect(validateMushafPageData(manifest.pages[0], { page: 1, zones: [[114, 6236, 1, 1, 1, 1, 1]] })).toBe(false);

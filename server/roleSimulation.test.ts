@@ -9,7 +9,7 @@ const simulationRouter = router({
 
 function makeContext(simulation: boolean): TrpcContext {
   return {
-    user: { id: 1, openId: "simulation-owner", name: "مالك تجريبي", email: "owner@example.test", loginMethod: "manus", role: "admin", isActive: true, accountStatus: "active", accessRevokedAt: null, phone: null, avatar: null, lastActiveAt: null, deletedAt: null, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() },
+    user: { id: 1, openId: "simulation-owner", name: "مالك تجريبي", email: "owner@example.test", loginMethod: "password", role: "admin", isActive: true, accountStatus: "active", accessRevokedAt: null, phone: null, avatar: null, lastActiveAt: null, deletedAt: null, createdAt: new Date(), updatedAt: new Date(), lastSignedIn: new Date() },
     req: { headers: simulation ? { "x-tarteel-role-simulation": "1" } : {} } as TrpcContext["req"],
     res: {} as TrpcContext["res"],
   };

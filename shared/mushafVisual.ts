@@ -76,7 +76,7 @@ export function validateMushafRegistry(registry: MushafVisualRegistry) {
   const surahs = new Set<number>();
   const verses = new Set<string>();
   for (const page of registry.pages) {
-    if (!page.url.startsWith("/manus-storage/") || page.verses.length === 0 || page.zones.length === 0) return false;
+    if (!page.url.startsWith("/storage/") || page.verses.length === 0 || page.zones.length === 0) return false;
     const pageVerses = new Set<string>();
     for (const [surah, ayah] of page.verses) {
       if (!Number.isInteger(surah) || surah < 1 || surah > MUSHAF_SURAH_COUNT || !Number.isInteger(ayah) || ayah < 1) return false;
@@ -98,7 +98,7 @@ export function validateMushafVisualManifest(manifest: MushafVisualManifest) {
   const verses = new Set<string>();
   for (let pageNumber = 1; pageNumber <= MUSHAF_PAGE_COUNT; pageNumber += 1) if (!pages.has(pageNumber)) return false;
   for (const page of manifest.pages) {
-    if (!page.url.startsWith("/manus-storage/") || !page.zonesUrl.startsWith("/manus-storage/") || page.verses.length === 0) return false;
+    if (!page.url.startsWith("/storage/") || !page.zonesUrl.startsWith("/storage/") || page.verses.length === 0) return false;
     for (const [surah, ayah] of page.verses) {
       if (!Number.isInteger(surah) || surah < 1 || surah > MUSHAF_SURAH_COUNT || !Number.isInteger(ayah) || ayah < 1) return false;
       surahs.add(surah);

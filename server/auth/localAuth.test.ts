@@ -56,25 +56,15 @@ describe("auth.providers", () => {
   const original = { ...ENV };
   afterEach(() => Object.assign(ENV, original));
 
-  it("الوضع الافتراضي محلي بلا Manus", async () => {
-    Object.assign(ENV, { authProvider: "local", oAuthServerUrl: "", allowSignup: true });
-    expect(await appRouter.createCaller(publicCtx()).auth.providers()).toEqual({ local: true, manus: false, allowSignup: true });
-  });
-
-  it("الوضع الهجين يظهر زر Manus فقط إن كان OAUTH_SERVER_URL مضبوطاً", async () => {
-    Object.assign(ENV, { authProvider: "hybrid", oAuthServerUrl: "https://api.manus.im", allowSignup: false });
-    expect(await appRouter.createCaller(publicCtx()).auth.providers()).toEqual({ local: true, manus: true, allowSignup: false });
-    Object.assign(ENV, { oAuthServerUrl: "" });
-    expect((await appRouter.createCaller(publicCtx()).auth.providers()).manus).toBe(false);
-  });
-
-  it("وضع manus يرفض الدخول المحلي", async () => {
-    Object.assign(ENV, { authProvider: "manus", oAuthServerUrl: "https://api.manus.im" });
-    await expect(appRouter.createCaller(publicCtx()).auth.login({ email: "a@b.co", password: "Quran1234" })).rejects.toThrow("غير مفعّل");
+  it("صفحة الدخول تعرض البريد وكلمة المرور، والتسجيل حسب ALLOW_SIGNUP", async () => {
+    Object.assign(ENV, { allowSignup: true });
+    expect(await appRouter.createCaller(publicCtx()).auth.providers()).toEqual({ local: true, allowSignup: true });
+    Object.assign(ENV, { allowSignup: false });
+    expect(await appRouter.createCaller(publicCtx()).auth.providers()).toEqual({ local: true, allowSignup: false });
   });
 
   it("إغلاق التسجيل يرفض الحسابات الجديدة لغير المالك", async () => {
-    Object.assign(ENV, { authProvider: "local", allowSignup: false, ownerEmail: "owner@tarteel.app" });
+    Object.assign(ENV, { allowSignup: false, ownerEmail: "owner@tarteel.app" });
     await expect(appRouter.createCaller(publicCtx()).auth.register({ name: "زائر", email: "x@y.co", password: "Quran1234" })).rejects.toThrow("مغلق");
   });
 
@@ -100,12 +90,10 @@ describe("الكوكي والتخزين", () => {
     expect(resolveLocalPath("")).toBeNull();
   });
 
-  it("يختار المحرك تلقائياً: S3 إن ضُبط، ثم Manus، ثم القرص المحلي", () => {
+  it("يختار المحرك تلقائياً: S3 إن ضُبط، وإلا القرص المحلي", () => {
     const original = { ...ENV };
-    Object.assign(ENV, { storageDriver: "", s3Bucket: "", forgeApiUrl: "", forgeApiKey: "" });
+    Object.assign(ENV, { storageDriver: "", s3Bucket: "" });
     expect(getStorageDriver()).toBe("local");
-    Object.assign(ENV, { forgeApiUrl: "https://forge", forgeApiKey: "k" });
-    expect(getStorageDriver()).toBe("manus");
     Object.assign(ENV, { s3Bucket: "tarteel" });
     expect(getStorageDriver()).toBe("s3");
     Object.assign(ENV, { storageDriver: "local" });

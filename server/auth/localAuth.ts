@@ -1,6 +1,6 @@
 /**
  * الدخول المحلي لترتيل: بريد + كلمة مرور، وجلسة JWT في كوكي httpOnly.
- * لا يعتمد على Manus ولا على أي خدمة بريد أو نطاق؛ يعمل على أي استضافة Node + MySQL.
+ * لا يعتمد على أي خدمة خارجية أو بريد أو نطاق؛ يعمل على أي استضافة Node + MySQL.
  */
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { TRPCError } from "@trpc/server";
@@ -9,7 +9,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { localCredentials, passwordSetupTokens, users, type User } from "../../drizzle/schema";
 import { getSessionCookieOptions } from "../_core/cookies";
-import { ENV, isLocalAuthEnabled, isManusOAuthEnabled } from "../_core/env";
+import { ENV } from "../_core/env";
 import { sdk } from "../_core/sdk";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import type { TrpcContext } from "../_core/context";
@@ -41,10 +41,6 @@ async function requireDb() {
   const database = await db.getDb();
   if (!database) throw fail("INTERNAL_SERVER_ERROR", "قاعدة البيانات غير متاحة");
   return database;
-}
-
-function assertLocalEnabled() {
-  if (!isLocalAuthEnabled()) throw fail("FORBIDDEN", "الدخول بالبريد وكلمة المرور غير مفعّل في هذا الخادم");
 }
 
 function assertPolicy(password: string) {
@@ -134,21 +130,19 @@ export async function createPasswordSetupToken(userId: number, createdBy: number
 export const localAuthRouter = {
   /** ما تعرضه صفحة الدخول. */
   providers: publicProcedure.query(() => ({
-    local: isLocalAuthEnabled(),
-    manus: isManusOAuthEnabled(),
-    allowSignup: isLocalAuthEnabled() && ENV.allowSignup,
+    local: true,
+    allowSignup: ENV.allowSignup,
   })),
 
   register: publicProcedure
     .input(z.object({ name: z.string().trim().min(2, "الاسم قصير جداً").max(120), email: emailSchema, password: passwordSchema }))
     .mutation(async ({ ctx, input }) => {
-      assertLocalEnabled();
       const email = normalizeEmail(input.email);
       const isOwner = Boolean(ENV.ownerEmail) && email === ENV.ownerEmail;
       if (!ENV.allowSignup && !isOwner) throw fail("FORBIDDEN", "إنشاء الحسابات مغلق؛ اطلب من إدارة المركز رابط تفعيل");
       if (!consumeRateLimit(`register:${clientKey(ctx)}`)) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
       assertPolicy(input.password);
-      // لا نربط تلقائياً بحساب قديم يحمل البريد نفسه (مثل حساب Manus) لأن البريد غير مُتحقق منه؛
+      // لا نربط تلقائياً بحساب قديم يحمل البريد نفسه (مثل حساب أُنشئ بنظام الدخول السابق) لأن البريد غير مُتحقق منه؛
       // صاحب الحساب القديم يعيّن كلمة مروره من الإعدادات أو برابط من المدير.
       if (await findCredentialByEmail(email)) throw fail("CONFLICT", "يوجد حساب مسجّل بهذا البريد. سجّل الدخول بدلاً من ذلك");
       const database = await requireDb();
@@ -163,7 +157,6 @@ export const localAuthRouter = {
   login: publicProcedure
     .input(z.object({ email: emailSchema, password: passwordSchema }))
     .mutation(async ({ ctx, input }) => {
-      assertLocalEnabled();
       const email = normalizeEmail(input.email);
       if (!consumeRateLimit(`login:${clientKey(ctx)}`)) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول بعد ربع ساعة");
       const credential = await findCredentialByEmail(email);
@@ -200,7 +193,7 @@ export const localAuthRouter = {
     return { hasPassword: Boolean(credential), email: credential?.email ?? ctx.user.email ?? null };
   }),
 
-  /** تعيين/تغيير كلمة المرور من داخل الجلسة — مسار الانتقال الأساسي لمستخدمي Manus الحاليين. */
+  /** تعيين/تغيير كلمة المرور من داخل الجلسة — وهو أيضاً مسار المستخدمين القدامى لتعيين أول كلمة مرور. */
   setPassword: protectedProcedure
     .input(z.object({ email: emailSchema.optional(), currentPassword: passwordSchema.optional(), newPassword: passwordSchema }))
     .mutation(async ({ ctx, input }) => {
@@ -234,7 +227,6 @@ export const localAuthRouter = {
   completeSetup: publicProcedure
     .input(z.object({ token: z.string().trim().min(20).max(200), email: emailSchema.optional(), password: passwordSchema }))
     .mutation(async ({ ctx, input }) => {
-      assertLocalEnabled();
       if (!consumeRateLimit(`setup:${clientKey(ctx)}`)) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
       assertPolicy(input.password);
       const database = await requireDb();

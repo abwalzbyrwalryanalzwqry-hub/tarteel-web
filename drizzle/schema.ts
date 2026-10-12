@@ -460,7 +460,7 @@ export const auditLog = mysqlTable("audit_log", {
 export type AuditLog = typeof auditLog.$inferSelect;
 export type InsertAuditLog = typeof auditLog.$inferInsert;
 
-// ===================== LOCAL AUTH (مستقلة عن Manus) =====================
+// ===================== LOCAL AUTH (بريد وكلمة مرور) =====================
 /** بيانات الدخول المحلي: بريد + كلمة مرور مشفرة بـ scrypt. حساب واحد لكل مستخدم. */
 export const localCredentials = mysqlTable("local_credentials", {
   id: int("id").autoincrement().primaryKey(),
@@ -476,7 +476,7 @@ export const localCredentials = mysqlTable("local_credentials", {
 
 export type LocalCredential = typeof localCredentials.$inferSelect;
 
-/** روابط تعيين كلمة المرور لمرة واحدة: ينشئها المدير لمستخدم موجود (مثل حسابات Manus القديمة). */
+/** روابط تعيين كلمة المرور لمرة واحدة: ينشئها المدير لمستخدم موجود (مثل الحسابات القديمة بلا كلمة مرور). */
 export const passwordSetupTokens = mysqlTable("password_setup_tokens", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),

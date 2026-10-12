@@ -11,7 +11,7 @@ describe("نظام خطوط ترتيل المركزي", () => {
   it("يربط ملفات ثمانية شريف الرسمية بجميع الأوزان المتاحة من التخزين المعتمد", () => {
     expect(css).toContain('font-family: "Tarteel Serif Text"');
     for (const weight of ["Light", "Regular", "Medium", "Bold", "Black"]) {
-      expect(css).toContain(`/manus-storage/thmanyahseriftext-${weight}`);
+      expect(css).toContain(`/storage/thmanyahseriftext-${weight}`);
     }
     for (const weight of ["300", "400", "500", "700", "900"]) {
       expect(css).toContain(`font-weight: ${weight}`);

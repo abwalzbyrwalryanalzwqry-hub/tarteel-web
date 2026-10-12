@@ -17,7 +17,7 @@ function createAuthContext(): TrpcContext {
     openId: "ai-test-user",
     email: "teacher@tarteel.test",
     name: "معلم الاختبار",
-    loginMethod: "manus",
+    loginMethod: "password",
     role: "teacher",
     createdAt: new Date(),
     updatedAt: new Date(),

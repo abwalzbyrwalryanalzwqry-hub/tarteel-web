@@ -213,20 +213,18 @@ const normalizeToolChoice = (
 };
 
 /**
- * مزود الذكاء الاصطناعي: LLM_API_URL/LLM_API_KEY (أي خدمة متوافقة مع OpenAI) لها الأولوية،
- * وإلا Manus Forge إن وُجد. LLM_API_URL هو الجذر الذي يسبق /chat/completions،
- * مثل https://api.openai.com/v1 أو https://openrouter.ai/api/v1.
+ * مزود الذكاء الاصطناعي: أي خدمة متوافقة مع OpenAI عبر LLM_API_URL/LLM_API_KEY/LLM_MODEL.
+ * LLM_API_URL هو الجذر الذي يسبق /chat/completions، مثل https://api.openai.com/v1
+ * أو https://openrouter.ai/api/v1 أو http://localhost:11434/v1 (Ollama). الافتراضي OpenAI.
  */
 const llmBase = () => {
-  if (ENV.llmApiUrl) return ENV.llmApiUrl.replace(/\/+$/, "");
-  if (ENV.forgeApiUrl) return `${ENV.forgeApiUrl.replace(/\/+$/, "")}/v1`;
-  return "https://forge.manus.im/v1";
+  return (ENV.llmApiUrl || "https://api.openai.com/v1").replace(/\/+$/, "");
 };
-const llmKey = () => (ENV.llmApiUrl ? ENV.llmApiKey : ENV.forgeApiKey);
+const llmKey = () => ENV.llmApiKey;
 
 const resolveApiUrl = () => `${llmBase()}/chat/completions`;
 
-export const isLLMConfigured = () => Boolean(ENV.llmApiUrl ? ENV.llmApiKey || /localhost|127\.0\.0\.1/.test(ENV.llmApiUrl) : ENV.forgeApiKey);
+export const isLLMConfigured = () => Boolean(ENV.llmApiKey || /localhost|127\.0\.0\.1/.test(ENV.llmApiUrl));
 
 const assertApiKey = () => {
   if (!isLLMConfigured()) {

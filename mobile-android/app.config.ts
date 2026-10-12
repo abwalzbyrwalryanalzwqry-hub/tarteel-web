@@ -3,7 +3,7 @@ import type { ExpoConfig } from "expo/config";
 const config: ExpoConfig = {
   name: "ترتيل",
   slug: "tarteel-android",
-  version: "0.1.0",
+  version: "0.2.0",
   orientation: "default",
   scheme: "tarteel",
   userInterfaceStyle: "automatic",
@@ -28,8 +28,9 @@ const config: ExpoConfig = {
     "expo-secure-store"
   ],
   extra: {
-    architecture: "local-first",
-    remoteSync: "typed-adapter-required"
+    // عنوان المنصة الافتراضي يُحدَّد وقت البناء: TARTEEL_SERVER_URL=https://tarteel.example.org
+    // ويمكن للمستخدم تغييره من شاشة الإعدادات. إن تُرك فارغاً يطلب التطبيق العنوان عند أول تشغيل.
+    defaultServerUrl: process.env.TARTEEL_SERVER_URL || ""
   }
 };
 

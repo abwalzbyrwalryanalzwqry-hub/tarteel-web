@@ -555,8 +555,10 @@
 - [x] توحيد نسخة pnpm في Android Native workflow مع packageManager بعد ظهور ERR_PNPM_BAD_PM_VERSION
 - [x] حذف mobile-android/pnpm-workspace.yaml غير المكتمل الذي أوقف التثبيت بخطأ `packages field missing or empty` (السبب الفعلي لفشل البناء)
 - [x] إصلاح بناء أندرويد: تحرير مساحة القرص في CI، وإعداد NativeWind v4 وbabel-preset-expo وأصل نص Tanzil
-- [x] إضافة دخول مستقل بالبريد وكلمة المرور، وتخزين محلي/S3، وخطة النقل خارج Manus (docs/manus-exit-plan-ar.md)
+- [x] إضافة دخول مستقل بالبريد وكلمة المرور، وتخزين محلي/S3، ودليل التشغيل على خادم مستقل (docs/self-hosting-ar.md)
 
 ## صيانة المستودع
 - [x] إخراج حزمة APK التجريبية من المستودع (محفوظة في الوسم `archive/android-wrapper-debug-apk` وفي آثار `build-apk.yml`) ومنع حفظ ملفات APK وAAB مستقبلاً
 - [x] تقسيم `server/db.ts` (1378 سطراً) إلى 23 وحدة في `server/data/` بنقل حرفي، مع إبقاء `./db` واجهةً موحّدة
+
+- [x] إزالة كل اعتماد على Manus من الكود: OAuth وForge (تخزين/ذكاء/إشعارات/خرائط) وإضافات Vite والغلاف القديم؛ مسار الملفات /storage/

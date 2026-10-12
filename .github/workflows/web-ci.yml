@@ -9,13 +9,11 @@ on:
     branches: [main]
     paths-ignore:
       - "mobile-android/**"
-      - "android-wrapper/**"
       - "docs/**"
       - "**/*.md"
   pull_request:
     paths-ignore:
       - "mobile-android/**"
-      - "android-wrapper/**"
       - "docs/**"
       - "**/*.md"
   workflow_dispatch:

@@ -1,4 +1,4 @@
-# ترتيل — صورة إنتاج مستقلة عن Manus (Node 20 + pnpm)
+# ترتيل — صورة إنتاج (Node 20 + pnpm)
 FROM node:20-bookworm-slim AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@10.4.1 --activate
@@ -6,7 +6,7 @@ COPY package.json pnpm-lock.yaml ./
 COPY patches ./patches
 RUN pnpm install --frozen-lockfile
 COPY . .
-RUN DISABLE_MANUS_RUNTIME=1 pnpm build
+RUN pnpm build
 
 FROM node:20-bookworm-slim
 WORKDIR /app

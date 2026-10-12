@@ -11,7 +11,7 @@ function createAdminContext(): { ctx: TrpcContext; clearedCookies: any[] } {
     openId: "admin-user",
     email: "admin@tarteel.com",
     name: "مدير النظام",
-    loginMethod: "manus",
+    loginMethod: "password",
     role: "admin",
     createdAt: new Date(),
     updatedAt: new Date(),

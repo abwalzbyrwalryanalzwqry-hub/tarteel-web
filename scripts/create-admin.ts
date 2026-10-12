@@ -2,7 +2,7 @@
  * إنشاء المدير العام لترتيل أو إصدار رابط تعيين كلمة مرور لمستخدم موجود.
  *
  *   pnpm auth:create-admin --email you@example.com --name "اسمك" [--password ...]
- *   pnpm auth:setup-link --email old-user@example.com        # لمستخدم قديم (من Manus)
+ *   pnpm auth:setup-link --email old-user@example.com        # لمستخدم قديم بلا كلمة مرور
  *   pnpm auth:setup-link --user-id 42
  *
  * إن لم تُمرَّر --password تُولَّد كلمة مرور قوية وتُطبع مرة واحدة.
