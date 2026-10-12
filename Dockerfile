@@ -1,5 +1,5 @@
-# ترتيل — صورة إنتاج (Node 20 + pnpm)
-FROM node:20-bookworm-slim AS build
+# ترتيل — صورة إنتاج (Node 22 LTS + pnpm؛ Node 20 انتهى دعمه في 30 أبريل 2026)
+FROM node:22-bookworm-slim AS build
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@10.4.1 --activate
 COPY package.json pnpm-lock.yaml ./
@@ -8,7 +8,7 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
 
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production PORT=3000 STORAGE_DIR=/data/uploads
 RUN corepack enable && corepack prepare pnpm@10.4.1 --activate
