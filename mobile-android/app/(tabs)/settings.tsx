@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, T
 import { useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { DEFAULT_SERVER_URL, getServerUrl, normalizeServerUrl, probeServer, setServerUrl } from "../../src/config/server";
 import { colors } from "../../src/ui/theme";
 

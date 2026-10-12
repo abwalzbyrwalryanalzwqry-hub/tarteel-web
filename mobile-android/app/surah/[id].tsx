@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "
 import { router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { versesOfSurah, type LocalQuranVerse } from "../../src/quran/localQuran";
 import { stripBasmala, surahName, toArabicDigits } from "../../src/quran/surahs";
 import { useLocalQuran } from "../../src/quran/useLocalQuran";

@@ -6,7 +6,7 @@ import { WebView, type WebViewMessageEvent, type WebViewNavigation } from "react
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import Constants from "expo-constants";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { getServerUrl } from "../../src/config/server";
 import { BRIDGE_SCRIPT, type BridgeMessage } from "../../src/web/bridge";
 import { useNetworkStatus } from "../../src/network/useNetworkStatus";
