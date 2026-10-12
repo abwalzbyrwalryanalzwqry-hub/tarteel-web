@@ -550,9 +550,12 @@
 - [ ] تجهيز GitHub Actions لـ Debug وRelease APK وRelease AAB والتوقيع الآمن
 - [ ] إعداد ANDROID-OFFLINE-RELEASE-REPORT.md بعد اكتمال الاختبارات الفعلية
 
-- [ ] إصلاح ترتيب إعداد pnpm وNode في Android Native workflow بعد فشل CI في Setup Node
+- [x] إصلاح ترتيب إعداد pnpm وNode في Android Native workflow بعد فشل CI في Setup Node
 
-- [ ] توحيد نسخة pnpm في Android Native workflow مع packageManager بعد ظهور ERR_PNPM_BAD_PM_VERSION
+- [x] توحيد نسخة pnpm في Android Native workflow مع packageManager بعد ظهور ERR_PNPM_BAD_PM_VERSION
+- [x] حذف mobile-android/pnpm-workspace.yaml غير المكتمل الذي أوقف التثبيت بخطأ `packages field missing or empty` (السبب الفعلي لفشل البناء)
+- [x] إصلاح بناء أندرويد: تحرير مساحة القرص في CI، وإعداد NativeWind v4 وbabel-preset-expo وأصل نص Tanzil
+- [x] إضافة دخول مستقل بالبريد وكلمة المرور، وتخزين محلي/S3، وخطة النقل خارج Manus (docs/manus-exit-plan-ar.md)
 
 ## صيانة المستودع
 - [x] إخراج حزمة APK التجريبية من المستودع (محفوظة في الوسم `archive/android-wrapper-debug-apk` وفي آثار `build-apk.yml`) ومنع حفظ ملفات APK وAAB مستقبلاً
