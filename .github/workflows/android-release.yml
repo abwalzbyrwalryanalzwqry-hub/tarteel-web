@@ -41,23 +41,23 @@ jobs:
           df -h /
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Normalize version name
         run: echo "ANDROID_VERSION_NAME=${ANDROID_VERSION_NAME#android-v}" >> "$GITHUB_ENV"
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
           cache: gradle
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -72,7 +72,7 @@ jobs:
           ./node_modules/.bin/vitest run --config vitest.config.ts
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           packages: platform-tools
 
@@ -116,7 +116,7 @@ jobs:
           for f in "$RUNNER_TEMP"/apks/*.apk; do "$BT/apksigner" verify --print-certs "$f" | head -2; done
 
       - name: Upload release artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tarteel-android-${{ env.ANDROID_VERSION_NAME }}-${{ github.run_number }}
           if-no-files-found: error
