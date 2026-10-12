@@ -60,6 +60,11 @@ jobs:
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      # يفشل عند ثغرة عالية أو حرجة جديدة. الاستثناءات الموثقة في SECURITY-DEPENDENCIES.md
+      # (pnpm.auditConfig.ignoreGhsas) أدوات بناء بلا إصدار مصلح، أو مرقّعة محلياً.
+      - name: Dependency audit
+        run: pnpm audit --audit-level=high
+
       - name: Typecheck
         run: ./node_modules/.bin/tsc --noEmit
 
