@@ -1,7 +1,9 @@
 import "../global.css";
 import { Stack } from "expo-router";
+import { StatusBar } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { I18nManager } from "react-native";
+import { colors } from "../src/ui/theme";
 
 if (!I18nManager.isRTL) {
   I18nManager.allowRTL(true);
@@ -11,8 +13,10 @@ if (!I18nManager.isRTL) {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <Stack screenOptions={{ headerShown: false }}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="surah/[id]" options={{ animation: "slide_from_left" }} />
       </Stack>
     </SafeAreaProvider>
   );

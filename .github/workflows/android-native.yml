@@ -18,6 +18,8 @@ env:
   # الهواتف الحقيقية فقط؛ x86/x86_64 للمحاكيات وتضاعف حجم البناء الأصلي (C++)
   # وكانت سبب نفاد مساحة القرص في خادم GitHub عند بناء نسخة الإصدار.
   ORG_GRADLE_PROJECT_reactNativeArchitectures: armeabi-v7a,arm64-v8a
+  # عنوان منصة ترتيل الافتراضي داخل التطبيق (متغير مستودع: Settings ← Variables ← TARTEEL_SERVER_URL)
+  TARTEEL_SERVER_URL: ${{ vars.TARTEEL_SERVER_URL }}
 
 jobs:
   verify-and-build-debug:

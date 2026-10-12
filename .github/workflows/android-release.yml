@@ -21,6 +21,8 @@ defaults:
 
 env:
   ORG_GRADLE_PROJECT_reactNativeArchitectures: armeabi-v7a,arm64-v8a
+  # عنوان منصة ترتيل الافتراضي داخل التطبيق (متغير مستودع: Settings ← Variables ← TARTEEL_SERVER_URL)
+  TARTEEL_SERVER_URL: ${{ vars.TARTEEL_SERVER_URL }}
   # رقم متزايد تلقائياً؛ Google Play يرفض تكرار versionCode.
   ANDROID_VERSION_CODE: ${{ github.run_number }}
   ANDROID_VERSION_NAME: ${{ inputs.version_name || github.ref_name }}
