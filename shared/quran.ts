@@ -5,7 +5,7 @@ export type QuranVerse = {
 };
 
 export const TANZIL_UTHMANI_SOURCE_URL = "https://tanzil.net/download/";
-export const QURAN_TEXT_ASSET_URL = "/manus-storage/tanzil-uthmani_6fa64a0a.txt";
+export const QURAN_TEXT_ASSET_URL = "/storage/tanzil-uthmani_6fa64a0a.txt";
 const CACHE_KEY = "tarteel:quran:uthmani:v1";
 
 export function parseTanzilUthmaniText(raw: string): QuranVerse[] {

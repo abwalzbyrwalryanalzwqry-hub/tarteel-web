@@ -2,7 +2,7 @@ import { type MushafVisualManifest, type MushafVisualPageData, validateMushafPag
 
 const MANIFEST_SCRIPT_ID = "tarteel-mushaf-page-manifest";
 const PAGE_SCRIPT_PREFIX = "tarteel-mushaf-page-data-";
-export const MUSHAF_MANIFEST_URL = "/manus-storage/mushaf-page-manifest_d0219729.js";
+export const MUSHAF_MANIFEST_URL = "/storage/mushaf-page-manifest_d0219729.js";
 
 declare global {
   interface Window {

@@ -1,4 +1,4 @@
-export const TAFSIR_MANIFEST_URL = "/manus-storage/tafsir-manifest_86958e1c.json";
+export const TAFSIR_MANIFEST_URL = "/storage/tafsir-manifest_86958e1c.json";
 
 import { QURAN_STUDY_PAGE_COUNT, validateQuranStudyPage, type QuranStudyPage, type QuranStudyVerse, type QuranWordMeaning } from "../../../shared/quranStudy";
 

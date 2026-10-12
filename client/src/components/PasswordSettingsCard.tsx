@@ -3,7 +3,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 
-/** تعيين/تغيير كلمة المرور للدخول المحلي — يستخدمه مستخدمو Manus الحاليون قبل النقل. */
+/** تعيين/تغيير كلمة المرور للدخول بالبريد. */
 export function PasswordSettingsCard() {
   const utils = trpc.useUtils();
   const { data } = trpc.auth.myCredential.useQuery();

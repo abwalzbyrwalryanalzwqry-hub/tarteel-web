@@ -1,6 +1,5 @@
-import { clearPendingOAuthLoginAttempt, startManusLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { BookOpen, KeyRound, LogIn, Mail, Star, UserPlus } from "lucide-react";
+import { BookOpen, KeyRound, LogIn, Star, UserPlus } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -28,11 +27,6 @@ export default function LoginPage() {
     if (mode === "login") loginMutation.mutate({ email, password });
     else registerMutation.mutate({ name, email, password });
   };
-  const oauthStateFailed = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("authError") === "oauth_state";
-
-  useEffect(() => {
-    if (oauthStateFailed) clearPendingOAuthLoginAttempt();
-  }, [oauthStateFailed]);
   const [switchAccount] = useState(() => {
     try { return sessionStorage.getItem("tarteel-switch-account") === "1"; } catch { return false; }
   });
@@ -75,13 +69,7 @@ export default function LoginPage() {
           {switchAccount && (
             <div className="mb-5 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-right text-xs leading-6 text-muted-foreground">
               <p className="font-semibold text-foreground">تم تسجيل خروجك من ترتيل.</p>
-              <p className="mt-1">إذا عاد موفر المصادقة بالحساب نفسه، فهذه جلسة خارجية مستقلة. لاستخدام حساب آخر افتح ترتيل في نافذة خاصة أو ملف متصفح مختلف، ثم سجّل الدخول بالحساب الثاني هناك.</p>
-            </div>
-          )}
-
-          {oauthStateFailed && (
-            <div className="mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-right text-xs leading-6 text-foreground">
-              انتهت محاولة الدخول السابقة أو تغيّرت نافذة المتصفح. اضغط زر الدخول مرة واحدة لإعادة المحاولة من هذه الصفحة.
+              <p className="mt-1">يمكنك الآن الدخول بحساب آخر ببريده وكلمة مروره.</p>
             </div>
           )}
 
@@ -129,21 +117,6 @@ export default function LoginPage() {
               </button>
               <p className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground"><KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0"/>نسيت كلمة المرور؟ اطلب من إدارة المركز رابط تعيين كلمة مرور جديدة.</p>
             </form>
-          )}
-
-          {providers?.manus && (
-            <>
-              <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
-                <span className="h-px flex-1 bg-border" />
-                أو
-                <span className="h-px flex-1 bg-border" />
-              </div>
-              <button onClick={() => startManusLogin()} className="w-full rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm font-semibold text-foreground flex items-center justify-center gap-2 hover:bg-muted/70">
-                <Mail className="w-5 h-5"/>
-                الدخول بالطريقة السابقة (Manus)
-              </button>
-              <p className="mt-2 text-xs text-muted-foreground">بعد الدخول، عيّن كلمة مرور من «الإعدادات» لتستمر في الدخول بعد نقل المنصة.</p>
-            </>
           )}
 
           <p className="text-xs text-muted-foreground mt-4">

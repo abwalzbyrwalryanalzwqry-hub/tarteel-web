@@ -1,19 +1,29 @@
 /**
- * نسخ كل ملفات /manus-storage/ (صفحات المصحف SVG ومناطق الآيات، التفسير، نص التنزيل،
- * الخطوط، شعارات المراكز) من النسخة المنشورة على Manus إلى مجلد محلي، لتُخدم من خادمك.
+ * نسخ ملفات التخزين (صفحات المصحف SVG ومناطق الآيات، التفسير، نص التنزيل، الخطوط، شعارات المراكز)
+ * من نسخة ترتيل منشورة إلى مجلد التخزين المحلي، لتُخدم من خادمك تحت /storage/.
  *
- *   pnpm assets:export --from https://tarteel-qura-8kmxg5hu.manus.space [--out ./data/uploads] [--keys-file keys.txt]
+ *   pnpm assets:import --from https://old-tarteel.example [--source-prefix /storage/] [--out ./data/uploads] [--keys-file keys.txt]
  *
+ * - --source-prefix: مسار الملفات في الخادم المصدر إن اختلف عن /storage/ (في الاستضافة القديمة
+ *   كان مسار الملفات مختلفاً؛ مرّره هنا). تُعاد كتابة الروابط داخل ملفات JSON/JS/CSS إلى /storage/.
  * - يكتشف الملفات تلقائياً بدءاً من المراجع في الكود ثم يتتبع الروابط داخل ملفات JSON/JS/CSS.
- * - يتخطى الملفات الموجودة مسبقاً (يمكن إعادة تشغيله بأمان بعد انقطاع).
+ * - يتخطى الملفات الموجودة مسبقاً (يمكن إعادة تشغيله بأمان بعد انقطاع)، ويصحح روابطها إن لزم.
  * - --keys-file: مفاتيح إضافية (سطر لكل مفتاح)، مثل logoKey من جدولي centers وreporting_preferences:
  *     SELECT logoKey FROM centers WHERE logoKey IS NOT NULL UNION SELECT logoKey FROM reporting_preferences WHERE logoKey IS NOT NULL;
  */
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-const PREFIX = "/manus-storage/";
-const REF = /\/manus-storage\/([A-Za-z0-9_.\-/%]+)/g;
+const PREFIX = "/storage/";
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+const normalizePrefix = (value: string) => `/${value.replace(/^\/+|\/+$/g, "")}/`;
+const SOURCE_PREFIX = normalizePrefix(arg("source-prefix", PREFIX)!);
+const REF = new RegExp(`(?:${escapeRegExp(PREFIX)}|${escapeRegExp(SOURCE_PREFIX)})([A-Za-z0-9_.\\-/%]+)`, "g");
+const rewrite = (buffer: Buffer) => {
+  if (SOURCE_PREFIX === PREFIX) return buffer;
+  const text = buffer.toString("utf8");
+  return text.includes(SOURCE_PREFIX) ? Buffer.from(text.split(SOURCE_PREFIX).join(PREFIX)) : buffer;
+};
 const TEXT_EXT = new Set([".js", ".json", ".css", ".html"]);
 const SOURCE_DIRS = ["client", "shared", "server"];
 const SOURCE_EXT = new Set([".ts", ".tsx", ".css", ".html", ".js", ".json"]);
@@ -44,7 +54,7 @@ function extractKeys(text: string) {
 
 async function main() {
   const from = arg("from")?.replace(/\/+$/, "");
-  if (!from) throw new Error("--from مطلوب (رابط ترتيل المنشور على Manus)");
+  if (!from) throw new Error("--from مطلوب (رابط نسخة ترتيل المصدر)");
   const out = path.resolve(arg("out", process.env.STORAGE_DIR ?? "./data/uploads")!);
   const concurrency = Number(arg("concurrency", "8"));
   await fs.mkdir(out, { recursive: true });
@@ -57,7 +67,7 @@ async function main() {
     }
   }
   const keysFile = arg("keys-file");
-  if (keysFile) for (const line of (await fs.readFile(keysFile, "utf8")).split(/\r?\n/)) if (line.trim()) queue.add(line.trim().replace(/^\/?manus-storage\//, ""));
+  if (keysFile) for (const line of (await fs.readFile(keysFile, "utf8")).split(/\r?\n/)) if (line.trim()) queue.add(line.trim().replace(/^\/+/, "").replace(SOURCE_PREFIX.slice(1), "").replace(PREFIX.slice(1), ""));
 
   const done = new Set<string>();
   const failed: string[] = [];
@@ -70,13 +80,18 @@ async function main() {
     const exists = await fs.stat(target).then((s) => s.isFile() && s.size > 0).catch(() => false);
     if (exists) {
       skipped++;
-      if (TEXT_EXT.has(path.extname(key))) content = await fs.readFile(target);
+      if (TEXT_EXT.has(path.extname(key))) {
+        const original = await fs.readFile(target);
+        content = rewrite(original);
+        if (content !== original) await fs.writeFile(target, content);
+      }
     } else {
       for (let attempt = 1; attempt <= 3 && !content; attempt++) {
         try {
-          const res = await fetch(`${from}${PREFIX}${encodeURI(key)}`, { redirect: "follow" });
+          const res = await fetch(`${from}${SOURCE_PREFIX}${encodeURI(key)}`, { redirect: "follow" });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           content = Buffer.from(await res.arrayBuffer());
+          if (TEXT_EXT.has(path.extname(key))) content = rewrite(content);
         } catch (error) {
           if (attempt === 3) { failed.push(`${key} (${(error as Error).message})`); return; }
           await new Promise((r) => setTimeout(r, 800 * attempt));
