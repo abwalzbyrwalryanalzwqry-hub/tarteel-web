@@ -2,7 +2,15 @@ import { OAUTH_STATE_COOKIE, encodeOAuthState, isOAuthLoginAttemptLocked } from 
 
 export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
-// Start the Manus OAuth login. Call this from an event handler or effect at the
+// صفحة الدخول الموحدة لترتيل (بريد وكلمة مرور، وزر Manus اختياري أثناء الانتقال).
+export const LOGIN_PATH = "/login";
+export const startLogin = () => {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname === LOGIN_PATH) return;
+  window.location.href = LOGIN_PATH;
+};
+
+// Start the Manus OAuth login (transition mode only). Call this from an event handler or effect at the
 // moment you want to navigate, e.g. `onClick={() => startLogin()}`.
 //
 // It has SIDE EFFECTS — it mints a one-time nonce, writes the __Host- state
@@ -12,7 +20,7 @@ export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 // call would desync it from an in-flight login and the callback would reject it
 // with "invalid oauth state". It returns void by design, so there is no URL to
 // stash across renders.
-export const startLogin = () => {
+export const startManusLogin = () => {
   // Several unauthenticated queries can fail together on mobile. Keep the first
   // navigation authoritative so a second call cannot overwrite its nonce cookie.
   try {

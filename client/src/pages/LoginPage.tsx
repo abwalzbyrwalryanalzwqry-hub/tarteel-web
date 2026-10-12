@@ -1,7 +1,7 @@
-import { clearPendingOAuthLoginAttempt, startLogin } from "@/const";
+import { clearPendingOAuthLoginAttempt, startManusLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { BookOpen, Chrome, Mail, Star } from "lucide-react";
-import { useEffect, useState } from "react";
+import { BookOpen, KeyRound, LogIn, Mail, Star, UserPlus } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -13,6 +13,21 @@ export default function LoginPage() {
   const { isAuthenticated, loading } = useAuth();
   const { data: memberships, isLoading: membershipsLoading } = trpc.access.mine.useQuery(undefined, { enabled: isAuthenticated });
   const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
+  const { data: providers } = trpc.auth.providers.useQuery(undefined, { staleTime: 5 * 60_000 });
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const onAuthSuccess = async () => { setPassword(""); try { sessionStorage.removeItem("tarteel-switch-account"); } catch {} await utils.auth.me.invalidate(); };
+  const loginMutation = trpc.auth.login.useMutation({ onSuccess: onAuthSuccess, onError: (e) => toast.error(e.message) });
+  const registerMutation = trpc.auth.register.useMutation({ onSuccess: async () => { toast.success("تم إنشاء حسابك"); await onAuthSuccess(); }, onError: (e) => toast.error(e.message) });
+  const busy = loginMutation.isPending || registerMutation.isPending;
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (mode === "login") loginMutation.mutate({ email, password });
+    else registerMutation.mutate({ name, email, password });
+  };
   const oauthStateFailed = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("authError") === "oauth_state";
 
   useEffect(() => {
@@ -85,27 +100,51 @@ export default function LoginPage() {
             ))}
           </div>
 
-          {/* الدخول المربوط فعلياً بموفر المصادقة الحالي */}
-          <button
-            onClick={() => startLogin()}
-            className="btn-gold w-full text-base py-3 flex items-center justify-center gap-2"
-          >
-            <Mail className="w-5 h-5"/>
-            الدخول الآمن إلى ترتيل
-          </button>
+          {providers?.local !== false && (
+            <form onSubmit={submit} className="space-y-3 text-right" noValidate>
+              {providers?.allowSignup && (
+                <div className="mb-2 grid grid-cols-2 gap-1 rounded-xl bg-muted/40 p-1 text-sm" role="tablist">
+                  <button type="button" role="tab" aria-selected={mode === "login"} onClick={() => setMode("login")} className={`rounded-lg py-2 font-semibold transition-colors ${mode === "login" ? "bg-background text-foreground shadow" : "text-muted-foreground"}`}>تسجيل الدخول</button>
+                  <button type="button" role="tab" aria-selected={mode === "register"} onClick={() => setMode("register")} className={`rounded-lg py-2 font-semibold transition-colors ${mode === "register" ? "bg-background text-foreground shadow" : "text-muted-foreground"}`}>حساب جديد</button>
+                </div>
+              )}
+              {mode === "register" && (
+                <label className="block text-sm">
+                  <span className="mb-1 block font-medium text-foreground">الاسم الكامل</span>
+                  <input required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 outline-none focus:border-primary" />
+                </label>
+              )}
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium text-foreground">البريد الإلكتروني</span>
+                <input required type="email" dir="ltr" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium text-foreground">كلمة المرور</span>
+                <input required type="password" dir="ltr" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
+                {mode === "register" && <span className="mt-1 block text-xs text-muted-foreground">8 أحرف على الأقل وتحتوي على حروف وأرقام.</span>}
+              </label>
+              <button type="submit" disabled={busy} className="btn-gold w-full text-base py-3 flex items-center justify-center gap-2 disabled:opacity-60">
+                {mode === "login" ? <LogIn className="w-5 h-5"/> : <UserPlus className="w-5 h-5"/>}
+                {busy ? "جارٍ التحقق…" : mode === "login" ? "الدخول إلى ترتيل" : "إنشاء الحساب"}
+              </button>
+              <p className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground"><KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0"/>نسيت كلمة المرور؟ اطلب من إدارة المركز رابط تعيين كلمة مرور جديدة.</p>
+            </form>
+          )}
 
-          <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="h-px flex-1 bg-border" />
-            أو
-            <span className="h-px flex-1 bg-border" />
-          </div>
-
-          <button disabled aria-describedby="google-auth-status" className="w-full cursor-not-allowed rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm font-semibold text-muted-foreground flex items-center justify-center gap-2">
-            <Chrome className="w-5 h-5 text-blue-600"/>
-            التسجيل بحساب Google — غير مفعّل بعد
-          </button>
-
-          <p id="google-auth-status" className="mt-3 text-xs text-muted-foreground">يتطلب Google بيانات OAuth مستقلة واختبار تحويل حقيقياً قبل تفعيله بصورة آمنة.</p>
+          {providers?.manus && (
+            <>
+              <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="h-px flex-1 bg-border" />
+                أو
+                <span className="h-px flex-1 bg-border" />
+              </div>
+              <button onClick={() => startManusLogin()} className="w-full rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm font-semibold text-foreground flex items-center justify-center gap-2 hover:bg-muted/70">
+                <Mail className="w-5 h-5"/>
+                الدخول بالطريقة السابقة (Manus)
+              </button>
+              <p className="mt-2 text-xs text-muted-foreground">بعد الدخول، عيّن كلمة مرور من «الإعدادات» لتستمر في الدخول بعد نقل المنصة.</p>
+            </>
+          )}
 
           <p className="text-xs text-muted-foreground mt-4">
             بتسجيل الدخول، أنت توافق على شروط الاستخدام وسياسة الخصوصية

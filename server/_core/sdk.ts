@@ -6,7 +6,7 @@ import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
-import { ENV } from "./env";
+import { ENV, isManusOAuthEnabled } from "./env";
 import type {
   ExchangeTokenRequest,
   ExchangeTokenResponse,
@@ -30,8 +30,8 @@ const GET_USER_INFO_WITH_JWT_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserI
 
 class OAuthService {
   constructor(private client: ReturnType<typeof axios.create>) {
-    console.log("[OAuth] Initialized with baseURL:", ENV.oAuthServerUrl);
-    if (!ENV.oAuthServerUrl) {
+    if (isManusOAuthEnabled()) console.log("[OAuth] Manus OAuth enabled:", ENV.oAuthServerUrl);
+    if (ENV.authProvider === "manus" && !ENV.oAuthServerUrl) {
       console.error(
         "[OAuth] ERROR: OAUTH_SERVER_URL is not configured! Set OAUTH_SERVER_URL environment variable."
       );
@@ -214,7 +214,7 @@ class SDKServer {
       if (
         !isNonEmptyString(openId) ||
         !isNonEmptyString(appId) ||
-        !isNonEmptyString(name)
+        typeof name !== "string"
       ) {
         console.warn("[Auth] Session payload missing required fields");
         return null;
@@ -277,6 +277,7 @@ class SDKServer {
     }
 
     if (session.openId.startsWith(CRON_OPEN_ID_PREFIX)) {
+      if (!isManusOAuthEnabled()) throw ForbiddenError("Cron sessions require Manus");
       const userInfo = await this.getUserInfoWithJwt(sessionToken ?? "");
       const taskUid = userInfo.taskUid ?? null;
       if (!taskUid) {
@@ -289,8 +290,8 @@ class SDKServer {
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // If user not in DB, sync from OAuth server automatically
-    if (!user) {
+    // If user not in DB, sync from OAuth server automatically (Manus mode only).
+    if (!user && isManusOAuthEnabled() && !sessionUserId.startsWith("local_")) {
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionToken ?? "");
         await db.upsertUser({
@@ -309,6 +310,9 @@ class SDKServer {
 
     if (!user) {
       throw ForbiddenError("User not found");
+    }
+    if (user.deletedAt || !user.isActive) {
+      throw ForbiddenError("User is not active");
     }
 
     await db.upsertUser({

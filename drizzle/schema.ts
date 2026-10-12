@@ -459,3 +459,32 @@ export const auditLog = mysqlTable("audit_log", {
 
 export type AuditLog = typeof auditLog.$inferSelect;
 export type InsertAuditLog = typeof auditLog.$inferInsert;
+
+// ===================== LOCAL AUTH (مستقلة عن Manus) =====================
+/** بيانات الدخول المحلي: بريد + كلمة مرور مشفرة بـ scrypt. حساب واحد لكل مستخدم. */
+export const localCredentials = mysqlTable("local_credentials", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
+  failedAttempts: int("failedAttempts").default(0).notNull(),
+  lockedUntil: timestamp("lockedUntil"),
+  passwordChangedAt: timestamp("passwordChangedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [uniqueIndex("local_credentials_email_unique").on(table.email), uniqueIndex("local_credentials_user_unique").on(table.userId)]);
+
+export type LocalCredential = typeof localCredentials.$inferSelect;
+
+/** روابط تعيين كلمة المرور لمرة واحدة: ينشئها المدير لمستخدم موجود (مثل حسابات Manus القديمة). */
+export const passwordSetupTokens = mysqlTable("password_setup_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  tokenHash: varchar("tokenHash", { length: 128 }).notNull(),
+  createdBy: int("createdBy"),
+  expiresAt: timestamp("expiresAt").notNull(),
+  usedAt: timestamp("usedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [uniqueIndex("password_setup_tokens_hash_unique").on(table.tokenHash), index("password_setup_tokens_user_idx").on(table.userId)]);
+
+export type PasswordSetupToken = typeof passwordSetupTokens.$inferSelect;
