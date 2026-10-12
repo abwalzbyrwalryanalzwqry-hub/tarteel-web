@@ -38,20 +38,20 @@ jobs:
           df -h /
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
           cache: gradle
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
@@ -67,7 +67,7 @@ jobs:
         run: ./node_modules/.bin/vitest run --config vitest.config.ts
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           # الحزمة الافتراضية «tools» أُزيلت من مستودع Google فيفشل sdkmanager بها.
           packages: platform-tools
@@ -90,7 +90,7 @@ jobs:
         run: ./gradlew :app:assembleDebug :app:bundleDebug --no-daemon
 
       - name: Upload debug artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tarteel-native-android-debug-${{ github.sha }}
           if-no-files-found: error
@@ -111,7 +111,7 @@ jobs:
         run: ./gradlew :app:assembleReleaseUnsigned :app:bundleReleaseUnsigned --no-daemon
 
       - name: Upload release artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tarteel-native-android-release-unsigned-${{ github.sha }}
           if-no-files-found: error
