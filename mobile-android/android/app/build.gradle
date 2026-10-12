@@ -92,8 +92,9 @@ android {
         applicationId 'com.tarteel.quranapp'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "0.1.0"
+        // CI يمرر رقم إصدار متزايداً لكل رفع إلى Google Play.
+        versionCode((System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger())
+        versionName(System.getenv("ANDROID_VERSION_NAME") ?: "0.1.0")
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
