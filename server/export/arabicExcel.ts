@@ -1,5 +1,5 @@
 import XLSX from "xlsx-js-style";
-import AdmZip from "adm-zip";
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 
 const border = { top: { style: "thin", color: { rgb: "D9E4DB" } }, bottom: { style: "thin", color: { rgb: "D9E4DB" } }, left: { style: "thin", color: { rgb: "D9E4DB" } }, right: { style: "thin", color: { rgb: "D9E4DB" } } } as const;
 
@@ -11,16 +11,19 @@ export function configureArabicWorkbook(workbook: XLSX.WorkBook) {
 }
 
 export function writeArabicWorkbook(workbook: XLSX.WorkBook): Buffer {
-  const archive = new AdmZip(XLSX.write(workbook, { bookType: "xlsx", type: "buffer", compression: true }) as Buffer);
+  // xlsx ملف ZIP؛ نضيف إعداد الطباعة (أفقي، A4، ملاءمة العرض) لكل ورقة ثم نعيد ضغطه.
+  // المصدر ملف أنشأناه نحن للتو، لا ملف يرفعه مستخدم.
+  const files = unzipSync(new Uint8Array(XLSX.write(workbook, { bookType: "xlsx", type: "buffer", compression: true }) as Buffer));
   const pageSetup = '<pageSetup orientation="landscape" paperSize="9" fitToWidth="1" fitToHeight="0"/>';
-  archive.getEntries().filter((entry) => /^xl\/worksheets\/sheet\d+\.xml$/.test(entry.entryName)).forEach((entry) => {
-    const source = entry.getData().toString("utf8");
+  for (const name of Object.keys(files)) {
+    if (!/^xl\/worksheets\/sheet\d+\.xml$/.test(name)) continue;
+    const source = strFromU8(files[name]);
     const withSheetProperties = source.includes("<sheetPr>")
       ? source.replace("<sheetPr>", '<sheetPr><pageSetUpPr fitToPage="1"/>')
       : source.replace(/(<worksheet[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>');
-    archive.updateFile(entry.entryName, Buffer.from(withSheetProperties.replace("</worksheet>", `${pageSetup}</worksheet>`), "utf8"));
-  });
-  return archive.toBuffer();
+    files[name] = strToU8(withSheetProperties.replace("</worksheet>", `${pageSetup}</worksheet>`));
+  }
+  return Buffer.from(zipSync(files, { level: 6 }));
 }
 
 export function styleArabicTable(sheet: XLSX.WorkSheet, options: { headerRow: number; widths: number[]; titleRow?: number; filter?: boolean }) {
