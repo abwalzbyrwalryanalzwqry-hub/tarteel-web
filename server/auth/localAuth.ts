@@ -2,7 +2,7 @@
  * الدخول المحلي لترتيل: بريد + كلمة مرور، وجلسة JWT في كوكي httpOnly.
  * لا يعتمد على أي خدمة خارجية أو بريد أو نطاق؛ يعمل على أي استضافة Node + MySQL.
  */
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
@@ -10,7 +10,8 @@ import { z } from "zod";
 import { localCredentials, passwordSetupTokens, users, type User } from "../../drizzle/schema";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { ENV } from "../_core/env";
-import { sdk } from "../_core/sdk";
+import { getClientIp } from "../_core/request";
+import { isAccountUsable, sdk } from "../_core/sdk";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import type { TrpcContext } from "../_core/context";
 import * as db from "../db";
@@ -48,19 +49,21 @@ function assertPolicy(password: string) {
   if (error) throw fail("BAD_REQUEST", error);
 }
 
-function clientKey(ctx: TrpcContext) {
-  const forwarded = ctx.req.headers?.["x-forwarded-for"];
-  const ip = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(",")[0]?.trim() || ctx.req.ip || "unknown";
-  return ip;
+/** مفتاح حد المحاولات: IP الحقيقي كما يحسبه Express خلف الوكيل، لا قيمة X-Forwarded-For التي يرسلها العميل. */
+export function clientKey(ctx: Pick<TrpcContext, "req">) {
+  return getClientIp(ctx.req);
 }
 
-function isUserActive(user: Pick<User, "isActive" | "accountStatus" | "accessRevokedAt" | "deletedAt">) {
-  return user.isActive && user.accountStatus === "active" && !user.accessRevokedAt && !user.deletedAt;
+const isUserActive = isAccountUsable;
+
+async function issueSession(ctx: TrpcContext, user: Pick<User, "openId" | "name" | "email" | "sessionVersion">) {
+  await sdk.issueSessionCookie(ctx.req, ctx.res, user);
 }
 
-async function issueSession(ctx: TrpcContext, user: Pick<User, "openId" | "name" | "email">) {
-  const token = await sdk.createSessionToken(user.openId, { name: user.name || user.email || "مستخدم", expiresInMs: ONE_YEAR_MS });
-  ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
+/** يبطل كل الجلسات السابقة للمستخدم ثم يصدر جلسة جديدة لهذا الجهاز فقط. */
+async function rotateSessions(ctx: TrpcContext, user: Pick<User, "id" | "openId" | "name" | "email">) {
+  const sessionVersion = await db.bumpSessionVersion(user.id);
+  await issueSession(ctx, { ...user, sessionVersion });
 }
 
 async function audit(userId: number | null, action: string, entityId: number | null, ctx: TrpcContext, data?: Record<string, unknown>) {
@@ -112,7 +115,8 @@ export async function createLocalUser(input: { name: string; email: string; pass
   const email = normalizeEmail(input.email);
   if (await findCredentialByEmail(email)) throw fail("CONFLICT", "يوجد حساب مسجّل بهذا البريد");
   const openId = `${LOCAL_OPEN_ID_PREFIX}${randomBytes(12).toString("hex")}`;
-  const role = input.role ?? (ENV.ownerEmail && email === ENV.ownerEmail ? "admin" : undefined);
+  // الدور الإداري يُمنح فقط صراحةً (سكربت create-admin)، لا بمطابقة بريد غير متحقق منه.
+  const role = input.role;
   await db.upsertUser({ openId, name: input.name.trim(), email, loginMethod: "password", lastSignedIn: new Date(), ...(role ? { role } : {}) });
   const user = await db.getUserByOpenId(openId);
   if (!user) throw fail("INTERNAL_SERVER_ERROR", "تعذر إنشاء الحساب");
@@ -138,8 +142,7 @@ export const localAuthRouter = {
     .input(z.object({ name: z.string().trim().min(2, "الاسم قصير جداً").max(120), email: emailSchema, password: passwordSchema }))
     .mutation(async ({ ctx, input }) => {
       const email = normalizeEmail(input.email);
-      const isOwner = Boolean(ENV.ownerEmail) && email === ENV.ownerEmail;
-      if (!ENV.allowSignup && !isOwner) throw fail("FORBIDDEN", "إنشاء الحسابات مغلق؛ اطلب من إدارة المركز رابط تفعيل");
+      if (!ENV.allowSignup) throw fail("FORBIDDEN", "إنشاء الحسابات مغلق؛ اطلب من إدارة المركز رابط تفعيل");
       if (!consumeRateLimit(`register:${clientKey(ctx)}`)) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
       assertPolicy(input.password);
       // لا نربط تلقائياً بحساب قديم يحمل البريد نفسه (مثل حساب أُنشئ بنظام الدخول السابق) لأن البريد غير مُتحقق منه؛
@@ -207,9 +210,19 @@ export const localAuthRouter = {
       const email = normalizeEmail(input.email ?? existing?.email ?? ctx.user.email ?? "");
       if (!email) throw fail("BAD_REQUEST", "أدخل البريد الذي ستستخدمه للدخول");
       await saveCredential(ctx.user.id, email, input.newPassword);
+      // تغيير كلمة المرور يُخرج كل الأجهزة الأخرى؛ الجهاز الحالي يبقى داخلاً بجلسة جديدة.
+      await rotateSessions(ctx, ctx.user);
       await audit(ctx.user.id, existing ? "auth.password_changed" : "auth.password_set", ctx.user.id, ctx);
       return { success: true, email } as const;
     }),
+
+  /** الخروج من كل الأجهزة: يبطل كل الجلسات بما فيها الحالية. */
+  logoutAll: protectedProcedure.mutation(async ({ ctx }) => {
+    await db.bumpSessionVersion(ctx.user.id);
+    ctx.res.clearCookie(COOKIE_NAME, { ...getSessionCookieOptions(ctx.req), maxAge: -1 });
+    await audit(ctx.user.id, "auth.logout_all", ctx.user.id, ctx);
+    return { success: true } as const;
+  }),
 
   /** المدير العام ينشئ رابط تعيين كلمة مرور لمستخدم (صالح 72 ساعة ولمرة واحدة). */
   createSetupLink: protectedProcedure
@@ -246,7 +259,7 @@ export const localAuthRouter = {
       const affected = (marked as unknown as [{ affectedRows?: number }])[0]?.affectedRows;
       if (affected === 0) throw fail("BAD_REQUEST", "الرابط مستخدم من قبل");
       await saveCredential(user.id, email, input.password);
-      await issueSession(ctx, user);
+      await rotateSessions(ctx, user);
       await audit(user.id, "auth.setup_completed", user.id, ctx);
       return { success: true, email } as const;
     }),

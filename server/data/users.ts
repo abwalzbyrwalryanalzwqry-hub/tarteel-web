@@ -1,4 +1,4 @@
-import { desc, eq, isNull } from "drizzle-orm";
+import { desc, eq, isNull, sql } from "drizzle-orm";
 import {
   InsertUser,
   users,
@@ -49,4 +49,23 @@ export async function getAllUsers(limit = 50, offset = 0) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(users).where(isNull(users.deletedAt)).limit(limit).offset(offset).orderBy(desc(users.createdAt));
+}
+
+/** يبطل كل الجلسات الحالية للمستخدم ويعيد رقم الإصدار الجديد. */
+export async function bumpSessionVersion(userId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(users).set({ sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.id, userId));
+  const row = (await db.select({ sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, userId)).limit(1))[0];
+  return row?.sessionVersion ?? 0;
+}
+
+/** تحديث آخر نشاط دون الكتابة في قاعدة البيانات مع كل طلب. */
+export const LAST_SIGNED_IN_THROTTLE_MS = 15 * 60 * 1000;
+export async function touchLastSignedIn(user: { id: number; lastSignedIn: Date | null }, now = new Date()): Promise<boolean> {
+  if (user.lastSignedIn && now.getTime() - new Date(user.lastSignedIn).getTime() < LAST_SIGNED_IN_THROTTLE_MS) return false;
+  const db = await getDb();
+  if (!db) return false;
+  await db.update(users).set({ lastSignedIn: now }).where(eq(users.id, user.id));
+  return true;
 }

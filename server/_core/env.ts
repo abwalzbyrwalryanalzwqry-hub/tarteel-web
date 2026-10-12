@@ -3,6 +3,10 @@ const bool = (value: string | undefined, fallback: boolean) => {
   if (value === undefined || value.trim() === "") return fallback;
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 };
+const int = (value: string | undefined, fallback: number) => {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+};
 
 export const ENV = {
   appId: str(process.env.APP_ID, "tarteel") || "tarteel",
@@ -11,10 +15,12 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
 
   // ── المصادقة: بريد وكلمة مرور داخل ترتيل ──
-  /** صاحب المنصة: يُمنح دور admin عند إنشاء حسابه بهذا البريد. */
-  ownerEmail: str(process.env.OWNER_EMAIL).toLowerCase(),
   /** السماح بإنشاء حسابات جديدة من صفحة الدخول (الدور يبقى user حتى استرداد كود وصول). */
   allowSignup: bool(process.env.ALLOW_SIGNUP, true),
+  /** عدد الوكلاء العكسيين (Caddy/Nginx/Render) أمام الخادم؛ يحدد كيف يُقرأ IP العميل الحقيقي. */
+  trustProxyHops: int(process.env.TRUST_PROXY_HOPS, 1),
+  /** الحد اليومي لرسائل المساعد الذكي لكل مستخدم (0 = تعطيل المساعد). */
+  aiDailyLimit: int(process.env.AI_DAILY_LIMIT, 30),
 
   // ── الذكاء الاصطناعي: أي خدمة متوافقة مع OpenAI (OpenAI, OpenRouter, Groq, Ollama...) ──
   llmApiUrl: str(process.env.LLM_API_URL),
