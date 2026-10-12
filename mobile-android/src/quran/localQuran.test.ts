@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("expo-asset", () => ({ Asset: { fromModule: vi.fn() } }));
-vi.mock("expo-file-system", () => ({ EncodingType: { UTF8: "utf8" } }));
+vi.mock("expo-file-system/legacy", () => ({ EncodingType: { UTF8: "utf8" } }));
 
 import { parseLocalQuran, searchLocalQuran } from "./localQuran";
 

@@ -1,5 +1,6 @@
 import { Asset } from "expo-asset";
-import * as FileSystem from "expo-file-system";
+// SDK 54: الدوال القديمة في "expo-file-system" ترمي خطأ وقت التشغيل؛ يجب استيرادها من /legacy.
+import * as FileSystem from "expo-file-system/legacy";
 
 export type LocalQuranVerse = {
   surah: number;
@@ -36,4 +37,8 @@ export function searchLocalQuran(verses: LocalQuranVerse[], query: string, limit
   const normalized = query.normalize("NFD").replace(/[\u064B-\u065F\u0670ـ]/g, "").replace(/[أإآ]/g, "ا").replace(/ٱ/g, "ا").trim();
   if (!normalized) return [];
   return verses.filter((verse) => verse.text.normalize("NFD").replace(/[\u064B-\u065F\u0670ـ]/g, "").replace(/[أإآ]/g, "ا").replace(/ٱ/g, "ا").includes(normalized)).slice(0, limit);
+}
+
+export function versesOfSurah(verses: LocalQuranVerse[], surah: number): LocalQuranVerse[] {
+  return verses.filter((verse) => verse.surah === surah);
 }
