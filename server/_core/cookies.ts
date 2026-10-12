@@ -39,12 +39,13 @@ export function getSessionCookieOptions(
   //       ? hostname
   //       : undefined;
 
-  // SameSite=None يتطلب Secure؛ على HTTP المحلي نستخدم Lax وإلا يرفض المتصفح الكوكي.
+  // Lax: الكوكي لا يُرسل مع طلبات POST القادمة من مواقع أخرى (حماية من CSRF).
+  // تطبيق أندرويد يفتح المنصة نفسها داخل WebView فالكوكي فيه من الطرف الأول ولا يحتاج None.
   const secure = isSecureRequest(req);
   return {
     httpOnly: true,
     path: "/",
-    sameSite: secure ? "none" : "lax",
+    sameSite: "lax",
     secure,
   };
 }

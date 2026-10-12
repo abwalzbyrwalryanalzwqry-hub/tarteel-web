@@ -63,9 +63,10 @@ describe("auth.providers", () => {
     expect(await appRouter.createCaller(publicCtx()).auth.providers()).toEqual({ local: true, allowSignup: false });
   });
 
-  it("إغلاق التسجيل يرفض الحسابات الجديدة لغير المالك", async () => {
-    Object.assign(ENV, { allowSignup: false, ownerEmail: "owner@tarteel.app" });
+  it("إغلاق التسجيل يرفض كل الحسابات الجديدة، ولا استثناء لأي بريد (لا تصعيد صلاحيات بالبريد)", async () => {
+    Object.assign(ENV, { allowSignup: false });
     await expect(appRouter.createCaller(publicCtx()).auth.register({ name: "زائر", email: "x@y.co", password: "Quran1234" })).rejects.toThrow("مغلق");
+    await expect(appRouter.createCaller(publicCtx()).auth.register({ name: "منتحل", email: "owner@tarteel.app", password: "Quran1234" })).rejects.toThrow("مغلق");
   });
 
   it("المستخدم العادي لا ينشئ روابط كلمة المرور", async () => {
@@ -76,8 +77,8 @@ describe("auth.providers", () => {
 });
 
 describe("الكوكي والتخزين", () => {
-  it("SameSite=None+Secure على HTTPS و Lax على HTTP المحلي", () => {
-    expect(getSessionCookieOptions({ protocol: "https", headers: {} } as any)).toMatchObject({ sameSite: "none", secure: true });
+  it("SameSite=Lax دائماً (حماية CSRF)، و Secure على HTTPS فقط", () => {
+    expect(getSessionCookieOptions({ protocol: "https", headers: {} } as any)).toMatchObject({ sameSite: "lax", secure: true, httpOnly: true });
     expect(getSessionCookieOptions({ protocol: "http", headers: {} } as any)).toMatchObject({ sameSite: "lax", secure: false });
     expect(getSessionCookieOptions({ protocol: "http", headers: { "x-forwarded-proto": "https" } } as any)).toMatchObject({ secure: true });
   });

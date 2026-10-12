@@ -30,6 +30,8 @@ export const users = mysqlTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  /** يُرفع عند تغيير كلمة المرور أو «الخروج من كل الأجهزة» فتبطل كل الجلسات السابقة. */
+  sessionVersion: int("sessionVersion").default(0).notNull(),
 });
 
 export type User = typeof users.$inferSelect;

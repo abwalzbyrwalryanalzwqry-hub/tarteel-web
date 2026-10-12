@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { invokeLLM } from "../_core/llm";
 import { ENV } from "../_core/env";
+import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
 import {
   AI_CONTEXT_LABELS,
@@ -29,6 +30,29 @@ const assistantPolicy = (context: AiContext) => `
 5) اجعل الإجابة موجزة، ثم أضف قسم «خطوات مقترحة» من 2 إلى 4 نقاط عند ملاءمة السؤال.
 `;
 
+// ── حد يومي لكل مستخدم يحمي رصيد مفتاح LLM من الاستهلاك المفرط ──
+const dailyUsage = new Map<number, { day: string; count: number }>();
+const dayKey = (now: Date) => now.toISOString().slice(0, 10);
+
+/** يستهلك رسالة من حصة اليوم؛ يعيد false إن تجاوز المستخدم الحد. */
+export function consumeAiQuota(userId: number, limit = ENV.aiDailyLimit, now = new Date()): boolean {
+  if (limit <= 0) return false;
+  const day = dayKey(now);
+  const entry = dailyUsage.get(userId);
+  if (!entry || entry.day !== day) {
+    dailyUsage.set(userId, { day, count: 1 });
+    if (dailyUsage.size > 50_000) dailyUsage.forEach((value, key) => { if (value.day !== day) dailyUsage.delete(key); });
+    return true;
+  }
+  if (entry.count >= limit) return false;
+  entry.count += 1;
+  return true;
+}
+
+export function resetAiQuotaForTests() {
+  dailyUsage.clear();
+}
+
 export const aiRouter = router({
   chat: protectedProcedure
     .input(
@@ -37,7 +61,7 @@ export const aiRouter = router({
         context: contextSchema.default("general"),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const lastUserMessage = [...input.messages].reverse().find((message) => message.role === "user")?.content ?? "";
 
       if (!isTarteelAiInScope(lastUserMessage)) {
@@ -46,6 +70,14 @@ export const aiRouter = router({
           inScope: false,
           suggestions: [],
         };
+      }
+
+      // الأسئلة خارج النطاق لا تصل إلى LLM فلا تُحسب من الحصة.
+      if (!consumeAiQuota(ctx.user.id)) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: ENV.aiDailyLimit > 0 ? `بلغت الحد اليومي للمساعد الذكي (${ENV.aiDailyLimit} رسالة). حاول غداً.` : "المساعد الذكي غير مفعّل على هذا الخادم.",
+        });
       }
 
       const response = await invokeLLM({

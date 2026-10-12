@@ -4,7 +4,7 @@
 
 | الوظيفة | التنفيذ | الإعداد |
 |---|---|---|
-| تسجيل الدخول | بريد + كلمة مرور (scrypt، قفل بعد 8 محاولات، حد لكل IP، سجل تدقيق) | `JWT_SECRET`, `OWNER_EMAIL`, `ALLOW_SIGNUP` |
+| تسجيل الدخول | بريد + كلمة مرور (scrypt، قفل بعد 8 محاولات، حد لكل IP، سجل تدقيق) | `JWT_SECRET`, `ALLOW_SIGNUP`, `TRUST_PROXY_HOPS` |
 | الملفات (المصحف، التفسير، الخطوط، الشعارات) | تُخدم من `/storage/` | `STORAGE_DRIVER=local` + `STORAGE_DIR`، أو `s3` (S3/R2/B2/MinIO) |
 | المساعد الذكي | أي خدمة متوافقة مع OpenAI | `LLM_API_URL`, `LLM_API_KEY`, `LLM_MODEL` |
 | إشعارات المالك | Webhook عام | `OWNER_NOTIFY_WEBHOOK_URL` |
@@ -28,11 +28,15 @@ VPS واحد (2 vCPU، 4GB RAM، 40GB، Ubuntu 24.04) يكفي.
 ```bash
 curl -fsSL https://get.docker.com | sh
 git clone https://github.com/abwalzbyrwalryanalzwqry-hub/tarteel-web.git && cd tarteel-web
-cp .env.example .env && nano .env      # JWT_SECRET, OWNER_EMAIL, APP_DOMAIN, MYSQL_PASSWORD, MYSQL_ROOT_PASSWORD
+cp .env.example .env && nano .env      # JWT_SECRET, APP_DOMAIN, MYSQL_PASSWORD, MYSQL_ROOT_PASSWORD
 docker compose up -d db
 docker compose exec -T db mysql -utarteel -p"$MYSQL_PASSWORD" tarteel < tarteel-dump.sql
-docker compose up -d --build           # يطبق الترحيلات (0016 توحّد روابط الشعارات على /storage/)
+docker compose up -d --build           # يطبق الترحيلات (0016 توحّد روابط الشعارات، 0017 تضيف إصدار الجلسة)
+# على خادم جديد بلا قاعدة قديمة: أنشئ المدير العام (تُطبع كلمة مرور مؤقتة مرة واحدة)
+docker compose exec app pnpm auth:create-admin --email you@example.com --name "اسمك"
 ```
+
+> **الجلسات:** مدتها 30 يوماً وتتجدد تلقائياً مع الاستخدام. تغيير كلمة المرور يُخرج الأجهزة الأخرى، وفي الإعدادات زر «الخروج من كل الأجهزة». الجلسات الصادرة قبل الترحيل 0017 تُرفض، فيدخل كل مستخدم مرة واحدة من جديد.
 
 **الملفات:** انسخها من الاستضافة القديمة (كانت تحت مسار `/manus-storage/`)، فتُعاد كتابة الروابط داخل ملفات المصحف تلقائياً:
 

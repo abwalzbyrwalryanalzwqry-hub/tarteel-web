@@ -1,4 +1,4 @@
-import { KeyRound } from "lucide-react";
+import { KeyRound, LogOut } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -13,12 +13,23 @@ export function PasswordSettingsCard() {
   useEffect(() => { if (data?.email) setEmail(data.email); }, [data?.email]);
   const save = trpc.auth.setPassword.useMutation({
     onSuccess: async (result) => {
-      toast.success(`تم حفظ كلمة المرور. ادخل لاحقاً بالبريد ${result.email}`);
+      toast.success(`تم حفظ كلمة المرور وخرجت الأجهزة الأخرى. ادخل لاحقاً بالبريد ${result.email}`);
       setCurrent(""); setNext("");
       await utils.auth.myCredential.invalidate();
     },
     onError: (error) => toast.error(error.message),
   });
+  const logoutAll = trpc.auth.logoutAll.useMutation({
+    onSuccess: async () => {
+      utils.auth.me.setData(undefined, null);
+      await utils.invalidate();
+      window.location.href = "/login";
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const confirmLogoutAll = () => {
+    if (window.confirm("سيتم تسجيل الخروج من كل الأجهزة، ومنها هذا الجهاز. هل تريد المتابعة؟")) logoutAll.mutate();
+  };
   const submit = (event: FormEvent) => {
     event.preventDefault();
     save.mutate({ email: data?.hasPassword ? undefined : email.trim() || undefined, currentPassword: data?.hasPassword ? current : undefined, newPassword: next });
@@ -40,6 +51,10 @@ export function PasswordSettingsCard() {
           <input required type="password" dir="ltr" autoComplete="new-password" minLength={8} value={next} onChange={(e) => setNext(e.target.value)} className="w-full rounded-xl border border-border bg-background/70 px-3 py-2.5 text-left outline-none focus:border-primary" /></label>
         <button type="submit" disabled={save.isPending} className="btn-gold w-full py-2.5 text-sm disabled:opacity-60">{save.isPending ? "جارٍ الحفظ…" : data?.hasPassword ? "تغيير كلمة المرور" : "تعيين كلمة المرور"}</button>
       </form>
+      <div className="mt-4 border-t border-border pt-4">
+        <p className="mb-2 text-xs leading-6 text-muted-foreground">إن فقدت جهازاً أو شككت أن أحداً دخل حسابك، أخرج كل الأجهزة ثم غيّر كلمة المرور.</p>
+        <button type="button" onClick={confirmLogoutAll} disabled={logoutAll.isPending} className="flex w-full items-center justify-center gap-2 rounded-xl border border-destructive/40 py-2.5 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-60"><LogOut className="h-4 w-4" />{logoutAll.isPending ? "جارٍ الخروج…" : "الخروج من كل الأجهزة"}</button>
+      </div>
     </div>
   );
 }
