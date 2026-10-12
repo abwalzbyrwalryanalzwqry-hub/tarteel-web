@@ -212,14 +212,25 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
+/**
+ * مزود الذكاء الاصطناعي: LLM_API_URL/LLM_API_KEY (أي خدمة متوافقة مع OpenAI) لها الأولوية،
+ * وإلا Manus Forge إن وُجد. LLM_API_URL هو الجذر الذي يسبق /chat/completions،
+ * مثل https://api.openai.com/v1 أو https://openrouter.ai/api/v1.
+ */
+const llmBase = () => {
+  if (ENV.llmApiUrl) return ENV.llmApiUrl.replace(/\/+$/, "");
+  if (ENV.forgeApiUrl) return `${ENV.forgeApiUrl.replace(/\/+$/, "")}/v1`;
+  return "https://forge.manus.im/v1";
+};
+const llmKey = () => (ENV.llmApiUrl ? ENV.llmApiKey : ENV.forgeApiKey);
+
+const resolveApiUrl = () => `${llmBase()}/chat/completions`;
+
+export const isLLMConfigured = () => Boolean(ENV.llmApiUrl ? ENV.llmApiKey || /localhost|127\.0\.0\.1/.test(ENV.llmApiUrl) : ENV.forgeApiKey);
 
 const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+  if (!isLLMConfigured()) {
+    throw new Error("LLM is not configured: set LLM_API_URL, LLM_API_KEY and LLM_MODEL");
   }
 };
 
@@ -362,8 +373,8 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     messages: messages.map(normalizeMessage),
   };
 
-  if (model) {
-    payload.model = model;
+  if (model || ENV.llmModel) {
+    payload.model = model || ENV.llmModel;
   }
 
   if (tools && tools.length > 0) {
@@ -405,7 +416,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      authorization: `Bearer ${llmKey()}`,
     },
     body: JSON.stringify(payload),
   });
@@ -435,12 +446,10 @@ export type ModelsResponse = {
 export async function listLLMModels(): Promise<ModelsResponse> {
   assertApiKey();
 
-  const url = ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/models`
-    : "https://forge.manus.im/v1/models";
+  const url = `${llmBase()}/models`;
 
   const response = await fetchWithBackoff(url, {
-    headers: { authorization: `Bearer ${ENV.forgeApiKey}` },
+    headers: { authorization: `Bearer ${llmKey()}` },
   });
 
   if (!response.ok) {

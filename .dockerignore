@@ -1,0 +1,10 @@
+node_modules
+dist
+data
+.git
+mobile-android
+android-wrapper
+artifacts
+*.apk
+*.aab
+.env

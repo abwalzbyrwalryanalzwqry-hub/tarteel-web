@@ -28,13 +28,15 @@ describe("حماية حالة OAuth على الهاتف", () => {
     expect(login).toContain("انتهت محاولة الدخول السابقة");
   });
 
-  it("يعرض إرشاد وصول آمن ولا يقدم Google كإجراء دخول فعلي قبل ربطه", () => {
+  it("يعرض دخولاً محلياً بالبريد وكلمة المرور ولا يظهر Manus إلا عند تفعيله", () => {
     const login = readFileSync(path.join(process.cwd(), "client/src/pages/LoginPage.tsx"), "utf8");
     const redeem = readFileSync(path.join(process.cwd(), "client/src/pages/RedeemAccessCode.tsx"), "utf8");
     const support = readFileSync(path.join(process.cwd(), "client/src/components/AccessHelpPanel.tsx"), "utf8");
-    expect(login).toContain("الدخول الآمن إلى ترتيل");
-    expect(login).toContain("التسجيل بحساب Google — غير مفعّل بعد");
-    expect(login).toContain("disabled");
+    expect(login).toContain("الدخول إلى ترتيل");
+    expect(login).toContain("trpc.auth.login.useMutation");
+    expect(login).toContain('autoComplete={mode === "login" ? "current-password" : "new-password"}');
+    expect(login).toContain("providers?.manus &&");
+    expect(login).not.toContain("Google");
     expect(redeem).toContain("AccessHelpPanel");
     expect(support).toContain("دليل الوصول الآمن");
     expect(support).toContain("لا تشارك كودك أو كلمة مرورك");

@@ -4,6 +4,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Bell, Building2, Code2, Moon, Settings as SettingsIcon, Sun, Type, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
+import { PasswordSettingsCard } from "@/components/PasswordSettingsCard";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -33,6 +34,7 @@ export default function Settings() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <PasswordSettingsCard />
         {/* Profile */}
         <div className="glass-card rounded-2xl p-5">
           <h2 className="font-display font-bold text-foreground text-lg mb-4 flex items-center gap-2"><Users className="w-5 h-5 text-primary"/>معلومات الحساب</h2>

@@ -24,6 +24,7 @@ import Trash from "./pages/Trash";
 import AuditLog from "./pages/AuditLog";
 import AcademicSeasons from "./pages/AcademicSeasons";
 import LoginPage from "./pages/LoginPage";
+import SetPassword from "./pages/SetPassword";
 import AIAssistant from "./pages/AIAssistant";
 import SplashScreen from "./pages/SplashScreen";
 import DeveloperInfo from "./pages/DeveloperInfo";
@@ -48,6 +49,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={LoginPage} />
+      <Route path="/set-password" component={SetPassword} />
       <Route path="/dashboard" component={() => <TarteelLayout><Dashboard /></TarteelLayout>} />
       <Route path="/centers" component={() => <TarteelLayout><Centers /></TarteelLayout>} />
       <Route path="/branches" component={() => <TarteelLayout><Branches /></TarteelLayout>} />

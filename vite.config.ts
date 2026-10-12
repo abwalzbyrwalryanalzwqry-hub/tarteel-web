@@ -150,7 +150,9 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+// إضافات Manus (محرر المعاينة وجمع السجلات) تُستبعد خارج Manus: DISABLE_MANUS_RUNTIME=1
+const manusPlugins = process.env.DISABLE_MANUS_RUNTIME === "1" ? [] : [vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+const plugins = [react(), tailwindcss(), jsxLocPlugin(), ...manusPlugins];
 
 export default defineConfig({
   plugins,

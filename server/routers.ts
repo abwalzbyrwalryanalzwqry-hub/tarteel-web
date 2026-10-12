@@ -17,6 +17,7 @@ import { exportRouter } from "./routers/export";
 import { aiRouter } from "./routers/ai";
 import { reportingRouter } from "./routers/reporting";
 import { storagePut } from "./storage";
+import { localAuthRouter } from "./auth/localAuth";
 import {
   createAcademicSeason,
   createAccessCode,
@@ -274,6 +275,7 @@ export const appRouter = router({
   system: systemRouter,
 
   auth: router({
+    ...localAuthRouter,
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);

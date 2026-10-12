@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { invokeLLM } from "../_core/llm";
+import { ENV } from "../_core/env";
 import { protectedProcedure, router } from "../_core/trpc";
 import {
   AI_CONTEXT_LABELS,
@@ -48,7 +49,7 @@ export const aiRouter = router({
       }
 
       const response = await invokeLLM({
-        model: "gpt-5-mini",
+        model: ENV.llmModel || "gpt-5-mini",
         maxTokens: 700,
         messages: [
           { role: "system", content: assistantPolicy(input.context) },

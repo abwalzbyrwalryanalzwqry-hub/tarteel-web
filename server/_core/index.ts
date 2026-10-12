@@ -8,6 +8,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { ENV, isManusOAuthEnabled } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -29,13 +30,23 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  if (ENV.isProduction && !ENV.cookieSecret) {
+    throw new Error("JWT_SECRET is required in production");
+  }
+  if (ENV.cookieSecret && ENV.cookieSecret.length < 32) {
+    console.warn("[Security] JWT_SECRET is shorter than 32 characters; use `openssl rand -base64 48`.");
+  }
   const app = express();
+  // خلف Nginx/Caddy/Render: لقراءة https وعنوان IP الحقيقي.
+  app.set("trust proxy", 1);
+  app.disable("x-powered-by");
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
-  registerOAuthRoutes(app);
+  if (isManusOAuthEnabled()) registerOAuthRoutes(app);
+  app.get("/api/health", (_req, res) => res.json({ ok: true, auth: ENV.authProvider }));
   // tRPC API
   app.use(
     "/api/trpc",

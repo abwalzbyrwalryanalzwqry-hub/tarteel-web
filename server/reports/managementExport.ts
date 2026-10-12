@@ -1,6 +1,6 @@
 import XLSX from "xlsx-js-style";
 import { AGE_GROUP_LABELS, type CenterManagementReport } from "./reportBuilder";
-import { storageGetSignedUrl } from "../storage";
+import { storageRead } from "../storage";
 import { generateArabicReportPdf } from "../export/reportPdf";
 import { configureArabicWorkbook, styleArabicSummary, styleArabicTable, writeArabicWorkbook } from "../export/arabicExcel";
 
@@ -16,7 +16,7 @@ function filters(report: CenterManagementReport) {
 
 async function readLogo(report: CenterManagementReport): Promise<Buffer | undefined> {
   if (!report.meta.branding.logoKey) return undefined;
-  try { const response = await fetch(await storageGetSignedUrl(report.meta.branding.logoKey)); return response.ok ? Buffer.from(await response.arrayBuffer()) : undefined; } catch { return undefined; }
+  try { return await storageRead(report.meta.branding.logoKey); } catch { return undefined; }
 }
 
 export async function generateManagementReportPdf(report: CenterManagementReport): Promise<Buffer> {
