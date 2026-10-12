@@ -68,6 +68,27 @@ export async function notifyOwner(
 ): Promise<boolean> {
   const { title, content } = validatePayload(payload);
 
+  // خارج Manus: Webhook عام يستقبل JSON {title, content, text} (Slack/Discord/n8n/وسيط Telegram).
+  if (ENV.ownerWebhookUrl) {
+    try {
+      const response = await fetch(ENV.ownerWebhookUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title, content, text: `${title}\n\n${content}` }),
+      });
+      if (!response.ok) console.warn(`[Notification] webhook failed (${response.status})`);
+      return response.ok;
+    } catch (error) {
+      console.warn("[Notification] webhook error:", error);
+      return false;
+    }
+  }
+
+  if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
+    console.info(`[Notification] (no channel configured) ${title}: ${content.slice(0, 500)}`);
+    return false;
+  }
+
   if (!ENV.forgeApiUrl) {
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
