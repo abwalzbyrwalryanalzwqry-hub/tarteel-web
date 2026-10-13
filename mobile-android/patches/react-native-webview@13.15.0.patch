@@ -1,0 +1,84 @@
+diff --git a/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java b/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
+index 251939e56ac24832e6272f77b324eb2d51442ad7..8eb64ec1fa0666bd4ea03f3a15b0d6b88a2ce6b6 100644
+--- a/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
++++ b/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewClient.java
+@@ -35,6 +35,12 @@ import android.webkit.CookieManager;
+ import android.webkit.CookieSyncManager;
+ 
+ import java.util.concurrent.atomic.AtomicReference;
++import java.io.IOException;
++import java.io.InputStream;
++import java.io.ByteArrayInputStream;
++import java.util.HashMap;
++import java.util.Map;
++import android.net.Uri;
+ 
+ public class RNCWebViewClient extends WebViewClient {
+     private static String TAG = "RNCWebViewClient";
+@@ -53,6 +59,66 @@ public class RNCWebViewClient extends WebViewClient {
+         basicAuthCredential = credential;
+     }
+ 
++    // ── ترتيل: نسخة الجهاز المحلية ──
++    // الواجهة المبنية (dist/local) مضمّنة في assets/web وتُخدم من أصل https ثابت داخل التطبيق،
++    // فتعمل وحدات ES وIndexedDB ومسارات الصفحات كما في المتصفح، دون خادم ودون شبكة.
++    private static final String TARTEEL_LOCAL_HOST = "appassets.androidplatform.net";
++    private static final String TARTEEL_ASSET_ROOT = "web";
++
++    private static String tarteelMimeType(String path) {
++        String lower = path.toLowerCase();
++        if (lower.endsWith(".html")) return "text/html";
++        if (lower.endsWith(".js") || lower.endsWith(".mjs")) return "text/javascript";
++        if (lower.endsWith(".css")) return "text/css";
++        if (lower.endsWith(".json") || lower.endsWith(".webmanifest")) return "application/json";
++        if (lower.endsWith(".wasm")) return "application/wasm";
++        if (lower.endsWith(".svg")) return "image/svg+xml";
++        if (lower.endsWith(".png")) return "image/png";
++        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
++        if (lower.endsWith(".webp")) return "image/webp";
++        if (lower.endsWith(".ico")) return "image/x-icon";
++        if (lower.endsWith(".woff2")) return "font/woff2";
++        if (lower.endsWith(".woff")) return "font/woff";
++        if (lower.endsWith(".ttf")) return "font/ttf";
++        if (lower.endsWith(".txt")) return "text/plain";
++        return "application/octet-stream";
++    }
++
++    private static WebResourceResponse tarteelResponse(String mime, int status, String reason, InputStream body, boolean cacheable) {
++        Map<String, String> headers = new HashMap<>();
++        headers.put("Cache-Control", cacheable ? "public, max-age=31536000, immutable" : "no-cache");
++        headers.put("Access-Control-Allow-Origin", "https://" + TARTEEL_LOCAL_HOST);
++        headers.put("X-Content-Type-Options", "nosniff");
++        String encoding = mime.startsWith("text/") || mime.equals("application/json") ? "utf-8" : null;
++        return new WebResourceResponse(mime, encoding, status, reason, headers, body);
++    }
++
++    @Nullable
++    private static WebResourceResponse tarteelServeLocal(WebView view, Uri url) {
++        String path = url.getPath();
++        if (path == null || path.isEmpty() || path.equals("/")) path = "/index.html";
++        if (path.contains("..")) return tarteelResponse("text/plain", 403, "Forbidden", new ByteArrayInputStream(new byte[0]), false);
++        String lastSegment = path.substring(path.lastIndexOf('/') + 1);
++        boolean isFile = lastSegment.contains(".");
++        String assetPath = TARTEEL_ASSET_ROOT + (isFile ? path : "/index.html");
++        try {
++            InputStream stream = view.getContext().getAssets().open(assetPath);
++            boolean cacheable = assetPath.startsWith(TARTEEL_ASSET_ROOT + "/assets/");
++            return tarteelResponse(tarteelMimeType(assetPath), 200, "OK", stream, cacheable);
++        } catch (IOException missing) {
++            return tarteelResponse("text/plain", 404, "Not Found", new ByteArrayInputStream(new byte[0]), false);
++        }
++    }
++
++    @Override
++    public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
++        Uri url = request.getUrl();
++        if (url != null && "https".equals(url.getScheme()) && TARTEEL_LOCAL_HOST.equals(url.getHost())) {
++            return tarteelServeLocal(view, url);
++        }
++        return super.shouldInterceptRequest(view, request);
++    }
++
+     @Override
+     public void onPageFinished(WebView webView, String url) {
+         super.onPageFinished(webView, url);

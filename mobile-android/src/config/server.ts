@@ -30,6 +30,19 @@ export async function getServerUrl(): Promise<string> {
   }
 }
 
+/**
+ * عنوان الخادم الذي اختاره المستخدم صراحةً من الإعدادات، أو "" إن لم يختر.
+ * دون خادم يعمل التطبيق بنسخة الجهاز المحلية (src/config/localWeb.ts).
+ */
+export async function getSavedServerUrl(): Promise<string> {
+  try {
+    const saved = await SecureStore.getItemAsync(KEY);
+    return (saved && normalizeServerUrl(saved)) || "";
+  } catch {
+    return "";
+  }
+}
+
 export async function setServerUrl(url: string | null) {
   if (url) await SecureStore.setItemAsync(KEY, url);
   else await SecureStore.deleteItemAsync(KEY);

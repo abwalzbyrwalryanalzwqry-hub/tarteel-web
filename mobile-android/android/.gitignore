@@ -14,3 +14,6 @@ local.properties
 
 # Bundle artifacts
 *.jsbundle
+
+# نسخة الجهاز من المنصة (dist/local) تُنسخ هنا وقت البناء: pnpm build:local
+app/src/main/assets/web/

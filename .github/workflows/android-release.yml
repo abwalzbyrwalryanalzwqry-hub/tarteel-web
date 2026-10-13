@@ -71,6 +71,18 @@ jobs:
           ./node_modules/.bin/tsc --noEmit
           ./node_modules/.bin/vitest run --config vitest.config.ts
 
+      - name: Build on-device Tarteel platform (no server)
+        # الواجهة ومنطق الخادم على SQLite يُضمَّنان في التطبيق (assets/web)؛ يعمل دون خادم ودون إنترنت.
+        working-directory: .
+        run: |
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm build:local
+          test -f dist/local/index.html
+          rm -rf mobile-android/android/app/src/main/assets/web
+          mkdir -p mobile-android/android/app/src/main/assets/web
+          cp -R dist/local/. mobile-android/android/app/src/main/assets/web/
+          du -sh mobile-android/android/app/src/main/assets/web
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
         with:

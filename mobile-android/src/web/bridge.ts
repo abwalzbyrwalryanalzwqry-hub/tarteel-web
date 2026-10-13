@@ -37,4 +37,7 @@ export const BRIDGE_SCRIPT = `(function () {
 export type BridgeMessage =
   | { type: "download"; filename: string; mime: string; data: string }
   | { type: "open"; url: string }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  /** نسخة الجهاز: الواجهة تطلب آخر نسخة من ملف قاعدة البيانات، أو ترسل نسخة لحفظها. */
+  | { type: "tarteel:db-load"; requestId: string }
+  | { type: "tarteel:db-save"; base64: string };

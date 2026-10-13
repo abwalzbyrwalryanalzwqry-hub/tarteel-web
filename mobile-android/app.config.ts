@@ -3,7 +3,7 @@ import type { ExpoConfig } from "expo/config";
 const config: ExpoConfig = {
   name: "ترتيل",
   slug: "tarteel-android",
-  version: "0.2.3",
+  version: "0.3.0",
   orientation: "default",
   scheme: "tarteel",
   userInterfaceStyle: "automatic",

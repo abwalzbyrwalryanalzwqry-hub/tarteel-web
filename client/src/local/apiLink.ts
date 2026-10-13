@@ -102,6 +102,8 @@ export async function createApiLinks(getHeaders: () => Record<string, string>): 
   await initLocalDatabase();
   const { appRouter } = await import("../../../server/routers");
   installFetchBridge(appRouter);
+  // علامة جاهزية نسخة الجهاز (قاعدة البيانات محمّلة والجسر مثبّت): تنتظرها الاختبارات.
+  (globalThis as { __tarteelLocalReady?: boolean }).__tarteelLocalReady = true;
   return [
     serialLink(
       unstable_localLink({
