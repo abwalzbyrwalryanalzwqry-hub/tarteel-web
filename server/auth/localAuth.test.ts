@@ -43,12 +43,12 @@ describe("كلمات المرور (scrypt)", () => {
 
 describe("حد المحاولات", () => {
   afterEach(() => resetRateLimitsForTests());
-  it("يسمح بـ 20 محاولة في النافذة ثم يمنع، ويعيد الفتح بعد انتهائها", () => {
+  it("يسمح بـ 20 محاولة في النافذة ثم يمنع، ويعيد الفتح بعد انتهائها", async () => {
     const now = 1_000_000;
-    for (let i = 0; i < 20; i++) expect(consumeRateLimit("ip", now)).toBe(true);
-    expect(consumeRateLimit("ip", now)).toBe(false);
-    expect(consumeRateLimit("other-ip", now)).toBe(true);
-    expect(consumeRateLimit("ip", now + 16 * 60 * 1000)).toBe(true);
+    for (let i = 0; i < 20; i++) expect(await consumeRateLimit("ip", now)).toBe(true);
+    expect(await consumeRateLimit("ip", now)).toBe(false);
+    expect(await consumeRateLimit("other-ip", now)).toBe(true);
+    expect(await consumeRateLimit("ip", now + 16 * 60 * 1000)).toBe(true);
   });
 });
 
@@ -58,9 +58,9 @@ describe("auth.providers", () => {
 
   it("صفحة الدخول تعرض البريد وكلمة المرور، والتسجيل حسب ALLOW_SIGNUP", async () => {
     Object.assign(ENV, { allowSignup: true });
-    expect(await appRouter.createCaller(publicCtx()).auth.providers()).toEqual({ local: true, allowSignup: true });
+    expect(await appRouter.createCaller(publicCtx()).auth.providers()).toEqual({ local: true, allowSignup: true, inviteSignup: true });
     Object.assign(ENV, { allowSignup: false });
-    expect(await appRouter.createCaller(publicCtx()).auth.providers()).toEqual({ local: true, allowSignup: false });
+    expect(await appRouter.createCaller(publicCtx()).auth.providers()).toEqual({ local: true, allowSignup: false, inviteSignup: true });
   });
 
   it("إغلاق التسجيل يرفض كل الحسابات الجديدة، ولا استثناء لأي بريد (لا تصعيد صلاحيات بالبريد)", async () => {
