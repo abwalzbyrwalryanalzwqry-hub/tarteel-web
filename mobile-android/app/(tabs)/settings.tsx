@@ -1,10 +1,11 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable } from "../../src/ui/Pressable";
+import { router, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { DEFAULT_SERVER_URL, getServerUrl, normalizeServerUrl, probeServer, setServerUrl } from "../../src/config/server";
+import { getSavedServerUrl, normalizeServerUrl, probeServer, setServerUrl } from "../../src/config/server";
 import { colors } from "../../src/ui/theme";
 
 export default function SettingsScreen() {
@@ -13,8 +14,9 @@ export default function SettingsScreen() {
   const [checking, setChecking] = useState(false);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // current = "" يعني نسخة الجهاز (الافتراضي): كل البيانات على هذا الهاتف دون خادم.
   useFocusEffect(useCallback(() => {
-    void getServerUrl().then((url) => { setCurrent(url); setDraft(url); });
+    void getSavedServerUrl().then((url) => { setCurrent(url); setDraft(url); });
   }, []));
 
   const save = async () => {
@@ -24,9 +26,9 @@ export default function SettingsScreen() {
     const ok = await probeServer(url);
     setChecking(false);
     const apply = async () => {
-      await setServerUrl(url === DEFAULT_SERVER_URL ? null : url);
+      await setServerUrl(url);
       setCurrent(url); setDraft(url);
-      setStatus({ ok: true, text: "تم الحفظ. ستُفتح المنصة من العنوان الجديد." });
+      setStatus({ ok: true, text: "تم الربط. ستُفتح منصة المركز من هذا الخادم، وتبقى بيانات الجهاز محفوظة فيه." });
     };
     if (ok) { await apply(); return; }
     Alert.alert("لم يستجب الخادم", "تعذر التحقق من أن هذا العنوان خادم ترتيل. هل تريد حفظه على أي حال؟", [
@@ -37,8 +39,14 @@ export default function SettingsScreen() {
 
   const reset = async () => {
     await setServerUrl(null);
-    setCurrent(DEFAULT_SERVER_URL); setDraft(DEFAULT_SERVER_URL);
-    setStatus({ ok: true, text: "أُعيد العنوان الافتراضي." });
+    setCurrent(""); setDraft("");
+    setStatus({ ok: true, text: "عاد التطبيق إلى نسخة الجهاز: يعمل دون خادم وبياناتك على هذا الهاتف." });
+  };
+
+  /** صفحات المنصة (الخصوصية، الشروط، حذف الحساب) تُفتح في تبويب المنصة نفسه. */
+  const openPlatformPage = (path: string) => {
+    if (current) { void Linking.openURL(`${current}${path}`); return; }
+    router.navigate({ pathname: "/", params: { path } });
   };
 
   return (
@@ -47,8 +55,20 @@ export default function SettingsScreen() {
         <Text style={styles.title}>الإعدادات</Text>
 
         <View style={styles.card}>
-          <View style={styles.cardHeader}><Ionicons name="server-outline" size={20} color={colors.primary} /><Text style={styles.cardTitle}>عنوان خادم ترتيل</Text></View>
-          <Text style={styles.help}>عند نقل المنصة إلى نطاق جديد غيّر العنوان هنا دون الحاجة لتحديث التطبيق.</Text>
+          <View style={styles.cardHeader}><Ionicons name="phone-portrait-outline" size={20} color={colors.primary} /><Text style={styles.cardTitle}>طريقة التشغيل</Text></View>
+          {current ? (
+            <Text style={styles.help}>التطبيق مرتبط الآن بخادم مركز: <Text style={styles.strong}>{current}</Text></Text>
+          ) : (
+            <Text style={styles.help}>يعمل ترتيل على هذا الجهاز مباشرة دون خادم ودون إنترنت. الحسابات والمراكز والحلقات وسجلات الطلاب محفوظة في الهاتف، ويستطيع عدة مستخدمين الدخول بحساباتهم على الجهاز نفسه.</Text>
+          )}
+          {current ? (
+            <Pressable onPress={reset} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}><Text style={styles.secondaryText}>العودة إلى نسخة الجهاز (دون خادم)</Text></Pressable>
+          ) : null}
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.cardHeader}><Ionicons name="server-outline" size={20} color={colors.primary} /><Text style={styles.cardTitle}>الربط بخادم مركز (اختياري)</Text></View>
+          <Text style={styles.help}>لمن لديه منصة ترتيل منشورة على الإنترنت فقط. اتركه فارغاً ليبقى التطبيق على الجهاز.</Text>
           <TextInput
             value={draft}
             onChangeText={(value) => { setDraft(value); setStatus(null); }}
@@ -60,12 +80,9 @@ export default function SettingsScreen() {
             style={styles.input}
           />
           {status ? <Text style={[styles.status, { color: status.ok ? colors.primary : colors.danger }]}>{status.text}</Text> : null}
-          <Pressable disabled={checking || draft.trim() === current} onPress={save} style={({ pressed }) => [styles.primaryButton, (checking || draft.trim() === current) && styles.disabled, pressed && styles.pressed]}>
-            {checking ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>تحقق واحفظ</Text>}
+          <Pressable disabled={checking || !draft.trim() || draft.trim() === current} onPress={save} style={({ pressed }) => [styles.primaryButton, (checking || !draft.trim() || draft.trim() === current) && styles.disabled, pressed && styles.pressed]}>
+            {checking ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>تحقق واربط</Text>}
           </Pressable>
-          {DEFAULT_SERVER_URL && current !== DEFAULT_SERVER_URL ? (
-            <Pressable onPress={reset} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}><Text style={styles.secondaryText}>استعادة العنوان الافتراضي</Text></Pressable>
-          ) : null}
           {current ? <Pressable onPress={() => void Linking.openURL(current)} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
             <Ionicons name="open-outline" size={18} color={colors.primary} /><Text style={styles.linkText}>فتح المنصة في المتصفح</Text>
           </Pressable> : null}
@@ -80,21 +97,19 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
-        {current ? (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}><Ionicons name="shield-checkmark-outline" size={20} color={colors.primary} /><Text style={styles.cardTitle}>الخصوصية والحساب</Text></View>
-            <Text style={styles.help}>تحذف حسابك من «الإعدادات ← حذف الحساب» داخل المنصة بعد الدخول.</Text>
-            {[
-              { path: "/privacy", label: "سياسة الخصوصية", icon: "lock-closed-outline" as const },
-              { path: "/terms", label: "شروط الاستخدام", icon: "document-text-outline" as const },
-              { path: "/delete-account", label: "حذف الحساب", icon: "trash-outline" as const },
-            ].map((link) => (
-              <Pressable key={link.path} onPress={() => void Linking.openURL(`${current}${link.path}`)} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
-                <Ionicons name={link.icon} size={18} color={colors.primary} /><Text style={styles.linkText}>{link.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}><Ionicons name="shield-checkmark-outline" size={20} color={colors.primary} /><Text style={styles.cardTitle}>الخصوصية والحساب</Text></View>
+          <Text style={styles.help}>تحذف حسابك من «الإعدادات ← حذف الحساب» داخل المنصة بعد الدخول.</Text>
+          {[
+            { path: "/privacy", label: "سياسة الخصوصية", icon: "lock-closed-outline" as const },
+            { path: "/terms", label: "شروط الاستخدام", icon: "document-text-outline" as const },
+            { path: "/delete-account", label: "حذف الحساب", icon: "trash-outline" as const },
+          ].map((link) => (
+            <Pressable key={link.path} onPress={() => openPlatformPage(link.path)} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
+              <Ionicons name={link.icon} size={18} color={colors.primary} /><Text style={styles.linkText}>{link.label}</Text>
+            </Pressable>
+          ))}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -122,6 +137,7 @@ const styles = StyleSheet.create({
   secondaryText: { color: colors.primary, fontWeight: "600" },
   linkRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6 },
   linkText: { color: colors.primary, fontWeight: "600" },
+  strong: { color: colors.primary, fontWeight: "700" },
   row: { flexDirection: "row", justifyContent: "space-between", gap: 12, paddingVertical: 4 },
   rowLabel: { color: colors.muted },
   rowValue: { color: colors.primary, fontWeight: "600", flexShrink: 1 },

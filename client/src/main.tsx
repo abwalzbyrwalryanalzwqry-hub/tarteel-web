@@ -1,10 +1,10 @@
 import { trpc } from "@/lib/trpc";
 import { UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { httpBatchLink, TRPCClientError } from "@trpc/client";
+import { TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
-import superjson from "superjson";
 import App from "./App";
+import { API_MODE, createApiLinks } from "@/lib/apiLink";
 import { setupServiceWorker } from "./serviceWorker";
 import { ROLE_SIMULATION_STORAGE_KEY } from "./contexts/RoleSimulationContext";
 import "./index.css";
@@ -58,33 +58,41 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
-const trpcClient = trpc.createClient({
-  links: [
-    httpBatchLink({
-      url: "/api/trpc",
-      transformer: superjson,
-      headers() {
-        try {
-          if (sessionStorage.getItem(ROLE_SIMULATION_STORAGE_KEY)) return { "x-tarteel-role-simulation": "1" };
-        } catch {}
-        return {};
-      },
-      fetch(input, init) {
-        return globalThis.fetch(input, {
-          ...(init ?? {}),
-          credentials: "include",
-        });
-      },
-    }),
-  ],
-});
+const roleSimulationHeaders = (): Record<string, string> => {
+  try {
+    if (sessionStorage.getItem(ROLE_SIMULATION_STORAGE_KEY)) return { "x-tarteel-role-simulation": "1" };
+  } catch {}
+  return {};
+};
 
-createRoot(document.getElementById("root")!).render(
-  <trpc.Provider client={trpcClient} queryClient={queryClient}>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </trpc.Provider>
-);
+const root = createRoot(document.getElementById("root")!);
 
-setupServiceWorker();
+function renderStartupError(error: unknown) {
+  console.error("[Tarteel] startup failed", error);
+  const message = error instanceof Error ? error.message : String(error);
+  root.render(
+    <div dir="rtl" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "system-ui", textAlign: "center" }}>
+      <div>
+        <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>تعذر تشغيل ترتيل</h1>
+        <p style={{ color: "#5D665E", marginBottom: 16 }}>{message}</p>
+        <button type="button" onClick={() => window.location.reload()} style={{ padding: "10px 20px", borderRadius: 12, background: "#123D2A", color: "#fff" }}>إعادة المحاولة</button>
+      </div>
+    </div>
+  );
+}
+
+createApiLinks(roleSimulationHeaders)
+  .then((links) => {
+    const trpcClient = trpc.createClient({ links });
+    root.render(
+      <trpc.Provider client={trpcClient} queryClient={queryClient}>
+        <QueryClientProvider client={queryClient}>
+          <App />
+        </QueryClientProvider>
+      </trpc.Provider>
+    );
+  })
+  .catch(renderStartupError);
+
+// النسخة المحلية تعمل داخل التطبيق دون شبكة؛ عامل الخدمة (التخزين المؤقت للويب) لا حاجة له فيها.
+if (API_MODE === "server") setupServiceWorker();

@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, BackHandler, Linking, Pressable, StyleSheet, Text, View } from "react-native";
-import { useFocusEffect, router } from "expo-router";
+import { ActivityIndicator, BackHandler, Linking, StyleSheet, Text, View } from "react-native";
+import { Pressable } from "../../src/ui/Pressable";
+import { useFocusEffect, useLocalSearchParams, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView, type WebViewMessageEvent, type WebViewNavigation } from "react-native-webview";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import Constants from "expo-constants";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { getServerUrl } from "../../src/config/server";
+import { getSavedServerUrl } from "../../src/config/server";
+import { LOCAL_WEB_URL, isLocalWebUrl } from "../../src/config/localWeb";
+import { readLocalDatabaseFile, saveLocalDatabaseFile } from "../../src/data/localDatabaseFile";
 import { BRIDGE_SCRIPT, type BridgeMessage } from "../../src/web/bridge";
 import { useNetworkStatus } from "../../src/network/useNetworkStatus";
 import { colors } from "../../src/ui/theme";
@@ -23,7 +26,18 @@ function safeFileName(name: string) {
 
 export default function PlatformScreen() {
   const webRef = useRef<WebView>(null);
+  /** نسخة الجهاز افتراضياً؛ أو خادم مركز إن اختاره المستخدم من الإعدادات. */
   const [serverUrl, setServerUrlState] = useState<string | null>(null);
+  const isLocal = serverUrl !== null && isLocalWebUrl(serverUrl);
+  /** صفحة داخل المنصة يطلبها تبويب آخر (مثل سياسة الخصوصية من الإعدادات). */
+  const { path: requestedPath } = useLocalSearchParams<{ path?: string }>();
+  const [startPath, setStartPath] = useState("");
+  useEffect(() => {
+    if (typeof requestedPath === "string" && requestedPath.startsWith("/")) {
+      setStartPath(requestedPath);
+      setWebKey((k) => k + 1);
+    }
+  }, [requestedPath]);
   const [canGoBack, setCanGoBack] = useState(false);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -33,8 +47,9 @@ export default function PlatformScreen() {
   // نعيد قراءة العنوان عند العودة للتبويب (قد يكون تغيّر من الإعدادات).
   useFocusEffect(useCallback(() => {
     let active = true;
-    void getServerUrl().then((url) => {
+    void getSavedServerUrl().then((saved) => {
       if (!active) return;
+      const url = saved || LOCAL_WEB_URL;
       setServerUrlState((current) => {
         if (current !== null && current !== url) { setFailed(false); setWebKey((k) => k + 1); }
         return url;
@@ -54,12 +69,22 @@ export default function PlatformScreen() {
 
   // إعادة المحاولة تلقائياً عند عودة الاتصال.
   useEffect(() => {
-    if (network.isConnected && failed) { setFailed(false); setWebKey((k) => k + 1); }
+    if (!isLocal && network.isConnected && failed) { setFailed(false); setWebKey((k) => k + 1); }
   }, [network.isConnected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onMessage = useCallback(async (event: WebViewMessageEvent) => {
     let message: BridgeMessage;
     try { message = JSON.parse(event.nativeEvent.data); } catch { return; }
+    if (message.type === "tarteel:db-save") {
+      void saveLocalDatabaseFile(message.base64);
+      return;
+    }
+    if (message.type === "tarteel:db-load") {
+      const base64 = await readLocalDatabaseFile();
+      const payload = JSON.stringify({ requestId: message.requestId, base64 });
+      webRef.current?.injectJavaScript(`window.__tarteelNativeDb && window.__tarteelNativeDb(${payload}); true;`);
+      return;
+    }
     if (message.type === "open") {
       void Linking.openURL(message.url).catch(() => undefined);
       return;
@@ -81,11 +106,13 @@ export default function PlatformScreen() {
     const url = request.url;
     if (EXTERNAL_SCHEMES.test(url)) { void Linking.openURL(url).catch(() => undefined); return false; }
     try {
-      const host = new URL(url).hostname;
-      if (EXTERNAL_HOSTS.test(host)) { void Linking.openURL(url).catch(() => undefined); return false; }
+      const parsed = new URL(url);
+      if (EXTERNAL_HOSTS.test(parsed.hostname)) { void Linking.openURL(url).catch(() => undefined); return false; }
+      // نسخة الجهاز: أي موقع خارجي يُفتح في المتصفح حتى لا يحل محل المنصة داخل التطبيق.
+      if (isLocal && /^https?:$/.test(parsed.protocol) && !isLocalWebUrl(url)) { void Linking.openURL(url).catch(() => undefined); return false; }
     } catch { /* about:blank وما شابه */ }
     return true;
-  }, []);
+  }, [isLocal]);
 
   const retry = () => { setFailed(false); setLoading(true); setWebKey((k) => k + 1); };
 
@@ -93,34 +120,18 @@ export default function PlatformScreen() {
     return <View style={styles.center}><ActivityIndicator color={colors.primary} size="large" /></View>;
   }
 
-  if (serverUrl === "") {
-    return (
-      <SafeAreaView style={styles.root} edges={["top", "left", "right"]}>
-        <View style={styles.center}>
-          <Ionicons name="server-outline" size={56} color={colors.primary} />
-          <Text style={styles.title}>اربط التطبيق بمنصة مركزك</Text>
-          <Text style={styles.body}>أدخل عنوان خادم ترتيل الذي زوّدتك به إدارة المركز، مثل https://tarteel.example.org</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.navigate("/settings")} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
-            <Text style={styles.primaryButtonText}>إدخال عنوان الخادم</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={() => router.navigate("/quran")} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
-            <Text style={styles.secondaryButtonText}>فتح المصحف دون اتصال</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.root} edges={["top", "left", "right"]}>
       {failed ? (
         <View style={styles.center}>
-          <Ionicons name={network.isConnected ? "cloud-offline-outline" : "wifi-outline"} size={56} color={colors.primary} />
-          <Text style={styles.title}>{network.isConnected ? "تعذر الوصول إلى خادم ترتيل" : "لا يوجد اتصال بالإنترنت"}</Text>
+          <Ionicons name={isLocal ? "alert-circle-outline" : network.isConnected ? "cloud-offline-outline" : "wifi-outline"} size={56} color={colors.primary} />
+          <Text style={styles.title}>{isLocal ? "تعذر فتح ترتيل" : network.isConnected ? "تعذر الوصول إلى خادم ترتيل" : "لا يوجد اتصال بالإنترنت"}</Text>
           <Text style={styles.body}>
-            {network.isConnected
-              ? `تحقق من عنوان الخادم في الإعدادات:\n${serverUrl}`
-              : "المنصة تحتاج اتصالاً. يمكنك قراءة المصحف دون اتصال، وستُحمَّل المنصة تلقائياً عند عودة الشبكة."}
+            {isLocal
+              ? "حدث خطأ أثناء تشغيل المنصة على الجهاز. بياناتك محفوظة؛ أعد المحاولة."
+              : network.isConnected
+                ? `تحقق من عنوان الخادم في الإعدادات:\n${serverUrl}`
+                : "المنصة تحتاج اتصالاً بخادم المركز. يمكنك قراءة المصحف دون اتصال، وستُحمَّل المنصة تلقائياً عند عودة الشبكة."}
           </Text>
           <Pressable accessibilityRole="button" onPress={retry} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
             <Text style={styles.primaryButtonText}>إعادة المحاولة</Text>
@@ -133,7 +144,7 @@ export default function PlatformScreen() {
         <WebView
           key={webKey}
           ref={webRef}
-          source={{ uri: serverUrl }}
+          source={{ uri: startPath ? `${serverUrl.replace(/\/+$/, "")}${startPath}` : serverUrl }}
           style={styles.web}
           originWhitelist={["https://*", "http://*", "about:*", "blob:*", "data:*"]}
           injectedJavaScriptBeforeContentLoaded={BRIDGE_SCRIPT}

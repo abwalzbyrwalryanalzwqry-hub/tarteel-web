@@ -2,9 +2,12 @@ import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
+import { isSqliteDialect } from "../data/dialect";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
+  // نسخة الجهاز المحلية تشغّل الموجّه داخل WebView (client/src/local) دون خادم.
+  allowOutsideOfServer: isSqliteDialect(),
 });
 
 export const router = t.router;

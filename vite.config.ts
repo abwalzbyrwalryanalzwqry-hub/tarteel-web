@@ -38,9 +38,48 @@ function manualChunks(id: string) {
   return undefined; // الباقي (مثل recharts) يتبع الصفحة التي تستخدمه.
 }
 
-const plugins = [react(), tailwindcss(), optionalAnalytics()];
+const ROOT = import.meta.dirname;
+const r = (...parts: string[]) => path.resolve(ROOT, ...parts);
 
-export default defineConfig({
+/**
+ * نسخة الجهاز المحلية (`vite build --mode device`): تطبيق أندرويد يعمل دون خادم.
+ * منطق الخادم (server/) يُضمَّن في الواجهة ويعمل على SQLite داخل WebView؛ نستبدل هنا الملفات
+ * المرتبطة بـ Node/MySQL ببدائل للمتصفح حسب مسارها الفعلي بعد الحل (أياً كانت صيغة الاستيراد).
+ */
+function localModeOverrides(): Plugin {
+  const files = new Map<string, string>([
+    [r("drizzle/schema.ts"), r("drizzle/schema.sqlite.ts")],
+    [r("server/data/connection.ts"), r("client/src/local/connection.ts")],
+    [r("server/_core/logger.ts"), r("client/src/local/shims/logger.ts")],
+    [r("server/storage.ts"), r("client/src/local/shims/storage.ts")],
+    [r("server/export/reportPdf.ts"), r("client/src/local/shims/reportPdf.ts")],
+    [r("client/src/lib/apiLink.ts"), r("client/src/local/apiLink.ts")],
+  ]);
+  const builtins = new Map<string, string>([
+    ["node:crypto", r("client/src/local/shims/crypto.ts")],
+    ["crypto", r("client/src/local/shims/crypto.ts")],
+    ["node:util", r("client/src/local/shims/util.ts")],
+    ["util", r("client/src/local/shims/util.ts")],
+    ["node:module", r("client/src/local/shims/module.ts")],
+  ]);
+  return {
+    name: "tarteel-local-mode-overrides",
+    enforce: "pre",
+    async resolveId(source, importer, options) {
+      const builtin = builtins.get(source);
+      if (builtin) return builtin;
+      const resolved = await this.resolve(source, importer, { ...options, skipSelf: true });
+      if (!resolved) return null;
+      const replacement = files.get(resolved.id.split("?")[0]);
+      return replacement ? { ...resolved, id: replacement } : resolved;
+    },
+  };
+}
+
+export default defineConfig(({ mode }) => {
+  const isLocal = mode === "device";
+  const plugins = isLocal ? [localModeOverrides(), react(), tailwindcss()] : [react(), tailwindcss(), optionalAnalytics()];
+  return {
   plugins,
   resolve: {
     alias: {
@@ -52,9 +91,14 @@ export default defineConfig({
   envDir: path.resolve(import.meta.dirname),
   root: path.resolve(import.meta.dirname, "client"),
   publicDir: path.resolve(import.meta.dirname, "client", "public"),
+  // إعدادات منطق الخادم (process.env) تأتي في نسخة الجهاز من client/src/local/env.ts.
+  define: isLocal ? { "import.meta.env.VITE_TARTEEL_LOCAL": JSON.stringify("1"), "process.env": "globalThis.__TARTEEL_ENV__" } : undefined,
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    outDir: path.resolve(import.meta.dirname, isLocal ? "dist/local" : "dist/public"),
     emptyOutDir: true,
+    // WebView في أندرويد يُحدَّث من Google Play؛ Chrome 80+ يغطي الأجهزة العاملة اليوم.
+    target: isLocal ? ["es2020", "chrome80"] : undefined,
+    chunkSizeWarningLimit: isLocal ? 4000 : undefined,
     rollupOptions: { output: { manualChunks } },
   },
   server: {
@@ -65,4 +109,5 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
+  };
 });

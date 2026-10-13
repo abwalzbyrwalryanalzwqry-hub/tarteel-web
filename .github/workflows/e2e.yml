@@ -78,3 +78,47 @@ jobs:
             e2e/playwright-report
             e2e/test-results
           retention-days: 7
+
+  device:
+    # نسخة الجهاز (تطبيق أندرويد دون خادم): الواجهة ومنطق ترتيل على SQLite داخل الصفحة.
+    name: Playwright — نسخة الجهاز دون خادم
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: تثبيت حزم التطبيق
+        run: pnpm install --frozen-lockfile
+
+      - name: فحص مخطط SQLite المولّد
+        run: pnpm exec tsx scripts/gen-sqlite-schema.ts --check
+
+      - name: بناء نسخة الجهاز
+        run: pnpm build:local
+
+      - name: تثبيت Playwright
+        working-directory: e2e
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: الاختبارات
+        working-directory: e2e
+        run: npx playwright test -c playwright.device.config.ts
+
+      - name: رفع التقرير عند الفشل
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-device-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7
