@@ -1,3 +1,4 @@
+import { hitRateLimit, resetUsageLimitsMemoryForTests } from "../data/usage-limits";
 import { createHash, randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 
@@ -55,24 +56,16 @@ export function hashSetupToken(token: string) {
   return createHash("sha256").update(token.trim()).digest("hex");
 }
 
-// ── حدّ بسيط للمحاولات في الذاكرة (لكل IP) فوق القفل الدائم في قاعدة البيانات ──
-const WINDOW_MS = 15 * 60 * 1000;
-const MAX_PER_WINDOW = 20;
-const buckets = new Map<string, { count: number; resetAt: number }>();
+// ── حد المحاولات لكل IP فوق القفل الدائم لكل حساب؛ يُحفظ في MySQL (انظر data/usage-limits) ──
+export const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+export const RATE_LIMIT_MAX_PER_WINDOW = 20;
 
-export function consumeRateLimit(key: string, now = Date.now()): boolean {
-  const bucket = buckets.get(key);
-  if (!bucket || bucket.resetAt <= now) {
-    buckets.set(key, { count: 1, resetAt: now + WINDOW_MS });
-    if (buckets.size > 10_000) buckets.forEach((v, k) => { if (v.resetAt <= now) buckets.delete(k); });
-    return true;
-  }
-  bucket.count += 1;
-  return bucket.count <= MAX_PER_WINDOW;
+export function consumeRateLimit(key: string, now = Date.now()): Promise<boolean> {
+  return hitRateLimit(key, { max: RATE_LIMIT_MAX_PER_WINDOW, windowMs: RATE_LIMIT_WINDOW_MS, now });
 }
 
 export function resetRateLimitsForTests() {
-  buckets.clear();
+  resetUsageLimitsMemoryForTests();
 }
 
 export const MAX_FAILED_ATTEMPTS = 8;

@@ -33,6 +33,24 @@ jobs:
     name: الأنواع والاختبارات والبناء
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # قاعدة MySQL حقيقية لاختبارات التكامل (server/integration) وللتأكد أن الترحيلات تُطبَّق من الصفر.
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: tarteel_test
+          MYSQL_USER: tarteel
+          MYSQL_PASSWORD: tarteel
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      TEST_DATABASE_URL: mysql://tarteel:tarteel@127.0.0.1:3306/tarteel_test
     steps:
       - uses: actions/checkout@v7
         with:
@@ -69,7 +87,24 @@ jobs:
           if [ ${#files[@]} -eq 0 ]; then echo "لا ملفات جديدة"; exit 0; fi
           pnpm exec prettier --check --ignore-unknown "${files[@]}"
 
-      - name: الاختبارات
+      - name: تطبيق الترحيلات على قاعدة الاختبار
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+        run: pnpm exec drizzle-kit migrate
+
+      # يجب ألا يولّد المخطط ترحيلاً جديداً؛ وإلا فقد عُدّل schema.ts دون ترحيل.
+      - name: لا فرق بين المخطط والترحيلات
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+        run: |
+          pnpm exec drizzle-kit generate --name ci_drift_check
+          if [ -n "$(git status --porcelain drizzle)" ]; then
+            echo "::error::schema.ts يختلف عن الترحيلات؛ شغّل drizzle-kit generate وأضف الترحيل."
+            git status --porcelain drizzle
+            exit 1
+          fi
+
+      - name: الاختبارات (مع اختبارات التكامل على MySQL)
         run: pnpm test
 
       - name: البناء

@@ -1,89 +1,154 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
 import { Route, Switch, useLocation } from "wouter";
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect, type ComponentType } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleSimulationProvider } from "./contexts/RoleSimulationContext";
 import TarteelLayout from "./components/TarteelLayout";
-import Dashboard from "./pages/Dashboard";
-import Centers from "./pages/Centers";
-import Branches from "./pages/Branches";
-import Teachers from "./pages/Teachers";
-import Students from "./pages/Students";
-import StudentProfile from "./pages/StudentProfile";
-import Circles from "./pages/Circles";
-import CircleDetail from "./pages/CircleDetail";
-import Sessions from "./pages/Sessions";
-import SessionDetail from "./pages/SessionDetail";
-import Reports from "./pages/Reports";
-import Notifications from "./pages/Notifications";
-import Settings from "./pages/Settings";
-import Trash from "./pages/Trash";
-import AuditLog from "./pages/AuditLog";
-import AcademicSeasons from "./pages/AcademicSeasons";
-import LoginPage from "./pages/LoginPage";
-import SetPassword from "./pages/SetPassword";
-import AIAssistant from "./pages/AIAssistant";
-import SplashScreen from "./pages/SplashScreen";
-import DeveloperInfo from "./pages/DeveloperInfo";
-import QuranCenter from "./pages/QuranCenter";
-import MushafPickerPage from "./pages/MushafPickerPage";
-import QuranReaderPage from "./pages/QuranReaderPage";
-import ParentMessages from "./pages/ParentMessages";
-import TeacherInvites from "./pages/TeacherInvites";
-import RedeemTeacherInvite from "./pages/RedeemTeacherInvite";
-import AccessManagement from "./pages/AccessManagement";
-import RedeemAccessCode from "./pages/RedeemAccessCode";
-import CenterOnboarding from "./pages/CenterOnboarding";
-import GuideDashboard from "./pages/GuideDashboard";
+import { PageLoader } from "./components/PageLoader";
+
+// كل صفحة في ملف مستقل يُحمَّل عند فتحها فقط؛ كانت كلها في حزمة واحدة (~2.1MB).
+// الإطار (TarteelLayout) يبقى في الحزمة الرئيسية ليظهر الشريط الجانبي فوراً أثناء تحميل الصفحة.
+const NotFound = lazy(() => import("@/pages/NotFound"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Centers = lazy(() => import("./pages/Centers"));
+const Branches = lazy(() => import("./pages/Branches"));
+const Teachers = lazy(() => import("./pages/Teachers"));
+const Students = lazy(() => import("./pages/Students"));
+const StudentProfile = lazy(() => import("./pages/StudentProfile"));
+const Circles = lazy(() => import("./pages/Circles"));
+const CircleDetail = lazy(() => import("./pages/CircleDetail"));
+const Sessions = lazy(() => import("./pages/Sessions"));
+const SessionDetail = lazy(() => import("./pages/SessionDetail"));
+const Reports = lazy(() => import("./pages/Reports"));
+const Notifications = lazy(() => import("./pages/Notifications"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Trash = lazy(() => import("./pages/Trash"));
+const AuditLog = lazy(() => import("./pages/AuditLog"));
+const AcademicSeasons = lazy(() => import("./pages/AcademicSeasons"));
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const SetPassword = lazy(() => import("./pages/SetPassword"));
+const AIAssistant = lazy(() => import("./pages/AIAssistant"));
+const SplashScreen = lazy(() => import("./pages/SplashScreen"));
+const DeveloperInfo = lazy(() => import("./pages/DeveloperInfo"));
+const QuranCenter = lazy(() => import("./pages/QuranCenter"));
+const MushafPickerPage = lazy(() => import("./pages/MushafPickerPage"));
+const QuranReaderPage = lazy(() => import("./pages/QuranReaderPage"));
+const ParentMessages = lazy(() => import("./pages/ParentMessages"));
+const TeacherInvites = lazy(() => import("./pages/TeacherInvites"));
+const RedeemTeacherInvite = lazy(() => import("./pages/RedeemTeacherInvite"));
+const AccessManagement = lazy(() => import("./pages/AccessManagement"));
+const RedeemAccessCode = lazy(() => import("./pages/RedeemAccessCode"));
+const CenterOnboarding = lazy(() => import("./pages/CenterOnboarding"));
+const GuideDashboard = lazy(() => import("./pages/GuideDashboard"));
+
+/** صفحة داخل الإطار، معرّفة مرة واحدة حتى لا يُعاد تركيب الإطار مع كل إعادة رسم للموجّه. */
+function inLayout<P extends object>(
+  Page: ComponentType<P>,
+  mapProps?: (params: Record<string, string | undefined>) => P
+) {
+  return function LayoutRoute(props: {
+    params?: Record<string, string | undefined>;
+  }) {
+    const pageProps = mapProps ? mapProps(props.params ?? {}) : ({} as P);
+    return (
+      <TarteelLayout>
+        <Suspense fallback={<PageLoader />}>
+          <Page {...pageProps} />
+        </Suspense>
+      </TarteelLayout>
+    );
+  };
+}
+
+const idParam = (params: Record<string, string | undefined>) =>
+  Number(params.id);
+
+const DashboardRoute = inLayout(Dashboard);
+const CentersRoute = inLayout(Centers);
+const BranchesRoute = inLayout(Branches);
+const AcademicSeasonsRoute = inLayout(AcademicSeasons);
+const CirclesRoute = inLayout(Circles);
+const TeachersRoute = inLayout(Teachers);
+const StudentsRoute = inLayout(Students);
+const SessionsRoute = inLayout(Sessions);
+const AIAssistantRoute = inLayout(AIAssistant);
+const QuranCenterRoute = inLayout(QuranCenter);
+const ParentMessagesRoute = inLayout(ParentMessages);
+const TeacherInvitesRoute = inLayout(TeacherInvites);
+const AccessManagementRoute = inLayout(AccessManagement);
+const GuideDashboardRoute = inLayout(GuideDashboard);
+const ReportsRoute = inLayout(Reports);
+const NotificationsRoute = inLayout(Notifications);
+const SettingsRoute = inLayout(Settings);
+const DeveloperInfoRoute = inLayout(DeveloperInfo);
+const TrashRoute = inLayout(Trash);
+const AuditLogRoute = inLayout(AuditLog);
+const CircleDetailRoute = inLayout(CircleDetail, params => ({
+  circleId: idParam(params),
+}));
+const StudentProfileRoute = inLayout(StudentProfile, params => ({
+  studentId: idParam(params),
+}));
+const SessionDetailRoute = inLayout(SessionDetail, params => ({
+  sessionId: idParam(params),
+}));
 
 function LegacySessionRedirect({ id }: { id?: number }) {
   const [, navigate] = useLocation();
-  useEffect(() => { navigate(id ? `/periods/${id}` : "/periods"); }, [id, navigate]);
+  useEffect(() => {
+    navigate(id ? `/periods/${id}` : "/periods");
+  }, [id, navigate]);
   return null;
 }
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/login" component={LoginPage} />
-      <Route path="/set-password" component={SetPassword} />
-      <Route path="/dashboard" component={() => <TarteelLayout><Dashboard /></TarteelLayout>} />
-      <Route path="/centers" component={() => <TarteelLayout><Centers /></TarteelLayout>} />
-      <Route path="/branches" component={() => <TarteelLayout><Branches /></TarteelLayout>} />
-      <Route path="/seasons" component={() => <TarteelLayout><AcademicSeasons /></TarteelLayout>} />
-      <Route path="/circles" component={() => <TarteelLayout><Circles /></TarteelLayout>} />
-      <Route path="/circles/:id" component={(props: any) => <TarteelLayout><CircleDetail circleId={Number(props.params?.id)} /></TarteelLayout>} />
-      <Route path="/teachers" component={() => <TarteelLayout><Teachers /></TarteelLayout>} />
-      <Route path="/students/:id" component={(props: any) => <TarteelLayout><StudentProfile studentId={Number(props.params?.id)} /></TarteelLayout>} />
-      <Route path="/students" component={() => <TarteelLayout><Students /></TarteelLayout>} />
-      <Route path="/periods" component={() => <TarteelLayout><Sessions /></TarteelLayout>} />
-      <Route path="/periods/:id" component={(props: any) => <TarteelLayout><SessionDetail sessionId={Number(props.params?.id)} /></TarteelLayout>} />
-      <Route path="/sessions" component={() => <LegacySessionRedirect />} />
-      <Route path="/sessions/:id" component={(props: any) => <LegacySessionRedirect id={Number(props.params?.id)} />} />
-      <Route path="/assistant" component={() => <TarteelLayout><AIAssistant /></TarteelLayout>} />
-      <Route path="/quran/picker" component={MushafPickerPage} />
-      <Route path="/quran/read" component={QuranReaderPage} />
-      <Route path="/quran" component={() => <TarteelLayout><QuranCenter /></TarteelLayout>} />
-      <Route path="/parent-messages" component={() => <TarteelLayout><ParentMessages /></TarteelLayout>} />
-      <Route path="/teacher-invites" component={() => <TarteelLayout><TeacherInvites /></TarteelLayout>} />
-      <Route path="/access-management" component={() => <TarteelLayout><AccessManagement /></TarteelLayout>} />
-      <Route path="/guide" component={() => <TarteelLayout><GuideDashboard /></TarteelLayout>} />
-      <Route path="/redeem-teacher-invite" component={RedeemTeacherInvite} />
-      <Route path="/start" component={CenterOnboarding} />
-      <Route path="/redeem-access-code" component={RedeemAccessCode} />
-      <Route path="/reports" component={() => <TarteelLayout><Reports /></TarteelLayout>} />
-      <Route path="/notifications" component={() => <TarteelLayout><Notifications /></TarteelLayout>} />
-      <Route path="/settings" component={() => <TarteelLayout><Settings /></TarteelLayout>} />
-      <Route path="/developer" component={() => <TarteelLayout><DeveloperInfo /></TarteelLayout>} />
-      <Route path="/trash" component={() => <TarteelLayout><Trash /></TarteelLayout>} />
-      <Route path="/audit-log" component={() => <TarteelLayout><AuditLog /></TarteelLayout>} />
-      <Route path="/" component={SplashScreen} />
-      <Route path="/404" component={NotFound} />
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={<PageLoader fullScreen />}>
+      <Switch>
+        <Route path="/login" component={LoginPage} />
+        <Route path="/set-password" component={SetPassword} />
+        <Route path="/dashboard" component={DashboardRoute} />
+        <Route path="/centers" component={CentersRoute} />
+        <Route path="/branches" component={BranchesRoute} />
+        <Route path="/seasons" component={AcademicSeasonsRoute} />
+        <Route path="/circles" component={CirclesRoute} />
+        <Route path="/circles/:id" component={CircleDetailRoute} />
+        <Route path="/teachers" component={TeachersRoute} />
+        <Route path="/students/:id" component={StudentProfileRoute} />
+        <Route path="/students" component={StudentsRoute} />
+        <Route path="/periods" component={SessionsRoute} />
+        <Route path="/periods/:id" component={SessionDetailRoute} />
+        <Route path="/sessions" component={() => <LegacySessionRedirect />} />
+        <Route
+          path="/sessions/:id"
+          component={(props: any) => (
+            <LegacySessionRedirect id={Number(props.params?.id)} />
+          )}
+        />
+        <Route path="/assistant" component={AIAssistantRoute} />
+        <Route path="/quran/picker" component={MushafPickerPage} />
+        <Route path="/quran/read" component={QuranReaderPage} />
+        <Route path="/quran" component={QuranCenterRoute} />
+        <Route path="/parent-messages" component={ParentMessagesRoute} />
+        <Route path="/teacher-invites" component={TeacherInvitesRoute} />
+        <Route path="/access-management" component={AccessManagementRoute} />
+        <Route path="/guide" component={GuideDashboardRoute} />
+        <Route path="/redeem-teacher-invite" component={RedeemTeacherInvite} />
+        <Route path="/start" component={CenterOnboarding} />
+        <Route path="/redeem-access-code" component={RedeemAccessCode} />
+        <Route path="/reports" component={ReportsRoute} />
+        <Route path="/notifications" component={NotificationsRoute} />
+        <Route path="/settings" component={SettingsRoute} />
+        <Route path="/developer" component={DeveloperInfoRoute} />
+        <Route path="/trash" component={TrashRoute} />
+        <Route path="/audit-log" component={AuditLogRoute} />
+        <Route path="/" component={SplashScreen} />
+        <Route path="/404" component={NotFound} />
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 

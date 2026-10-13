@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { readPendingTeacherInvite } from "../../../shared/teacherInviteFlow";
+import { clearPendingTeacherInvite, readPendingTeacherInvite } from "../../../shared/teacherInviteFlow";
 import { hasActiveAccessMembership } from "../../../shared/accessMembership";
 import { AccessHelpPanel } from "@/components/AccessHelpPanel";
 
@@ -14,18 +14,30 @@ export default function LoginPage() {
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
   const { data: providers } = trpc.auth.providers.useQuery(undefined, { staleTime: 5 * 60_000 });
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [initialParams] = useState(() => new URLSearchParams(window.location.search));
+  const [mode, setMode] = useState<"login" | "register">(() => (initialParams.get("mode") === "register" || initialParams.get("code") ? "register" : "login"));
+  const [inviteCode, setInviteCode] = useState(() => (initialParams.get("code") ?? readPendingTeacherInvite() ?? "").toUpperCase());
+  const signupOpen = Boolean(providers?.allowSignup);
+  const canRegister = signupOpen || Boolean(providers?.inviteSignup);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const onAuthSuccess = async () => { setPassword(""); try { sessionStorage.removeItem("tarteel-switch-account"); } catch {} await utils.auth.me.invalidate(); };
   const loginMutation = trpc.auth.login.useMutation({ onSuccess: onAuthSuccess, onError: (e) => toast.error(e.message) });
-  const registerMutation = trpc.auth.register.useMutation({ onSuccess: async () => { toast.success("تم إنشاء حسابك"); await onAuthSuccess(); }, onError: (e) => toast.error(e.message) });
+  const registerMutation = trpc.auth.register.useMutation({
+    onSuccess: async (result) => {
+      // الدعوة استُردت مع إنشاء الحساب؛ لا نعيد المستخدم إلى صفحة استردادها.
+      if (result.role) clearPendingTeacherInvite();
+      toast.success(result.role ? "تم إنشاء حسابك وتفعيل الدعوة" : "تم إنشاء حسابك");
+      await onAuthSuccess();
+    },
+    onError: (e) => toast.error(e.message),
+  });
   const busy = loginMutation.isPending || registerMutation.isPending;
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (mode === "login") loginMutation.mutate({ email, password });
-    else registerMutation.mutate({ name, email, password });
+    else registerMutation.mutate({ name, email, password, inviteCode: inviteCode.trim() || undefined });
   };
   const [switchAccount] = useState(() => {
     try { return sessionStorage.getItem("tarteel-switch-account") === "1"; } catch { return false; }
@@ -90,11 +102,18 @@ export default function LoginPage() {
 
           {providers?.local !== false && (
             <form onSubmit={submit} className="space-y-3 text-right" noValidate>
-              {providers?.allowSignup && (
+              {canRegister && (
                 <div className="mb-2 grid grid-cols-2 gap-1 rounded-xl bg-muted/40 p-1 text-sm" role="tablist">
                   <button type="button" role="tab" aria-selected={mode === "login"} onClick={() => setMode("login")} className={`rounded-lg py-2 font-semibold transition-colors ${mode === "login" ? "bg-background text-foreground shadow" : "text-muted-foreground"}`}>تسجيل الدخول</button>
                   <button type="button" role="tab" aria-selected={mode === "register"} onClick={() => setMode("register")} className={`rounded-lg py-2 font-semibold transition-colors ${mode === "register" ? "bg-background text-foreground shadow" : "text-muted-foreground"}`}>حساب جديد</button>
                 </div>
+              )}
+              {mode === "register" && (
+                <label className="block text-sm">
+                  <span className="mb-1 block font-medium text-foreground">{signupOpen ? "رمز الدعوة أو كود الدخول (اختياري)" : "رمز الدعوة أو كود الدخول"}</span>
+                  <input required={!signupOpen} dir="ltr" autoComplete="off" spellCheck={false} value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} placeholder="TRTL-1234ABCD" className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-center font-mono tracking-wider outline-none focus:border-primary" />
+                  <span className="mt-1 block text-xs text-muted-foreground">{signupOpen ? "إن كان معك رمز من المركز أدخله ليُفعَّل دورك مباشرة." : "إنشاء الحسابات متاح لمن وصله رمز من إدارة المركز."}</span>
+                </label>
               )}
               {mode === "register" && (
                 <label className="block text-sm">

@@ -5,6 +5,7 @@ import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
+import { setupServiceWorker } from "./serviceWorker";
 import { ROLE_SIMULATION_STORAGE_KEY } from "./contexts/RoleSimulationContext";
 import "./index.css";
 
@@ -85,3 +86,5 @@ createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </trpc.Provider>
 );
+
+setupServiceWorker();

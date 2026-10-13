@@ -4,11 +4,13 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ===================== TARTEEL TYPOGRAPHY SYSTEM ===================== */
-@font-face { font-family: "Tarteel Serif Text"; src: url("/storage/thmanyahseriftext-Light_bb4bb1fe.woff2") format("woff2"); font-style: normal; font-weight: 300; font-display: swap; }
-@font-face { font-family: "Tarteel Serif Text"; src: url("/storage/thmanyahseriftext-Regular_f5aef1ee.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
-@font-face { font-family: "Tarteel Serif Text"; src: url("/storage/thmanyahseriftext-Medium_be200abb.woff2") format("woff2"); font-style: normal; font-weight: 500; font-display: swap; }
-@font-face { font-family: "Tarteel Serif Text"; src: url("/storage/thmanyahseriftext-Bold_6c86ea07.woff2") format("woff2"); font-style: normal; font-weight: 700; font-display: swap; }
-@font-face { font-family: "Tarteel Serif Text"; src: url("/storage/thmanyahseriftext-Black_99238822.woff2") format("woff2"); font-style: normal; font-weight: 900; font-display: swap; }
+/* ملفات خط ثمانية ليست في المستودع لأن ترخيصها يمنع إعادة نشرها؛ يضعها المشغّل في STORAGE_DIR
+   (انظر docs/self-hosting-ar.md). بدونها تُستخدم خطوط النظام العربية في --font-*. */
+@font-face { font-family: "Tarteel Serif Text"; src: local("Thmanyah Serif Text Light"), url("/storage/thmanyahseriftext-Light_bb4bb1fe.woff2") format("woff2"); font-style: normal; font-weight: 300; font-display: swap; }
+@font-face { font-family: "Tarteel Serif Text"; src: local("Thmanyah Serif Text Regular"), url("/storage/thmanyahseriftext-Regular_f5aef1ee.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: "Tarteel Serif Text"; src: local("Thmanyah Serif Text Medium"), url("/storage/thmanyahseriftext-Medium_be200abb.woff2") format("woff2"); font-style: normal; font-weight: 500; font-display: swap; }
+@font-face { font-family: "Tarteel Serif Text"; src: local("Thmanyah Serif Text Bold"), url("/storage/thmanyahseriftext-Bold_6c86ea07.woff2") format("woff2"); font-style: normal; font-weight: 700; font-display: swap; }
+@font-face { font-family: "Tarteel Serif Text"; src: local("Thmanyah Serif Text Black"), url("/storage/thmanyahseriftext-Black_99238822.woff2") format("woff2"); font-style: normal; font-weight: 900; font-display: swap; }
 
 /* ===================== ISLAMIC LUXURY UI TOKENS ===================== */
 @theme inline {
@@ -37,10 +39,10 @@
   --color-emerald-900: oklch(0.18 0.08 155);
 
   /* Central font families — all Arabic UI inherits the supplied font. */
-  --font-sans: "Tarteel Serif Text", serif;
+  --font-sans: "Tarteel Serif Text", "Noto Naskh Arabic", "Segoe UI", Tahoma, system-ui, serif;
   --font-serif: "Tarteel Serif Text", serif;
-  --font-display: "Tarteel Serif Text", serif;
-  --font-body: "Tarteel Serif Text", serif;
+  --font-display: "Tarteel Serif Text", "Noto Naskh Arabic", "Segoe UI", Tahoma, system-ui, serif;
+  --font-body: "Tarteel Serif Text", "Noto Naskh Arabic", "Segoe UI", Tahoma, system-ui, serif;
   --font-code: ui-monospace, "SFMono-Regular", Consolas, monospace;
   --font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
 

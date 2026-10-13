@@ -490,3 +490,18 @@ export const passwordSetupTokens = mysqlTable("password_setup_tokens", {
 }, (table) => [uniqueIndex("password_setup_tokens_hash_unique").on(table.tokenHash), index("password_setup_tokens_user_idx").on(table.userId)]);
 
 export type PasswordSetupToken = typeof passwordSetupTokens.$inferSelect;
+
+// ===================== حدود الاستخدام (مشتركة بين نسخ الخادم وتبقى بعد إعادة التشغيل) =====================
+/** نوافذ حد المحاولات لكل مفتاح (مثل login:IP). */
+export const rateLimitBuckets = mysqlTable("rate_limit_buckets", {
+  bucketKey: varchar("bucketKey", { length: 191 }).primaryKey(),
+  count: int("count").default(0).notNull(),
+  resetAt: timestamp("resetAt").notNull(),
+}, (table) => [index("rate_limit_buckets_reset_idx").on(table.resetAt)]);
+
+/** عدد رسائل المساعد الذكي لكل مستخدم في كل يوم (UTC). */
+export const aiDailyUsage = mysqlTable("ai_daily_usage", {
+  userId: int("userId").notNull(),
+  day: varchar("day", { length: 10 }).notNull(),
+  count: int("count").default(0).notNull(),
+}, (table) => [uniqueIndex("ai_daily_usage_user_day_unique").on(table.userId, table.day), index("ai_daily_usage_day_idx").on(table.day)]);
