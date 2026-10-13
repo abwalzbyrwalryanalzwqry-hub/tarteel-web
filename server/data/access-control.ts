@@ -159,32 +159,67 @@ export async function createUserScopes(data: (typeof userScopes.$inferInsert)[])
   await db.insert(userScopes).values(data);
 }
 
+/**
+ * رفض استرداد يجب تسجيله. يُرمى داخل المعاملة ويُسجَّل بعد التراجع عنها:
+ * لو كُتب العدّاد داخل المعاملة نفسها لتراجع MySQL عنه مع الخطأ، فلا يُقفل الرمز أبداً.
+ */
+export class AccessCodeRejection extends Error {
+  constructor(message: string, readonly record: { accessCodeId?: number; disable?: boolean }) {
+    super(message);
+    this.name = "AccessCodeRejection";
+  }
+}
+
+export const ACCESS_CODE_LOCK_AFTER = 5;
+export const ACCESS_CODE_DISABLE_AFTER = 10;
+
+async function recordAccessCodeRejection(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  input: { codeHash: string; userId: number; ipAddress?: string; userAgent?: string },
+  record: AccessCodeRejection["record"],
+  now: Date,
+) {
+  await db.insert(accessCodeAttempts).values({ accessCodeId: record.accessCodeId ?? null, codeFingerprint: input.codeHash, attemptedByUserId: input.userId, wasSuccessful: false, ipAddress: input.ipAddress, userAgent: input.userAgent });
+  if (!record.accessCodeId) return;
+  // MySQL يطبق التعيينات بالترتيب، فالشرطان التاليان يقرآن failedAttempts بعد زيادتها (تحديث ذري بلا سباق).
+  const lockUntil = new Date(now.getTime() + 15 * 60_000);
+  await db.update(accessCodes).set({
+    failedAttempts: sql`${accessCodes.failedAttempts} + 1`,
+    lockedUntil: sql`IF(${accessCodes.failedAttempts} >= ${ACCESS_CODE_LOCK_AFTER}, ${lockUntil}, ${accessCodes.lockedUntil})`,
+    status: record.disable ? "disabled" : sql`IF(${accessCodes.failedAttempts} >= ${ACCESS_CODE_DISABLE_AFTER}, 'disabled', ${accessCodes.status})`,
+    updatedAt: now,
+  }).where(eq(accessCodes.id, record.accessCodeId));
+}
+
 export async function redeemAccessCodeSecure(input: { codeHash: string; userId: number; ipAddress?: string; userAgent?: string }) {
   const db = await getDb();
   if (!db) throw new Error("قاعدة البيانات غير متاحة حالياً");
   const now = new Date();
+  try {
+    return await redeemAccessCodeInTransaction(db, input, now);
+  } catch (error) {
+    if (error instanceof AccessCodeRejection) {
+      await recordAccessCodeRejection(db, input, error.record, now).catch((recordError) => console.warn("[AccessCode] failed to record rejection", String(recordError)));
+    }
+    throw error;
+  }
+}
+
+async function redeemAccessCodeInTransaction(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  input: { codeHash: string; userId: number; ipAddress?: string; userAgent?: string },
+  now: Date,
+) {
   return db.transaction(async (tx) => {
     const [accessCode] = await tx.select().from(accessCodes).where(eq(accessCodes.codeHash, input.codeHash)).limit(1);
-    if (!accessCode) {
-      await tx.insert(accessCodeAttempts).values({ codeFingerprint: input.codeHash, attemptedByUserId: input.userId, wasSuccessful: false, ipAddress: input.ipAddress, userAgent: input.userAgent });
-      throw new Error("رمز الدخول غير صحيح");
-    }
-    const invalidate = async (message: string, disable = false) => {
-      const attempts = accessCode.failedAttempts + 1;
-      await tx.update(accessCodes).set({ failedAttempts: attempts, lockedUntil: attempts >= 5 ? new Date(now.getTime() + 15 * 60_000) : accessCode.lockedUntil, status: disable || attempts >= 10 ? "disabled" : accessCode.status, updatedAt: now }).where(eq(accessCodes.id, accessCode.id));
-      await tx.insert(accessCodeAttempts).values({ accessCodeId: accessCode.id, codeFingerprint: input.codeHash, attemptedByUserId: input.userId, wasSuccessful: false, ipAddress: input.ipAddress, userAgent: input.userAgent });
-      throw new Error(message);
+    if (!accessCode) throw new AccessCodeRejection("رمز الدخول غير صحيح", {});
+    const invalidate = (message: string, disable = false): never => {
+      throw new AccessCodeRejection(message, { accessCodeId: accessCode.id, disable });
     };
-    if (accessCode.status !== "active") await invalidate("هذا الرمز غير متاح", true);
-    if (accessCode.lockedUntil && accessCode.lockedUntil > now) await invalidate("تم تعليق محاولات هذا الرمز مؤقتاً");
-    if (accessCode.expiresAt && accessCode.expiresAt <= now) {
-      await tx.update(accessCodes).set({ status: "expired", updatedAt: now }).where(eq(accessCodes.id, accessCode.id));
-      await invalidate("انتهت صلاحية هذا الرمز", true);
-    }
-    if (accessCode.usedCount >= accessCode.maxUses) {
-      await tx.update(accessCodes).set({ status: "used", updatedAt: now }).where(eq(accessCodes.id, accessCode.id));
-      await invalidate("تم استخدام هذا الرمز بالكامل", true);
-    }
+    if (accessCode.status !== "active") invalidate("هذا الرمز غير متاح", true);
+    if (accessCode.lockedUntil && accessCode.lockedUntil > now) invalidate("تم تعليق محاولات هذا الرمز مؤقتاً");
+    if (accessCode.expiresAt && accessCode.expiresAt <= now) invalidate("انتهت صلاحية هذا الرمز", true);
+    if (accessCode.usedCount >= accessCode.maxUses) invalidate("تم استخدام هذا الرمز بالكامل", true);
     const isTeacherAccessCode = accessCode.role === "teacher" || accessCode.role === "assistant_teacher";
     const isReaderAccessCode = accessCode.role === "student" || accessCode.role === "guardian";
     const isGuideAccessCode = accessCode.role === "guide";
