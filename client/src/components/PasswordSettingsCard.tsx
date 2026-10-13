@@ -1,4 +1,4 @@
-import { KeyRound, LogOut, MailCheck, MailWarning, Phone } from "lucide-react";
+import { KeyRound, LogOut, MailCheck, MailWarning, Phone, ShieldCheck, ShieldAlert } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -27,10 +27,31 @@ export function PasswordSettingsCard() {
   });
   const [newPhone, setNewPhone] = useState("");
   const [phonePassword, setPhonePassword] = useState("");
+  const smsEnabled = Boolean(data?.smsEnabled);
+  /** مع SMS: إضافة الرقم على خطوتين (رمز إلى الرقم الجديد ثم الحفظ به). */
+  const [addCodeSentTo, setAddCodeSentTo] = useState<string | null>(null);
+  const [addCode, setAddCode] = useState("");
+  const requestAddCode = trpc.auth.requestLoginPhoneCode.useMutation({
+    onSuccess: (result) => { setAddCodeSentTo(result.phone); setAddCode(""); toast.success("أرسلنا رمز التحقق إلى الرقم الجديد"); },
+    onError: (error) => toast.error(error.message),
+  });
+  const [verifyCodeSent, setVerifyCodeSent] = useState(false);
+  const [verifyCode, setVerifyCode] = useState("");
+  const sendVerify = trpc.auth.sendPhoneVerification.useMutation({
+    onSuccess: async (result) => {
+      if (result.alreadyVerified) { toast.success("رقمك مؤكد مسبقاً"); await utils.auth.myCredential.invalidate(); return; }
+      setVerifyCodeSent(true); setVerifyCode(""); toast.success("أرسلنا رمز التحقق برسالة SMS");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const verify = trpc.auth.verifyPhone.useMutation({
+    onSuccess: async () => { toast.success("تم تأكيد رقم الهاتف"); setVerifyCodeSent(false); setVerifyCode(""); await utils.auth.myCredential.invalidate(); },
+    onError: (error) => toast.error(error.message),
+  });
   const savePhone = trpc.auth.setLoginPhone.useMutation({
     onSuccess: async (result) => {
       toast.success(`يمكنك الآن الدخول برقم الهاتف ${result.phone}`);
-      setNewPhone(""); setPhonePassword("");
+      setNewPhone(""); setPhonePassword(""); setAddCodeSentTo(null); setAddCode("");
       await Promise.all([utils.auth.myCredential.invalidate(), utils.auth.me.invalidate()]);
     },
     onError: (error) => toast.error(error.message),
@@ -65,6 +86,25 @@ export function PasswordSettingsCard() {
           )}
         </div>
       )}
+      {data?.phone && smsEnabled && (
+        <div className={`mb-4 space-y-2 rounded-xl border px-3 py-2 text-xs ${data.phoneVerified ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex items-center gap-1.5">
+              {data.phoneVerified ? <ShieldCheck className="h-4 w-4 text-emerald-600" /> : <ShieldAlert className="h-4 w-4 text-amber-600" />}
+              {data.phoneVerified ? "رقم الهاتف مؤكد" : "رقم الهاتف غير مؤكد؛ أكّده لتستعيد كلمة المرور به"}
+            </span>
+            {!data.phoneVerified && (
+              <button type="button" onClick={() => sendVerify.mutate()} disabled={sendVerify.isPending} className="shrink-0 font-semibold text-primary hover:underline disabled:opacity-60">{sendVerify.isPending ? "جارٍ الإرسال…" : verifyCodeSent ? "أعد الإرسال" : "أرسل رمز التحقق"}</button>
+            )}
+          </div>
+          {!data.phoneVerified && verifyCodeSent && (
+            <form onSubmit={(event) => { event.preventDefault(); verify.mutate({ code: verifyCode.trim() }); }} className="flex gap-2">
+              <input required type="text" dir="ltr" inputMode="numeric" autoComplete="one-time-code" maxLength={10} aria-label="رمز التحقق" value={verifyCode} onChange={(e) => setVerifyCode(e.target.value)} placeholder="••••••" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-center tracking-[0.3em] outline-none focus:border-primary" />
+              <button type="submit" disabled={verify.isPending || !verifyCode.trim()} className="btn-gold shrink-0 px-4 py-2 text-xs disabled:opacity-60">{verify.isPending ? "…" : "تأكيد"}</button>
+            </form>
+          )}
+        </div>
+      )}
       <form onSubmit={submit} className="space-y-3">
         {!data?.hasPassword && (
           <label className="block text-sm"><span className="mb-1 block">البريد الإلكتروني أو رقم الهاتف للدخول</span>
@@ -79,14 +119,22 @@ export function PasswordSettingsCard() {
         <button type="submit" disabled={save.isPending} className="btn-gold w-full py-2.5 text-sm disabled:opacity-60">{save.isPending ? "جارٍ الحفظ…" : data?.hasPassword ? "تغيير كلمة المرور" : "تعيين كلمة المرور"}</button>
       </form>
       {data?.hasPassword && (
-        <form onSubmit={(event) => { event.preventDefault(); savePhone.mutate({ phone: newPhone.trim(), currentPassword: phonePassword }); }} className="mt-4 space-y-3 border-t border-border pt-4">
+        <form onSubmit={(event) => {
+          event.preventDefault();
+          if (smsEnabled && !addCodeSentTo) requestAddCode.mutate({ phone: newPhone.trim(), currentPassword: phonePassword });
+          else savePhone.mutate({ phone: addCodeSentTo ?? newPhone.trim(), currentPassword: phonePassword, code: smsEnabled ? addCode.trim() : undefined });
+        }} className="mt-4 space-y-3 border-t border-border pt-4">
           <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Phone className="h-4 w-4 text-primary" />{data.phone ? "تغيير رقم الهاتف للدخول" : "إضافة رقم هاتف للدخول"}</h3>
           <p className="text-xs leading-6 text-muted-foreground">{data.phone ? <>{data.email ? "تدخل أيضاً بالرقم" : "رقم الدخول الحالي"} <bdi dir="ltr">{data.phone}</bdi>.</> : "أضف رقم هاتفك لتدخل به بدل البريد، بكلمة المرور نفسها."}</p>
           <label className="block text-sm"><span className="mb-1 block">رقم الهاتف</span>
-            <input required type="tel" dir="ltr" inputMode="tel" autoComplete="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} className="w-full rounded-xl border border-border bg-background/70 px-3 py-2.5 text-left outline-none focus:border-primary" /></label>
+            <input required type="tel" dir="ltr" inputMode="tel" autoComplete="tel" value={newPhone} onChange={(e) => { setNewPhone(e.target.value); setAddCodeSentTo(null); }} className="w-full rounded-xl border border-border bg-background/70 px-3 py-2.5 text-left outline-none focus:border-primary" /></label>
           <label className="block text-sm"><span className="mb-1 block">كلمة المرور الحالية للتأكيد</span>
             <input required type="password" dir="ltr" autoComplete="current-password" value={phonePassword} onChange={(e) => setPhonePassword(e.target.value)} className="w-full rounded-xl border border-border bg-background/70 px-3 py-2.5 text-left outline-none focus:border-primary" /></label>
-          <button type="submit" disabled={savePhone.isPending || !newPhone.trim() || !phonePassword} className="w-full rounded-xl border border-primary/40 py-2.5 text-sm font-semibold text-primary hover:bg-primary/10 disabled:opacity-60">{savePhone.isPending ? "جارٍ الحفظ…" : "حفظ رقم الهاتف"}</button>
+          {smsEnabled && addCodeSentTo && (
+            <label className="block text-sm"><span className="mb-1 block">رمز التحقق المرسل إلى <bdi dir="ltr">{addCodeSentTo}</bdi></span>
+              <input required type="text" dir="ltr" inputMode="numeric" autoComplete="one-time-code" maxLength={10} value={addCode} onChange={(e) => setAddCode(e.target.value)} placeholder="••••••" className="w-full rounded-xl border border-border bg-background/70 px-3 py-2.5 text-center tracking-[0.3em] outline-none focus:border-primary" /></label>
+          )}
+          <button type="submit" disabled={savePhone.isPending || requestAddCode.isPending || !newPhone.trim() || !phonePassword || (smsEnabled && Boolean(addCodeSentTo) && !addCode.trim())} className="w-full rounded-xl border border-primary/40 py-2.5 text-sm font-semibold text-primary hover:bg-primary/10 disabled:opacity-60">{savePhone.isPending || requestAddCode.isPending ? "جارٍ…" : smsEnabled && !addCodeSentTo ? "أرسل رمز التحقق" : "تأكيد وحفظ رقم الهاتف"}</button>
         </form>
       )}
       <div className="mt-4 border-t border-border pt-4">
