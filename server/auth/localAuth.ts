@@ -15,6 +15,7 @@ import { isAccountUsable, sdk } from "../_core/sdk";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import type { TrpcContext } from "../_core/context";
 import * as db from "../db";
+import { INVALID_INVITE_MESSAGE, classifyInviteCode, discardNewAccount, isInviteUsable, redeemSignupInvite } from "./inviteSignup";
 import {
   LOCK_DURATION_MS,
   MAX_FAILED_ATTEMPTS,
@@ -136,14 +137,23 @@ export const localAuthRouter = {
   providers: publicProcedure.query(() => ({
     local: true,
     allowSignup: ENV.allowSignup,
+    /** إنشاء حساب برمز دعوة أو كود دخول متاح دائماً، حتى حين يكون التسجيل العام مغلقاً. */
+    inviteSignup: true,
   })),
 
   register: publicProcedure
-    .input(z.object({ name: z.string().trim().min(2, "الاسم قصير جداً").max(120), email: emailSchema, password: passwordSchema }))
+    .input(z.object({
+      name: z.string().trim().min(2, "الاسم قصير جداً").max(120),
+      email: emailSchema,
+      password: passwordSchema,
+      inviteCode: z.string().trim().max(128).optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
       const email = normalizeEmail(input.email);
-      if (!ENV.allowSignup) throw fail("FORBIDDEN", "إنشاء الحسابات مغلق؛ اطلب من إدارة المركز رابط تفعيل");
-      if (!consumeRateLimit(`register:${clientKey(ctx)}`)) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
+      const invite = input.inviteCode ? classifyInviteCode(input.inviteCode) : null;
+      if (input.inviteCode && !invite) throw fail("BAD_REQUEST", INVALID_INVITE_MESSAGE);
+      if (!ENV.allowSignup && !invite) throw fail("FORBIDDEN", "إنشاء الحسابات مغلق إلا برمز دعوة؛ أدخل رمز الدعوة أو كود الدخول الذي وصلك من إدارة المركز");
+      if (!(await consumeRateLimit(`register:${clientKey(ctx)}`))) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
       assertPolicy(input.password);
       // لا نربط تلقائياً بحساب قديم يحمل البريد نفسه (مثل حساب أُنشئ بنظام الدخول السابق) لأن البريد غير مُتحقق منه؛
       // صاحب الحساب القديم يعيّن كلمة مروره من الإعدادات أو برابط من المدير.
@@ -151,17 +161,30 @@ export const localAuthRouter = {
       const database = await requireDb();
       const legacy = await database.select({ id: users.id }).from(users).where(and(eq(users.email, email), isNull(users.deletedAt))).limit(1);
       if (legacy.length) throw fail("CONFLICT", "هذا البريد مرتبط بحساب موجود. سجّل الدخول بالطريقة السابقة وعيّن كلمة مرور من الإعدادات، أو اطلب من المدير رابط تعيين كلمة المرور.");
+      if (invite && !(await isInviteUsable(invite))) throw fail("BAD_REQUEST", INVALID_INVITE_MESSAGE);
+
       const user = await createLocalUser({ name: input.name, email, password: input.password });
-      await issueSession(ctx, user);
-      await audit(user.id, "auth.register", user.id, ctx);
-      return { success: true } as const;
+      let granted: { role: string; centerId?: number } | null = null;
+      if (invite) {
+        try {
+          granted = await redeemSignupInvite(invite, user.id, { ipAddress: clientKey(ctx), userAgent: String(ctx.req.headers?.["user-agent"] ?? "").slice(0, 512) || undefined });
+        } catch (error) {
+          // الرمز صار غير صالح بين الفحص والاسترداد: لا نترك حساباً بلا دعوة.
+          await discardNewAccount(user.id).catch((discardError) => console.warn("[Auth] discard failed", String(discardError)));
+          throw fail("BAD_REQUEST", error instanceof Error ? error.message : INVALID_INVITE_MESSAGE);
+        }
+      }
+      const fresh = (await database.select().from(users).where(eq(users.id, user.id)).limit(1))[0] ?? user;
+      await issueSession(ctx, fresh);
+      await audit(user.id, invite ? "auth.register_invite" : "auth.register", user.id, ctx, granted ? { inviteKind: invite!.kind, role: granted.role, centerId: granted.centerId } : undefined);
+      return { success: true, role: granted?.role ?? null } as const;
     }),
 
   login: publicProcedure
     .input(z.object({ email: emailSchema, password: passwordSchema }))
     .mutation(async ({ ctx, input }) => {
       const email = normalizeEmail(input.email);
-      if (!consumeRateLimit(`login:${clientKey(ctx)}`)) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول بعد ربع ساعة");
+      if (!(await consumeRateLimit(`login:${clientKey(ctx)}`))) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول بعد ربع ساعة");
       const credential = await findCredentialByEmail(email);
       const invalid = fail("UNAUTHORIZED", "البريد أو كلمة المرور غير صحيحة");
       if (!credential) {
@@ -240,7 +263,7 @@ export const localAuthRouter = {
   completeSetup: publicProcedure
     .input(z.object({ token: z.string().trim().min(20).max(200), email: emailSchema.optional(), password: passwordSchema }))
     .mutation(async ({ ctx, input }) => {
-      if (!consumeRateLimit(`setup:${clientKey(ctx)}`)) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
+      if (!(await consumeRateLimit(`setup:${clientKey(ctx)}`))) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
       assertPolicy(input.password);
       const database = await requireDb();
       const row = (await database.select().from(passwordSetupTokens).where(and(
