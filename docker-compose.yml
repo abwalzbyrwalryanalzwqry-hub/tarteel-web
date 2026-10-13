@@ -2,8 +2,22 @@
 #   cp .env.example .env   # ثم املأ القيم
 #   docker compose up -d --build
 services:
+  # يطبق ترحيلات قاعدة البيانات مرة عند كل تشغيل ثم يخرج؛ التطبيق لا يبدأ إلا بعد نجاحه.
+  migrate:
+    build: .
+    image: tarteel-app
+    env_file: .env
+    environment:
+      DATABASE_URL: mysql://tarteel:${MYSQL_PASSWORD}@db:3306/tarteel
+    command: ["node", "dist/migrate.js"]
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+
   app:
     build: .
+    image: tarteel-app
     restart: unless-stopped
     env_file: .env
     environment:
@@ -15,6 +29,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   db:
     image: mysql:8.4

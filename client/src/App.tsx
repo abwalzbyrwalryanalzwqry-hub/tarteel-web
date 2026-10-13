@@ -29,6 +29,7 @@ const AuditLog = lazy(() => import("./pages/AuditLog"));
 const AcademicSeasons = lazy(() => import("./pages/AcademicSeasons"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const SetPassword = lazy(() => import("./pages/SetPassword"));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
 const AIAssistant = lazy(() => import("./pages/AIAssistant"));
 const SplashScreen = lazy(() => import("./pages/SplashScreen"));
 const DeveloperInfo = lazy(() => import("./pages/DeveloperInfo"));
@@ -109,6 +110,7 @@ function Router() {
       <Switch>
         <Route path="/login" component={LoginPage} />
         <Route path="/set-password" component={SetPassword} />
+        <Route path="/verify-email" component={VerifyEmail} />
         <Route path="/dashboard" component={DashboardRoute} />
         <Route path="/centers" component={CentersRoute} />
         <Route path="/branches" component={BranchesRoute} />

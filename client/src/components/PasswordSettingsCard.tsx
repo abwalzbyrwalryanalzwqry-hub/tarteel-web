@@ -1,4 +1,4 @@
-import { KeyRound, LogOut } from "lucide-react";
+import { KeyRound, LogOut, MailCheck, MailWarning } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -7,6 +7,11 @@ import { trpc } from "@/lib/trpc";
 export function PasswordSettingsCard() {
   const utils = trpc.useUtils();
   const { data } = trpc.auth.myCredential.useQuery();
+  const { data: emailStatus } = trpc.auth.emailStatus.useQuery();
+  const resend = trpc.auth.resendVerification.useMutation({
+    onSuccess: (result) => toast.success(result.alreadyVerified ? "بريدك مؤكد مسبقاً" : "أرسلنا رابط التأكيد إلى بريدك"),
+    onError: (error) => toast.error(error.message),
+  });
   const [email, setEmail] = useState("");
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -38,6 +43,17 @@ export function PasswordSettingsCard() {
     <div className="glass-card rounded-2xl p-5">
       <h2 className="font-display font-bold text-foreground text-lg mb-1 flex items-center gap-2"><KeyRound className="w-5 h-5 text-primary"/>كلمة المرور</h2>
       <p className="mb-4 text-xs leading-6 text-muted-foreground">{data?.hasPassword ? `تدخل بالبريد ${data.email}.` : "لم تُعيَّن كلمة مرور بعد. عيّنها الآن لتتمكن من الدخول بالبريد وكلمة المرور."}</p>
+      {emailStatus?.email && (
+        <div className={`mb-4 flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs ${emailStatus.verified ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
+          <span className="flex items-center gap-1.5">
+            {emailStatus.verified ? <MailCheck className="h-4 w-4 text-emerald-600" /> : <MailWarning className="h-4 w-4 text-amber-600" />}
+            {emailStatus.verified ? "البريد مؤكد" : "البريد غير مؤكد بعد"}
+          </span>
+          {!emailStatus.verified && emailStatus.canSend && (
+            <button type="button" onClick={() => resend.mutate()} disabled={resend.isPending} className="font-semibold text-primary hover:underline disabled:opacity-60">{resend.isPending ? "جارٍ الإرسال…" : "أرسل رابط التأكيد"}</button>
+          )}
+        </div>
+      )}
       <form onSubmit={submit} className="space-y-3">
         {!data?.hasPassword && (
           <label className="block text-sm"><span className="mb-1 block">البريد الإلكتروني للدخول</span>

@@ -1,0 +1,13 @@
+{
+  "name": "tarteel-e2e",
+  "private": true,
+  "type": "module",
+  "description": "اختبارات الواجهة من طرف إلى طرف لترتيل (Playwright). منفصلة عن اعتماديات التطبيق.",
+  "scripts": {
+    "test": "playwright test",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.59.1"
+  }
+}

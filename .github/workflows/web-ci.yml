@@ -109,3 +109,19 @@ jobs:
 
       - name: البناء
         run: pnpm build
+
+      # يحاكي صورة Docker: اعتماديات الإنتاج فقط + dist + drizzle، ترحيل قاعدة فارغة بـ dist/migrate.js
+      # (بلا drizzle-kit)، ثم تشغيل الخادم والتأكد من /api/health وأن ترويسة CSP موجودة.
+      - name: تشغيل باعتماديات الإنتاج فقط
+        run: |
+          mkdir -p /tmp/prod && cp -r package.json pnpm-lock.yaml patches dist drizzle /tmp/prod/
+          cd /tmp/prod && pnpm install --prod --frozen-lockfile
+          test ! -e node_modules/vite && test ! -e node_modules/drizzle-kit
+          node -e "require('$GITHUB_WORKSPACE/node_modules/mysql2/promise').createConnection('mysql://root:root@127.0.0.1:3306').then(async c=>{await c.query('CREATE DATABASE tarteel_prod');await c.query(\"GRANT ALL ON tarteel_prod.* TO 'tarteel'@'%'\");await c.end()})"
+          export DATABASE_URL=mysql://tarteel:tarteel@127.0.0.1:3306/tarteel_prod
+          node dist/migrate.js
+          NODE_ENV=production PORT=3100 JWT_SECRET=ci-secret-ci-secret-ci-secret-ci-secret-1234 node dist/index.js > /tmp/prod/app.log 2>&1 &
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:3100/api/health && break; sleep 1; done
+          curl -fs http://127.0.0.1:3100/api/health
+          curl -fsI http://127.0.0.1:3100/login | grep -i "content-security-policy: default-src 'self'"
+          kill %1 || true
