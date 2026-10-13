@@ -12,6 +12,10 @@ updates:
     groups:
       web-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # streamdown سيُستبدل بعارض Markdown خفيف (المرحلة 3، P2)؛ لا داعي لترحيل إصداره الأكبر.
+      - dependency-name: streamdown
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: "/"

@@ -1,8 +1,7 @@
-import XLSX from "xlsx-js-style";
 import { AGE_GROUP_LABELS, type CenterManagementReport } from "./reportBuilder";
 import { storageRead } from "../storage";
 import { generateArabicReportPdf } from "../export/reportPdf";
-import { configureArabicWorkbook, styleArabicSummary, styleArabicTable, writeArabicWorkbook } from "../export/arabicExcel";
+import { buildArabicWorkbook } from "../export/arabicExcel";
 
 const format = (value: number) => new Intl.NumberFormat("ar-SA", { maximumFractionDigits: 1 }).format(value);
 const date = (value: Date) => new Date(value).toLocaleDateString("ar-SA");
@@ -33,18 +32,10 @@ export async function generateManagementReportPdf(report: CenterManagementReport
 }
 
 export function generateManagementReportExcel(report: CenterManagementReport): Buffer {
-  const workbook = XLSX.utils.book_new(); configureArabicWorkbook(workbook);
-  const overview = XLSX.utils.aoa_to_sheet([["تقرير ترتيل لإدارة المركز"], ["المركز", report.meta.centerName], ["الدورية", report.meta.period === "weekly" ? "أسبوعي" : "شهري"], ["من تاريخ", date(report.meta.startDate)], ["إلى تاريخ", date(report.meta.endDate)], ["المعلم", report.meta.filters.teacherName ?? "كل المعلمين"], ["الفئة العمرية", report.meta.filters.ageGroup ? AGE_GROUP_LABELS[report.meta.filters.ageGroup] : "كل الفئات"], [], ["المؤشر", "القيمة"], ["الحلقات النشطة", report.summary.activeCircles], ["الطلاب ضمن النطاق", report.summary.activeStudents], ["الطلاب بسجل تقدم", report.summary.studentsWithRecordedProgress], ["الطلاب بلا سجل تقدم", report.summary.studentsWithoutRecordedProgress], ["الفترات المعتمدة", report.summary.sessions], ["نسبة الحضور", `${report.summary.attendanceRate}%`], ["صفحات الحفظ", report.summary.memorizedPages], ["صفحات المراجعة", report.summary.reviewedPages], ["سجلات الحفظ", report.summary.memorizationEntries], ["سجلات المراجعة", report.summary.revisionEntries], [], ["الأهداف", "القيمة"], ["هدف الحضور", report.goals.attendanceTarget == null ? "غير محدد" : `${report.goals.attendanceTarget}%`], ["هدف الحفظ للنطاق", report.goals.projectedMemorizedPagesTarget ?? "غير محدد"], ["هدف المراجعة للنطاق", report.goals.projectedReviewedPagesTarget ?? "غير محدد"]]);
-  const comparisons = XLSX.utils.aoa_to_sheet([["الحلقة", "المعلم", "الفترات", "نسبة الحضور", "توثيق التقدم", "صفحات الحفظ", "صفحات المراجعة", "سجلات الإنجاز"], ...report.comparisons.map((circle) => [circle.circleName, circle.teacherName ?? "غير معين", circle.sessions, `${circle.attendanceRate}%`, `${circle.studentsWithRecordedProgress}/${circle.activeStudents} · ${circle.progressCoverageRate}%`, circle.memorizedPages, circle.reviewedPages, circle.activityEntries])]);
-  const alerts = XLSX.utils.aoa_to_sheet([["الحالة", "العنوان", "التفاصيل", "المعلم"], ...report.alerts.map((alert) => [alert.severity === "warning" ? "تنبيه" : "متابعة", alert.title, alert.description, alert.teacherName ?? "—"])]);
-  const trend = XLSX.utils.aoa_to_sheet([["الفترة الزمنية", "الفترات", "نسبة الحضور", "صفحات الحفظ", "صفحات المراجعة"], ...report.trend.map((item) => [item.label, item.sessions, `${item.attendanceRate}%`, item.memorizedPages, item.reviewedPages])]);
-  styleArabicSummary(overview, [26, 32]);
-  styleArabicTable(comparisons, { headerRow: 1, widths: [24, 24, 12, 16, 20, 17, 18, 17] });
-  styleArabicTable(trend, { headerRow: 1, widths: [28, 15, 18, 18, 20] });
-  styleArabicTable(alerts, { headerRow: 1, widths: [14, 34, 68, 24] });
-  XLSX.utils.book_append_sheet(workbook, overview, "الملخص");
-  XLSX.utils.book_append_sheet(workbook, comparisons, "مقارنة الحلقات");
-  XLSX.utils.book_append_sheet(workbook, trend, "الاتجاه الزمني");
-  XLSX.utils.book_append_sheet(workbook, alerts, "التنبيهات");
-  return writeArabicWorkbook(workbook);
+  return buildArabicWorkbook([
+    { name: "الملخص", layout: "summary", widths: [26, 32], rows: [["تقرير ترتيل لإدارة المركز"], ["المركز", report.meta.centerName], ["الدورية", report.meta.period === "weekly" ? "أسبوعي" : "شهري"], ["من تاريخ", date(report.meta.startDate)], ["إلى تاريخ", date(report.meta.endDate)], ["المعلم", report.meta.filters.teacherName ?? "كل المعلمين"], ["الفئة العمرية", report.meta.filters.ageGroup ? AGE_GROUP_LABELS[report.meta.filters.ageGroup] : "كل الفئات"], [], ["المؤشر", "القيمة"], ["الحلقات النشطة", report.summary.activeCircles], ["الطلاب ضمن النطاق", report.summary.activeStudents], ["الطلاب بسجل تقدم", report.summary.studentsWithRecordedProgress], ["الطلاب بلا سجل تقدم", report.summary.studentsWithoutRecordedProgress], ["الفترات المعتمدة", report.summary.sessions], ["نسبة الحضور", `${report.summary.attendanceRate}%`], ["صفحات الحفظ", report.summary.memorizedPages], ["صفحات المراجعة", report.summary.reviewedPages], ["سجلات الحفظ", report.summary.memorizationEntries], ["سجلات المراجعة", report.summary.revisionEntries], [], ["الأهداف", "القيمة"], ["هدف الحضور", report.goals.attendanceTarget == null ? "غير محدد" : `${report.goals.attendanceTarget}%`], ["هدف الحفظ للنطاق", report.goals.projectedMemorizedPagesTarget ?? "غير محدد"], ["هدف المراجعة للنطاق", report.goals.projectedReviewedPagesTarget ?? "غير محدد"]] },
+    { name: "مقارنة الحلقات", layout: "table", widths: [24, 24, 12, 16, 20, 17, 18, 17], rows: [["الحلقة", "المعلم", "الفترات", "نسبة الحضور", "توثيق التقدم", "صفحات الحفظ", "صفحات المراجعة", "سجلات الإنجاز"], ...report.comparisons.map((circle) => [circle.circleName, circle.teacherName ?? "غير معين", circle.sessions, `${circle.attendanceRate}%`, `${circle.studentsWithRecordedProgress}/${circle.activeStudents} · ${circle.progressCoverageRate}%`, circle.memorizedPages, circle.reviewedPages, circle.activityEntries])] },
+    { name: "الاتجاه الزمني", layout: "table", widths: [28, 15, 18, 18, 20], rows: [["الفترة الزمنية", "الفترات", "نسبة الحضور", "صفحات الحفظ", "صفحات المراجعة"], ...report.trend.map((item) => [item.label, item.sessions, `${item.attendanceRate}%`, item.memorizedPages, item.reviewedPages])] },
+    { name: "التنبيهات", layout: "table", widths: [14, 34, 68, 24], rows: [["الحالة", "العنوان", "التفاصيل", "المعلم"], ...report.alerts.map((alert) => [alert.severity === "warning" ? "تنبيه" : "متابعة", alert.title, alert.description, alert.teacherName ?? "—"])] },
+  ]);
 }

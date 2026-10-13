@@ -16,8 +16,11 @@ export async function createContext(
   try {
     const auth = await sdk.authenticate(opts.req);
     user = auth.user;
-    if (auth.source === "cookie" && sdk.shouldRenew(auth.session)) {
-      await sdk.issueSessionCookie(opts.req, opts.res, auth.user).catch((error) => console.warn("[Auth] session renew failed", String(error)));
+    if (sdk.shouldRenew(auth.session)) {
+      const renew = auth.source === "cookie"
+        ? sdk.issueSessionCookie(opts.req, opts.res, auth.user)
+        : sdk.issueBearerRenewal(opts.res, auth.user);
+      await renew.catch((error) => console.warn("[Auth] session renew failed", String(error)));
     }
   } catch (error) {
     // Authentication is optional for public procedures.
