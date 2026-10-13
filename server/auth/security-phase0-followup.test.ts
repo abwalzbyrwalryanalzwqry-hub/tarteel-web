@@ -59,7 +59,7 @@ describe("H3: لا تصعيد صلاحيات بالبريد عند التسجي�
   it("التسجيل ببريد المالك (والتسجيل مفتوح) ينشئ حساباً عادياً بلا دور إداري", async () => {
     await expect(
       appRouter.createCaller(ctx()).auth.register({ name: "منتحل", email: "Owner@Tarteel.app", password: "Quran1234" }),
-    ).resolves.toEqual({ success: true });
+    ).resolves.toEqual({ success: true, role: null });
     expect(db.upsertUser).toHaveBeenCalledTimes(1);
     const saved = vi.mocked(db.upsertUser).mock.calls[0][0];
     expect(saved.email).toBe("owner@tarteel.app");
