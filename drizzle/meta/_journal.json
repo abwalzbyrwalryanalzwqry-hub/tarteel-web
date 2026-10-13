@@ -141,6 +141,13 @@
       "when": 1791853402154,
       "tag": "0019_email_and_oauth",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1791864780304,
+      "tag": "0020_phone_login",
+      "breakpoints": true
     }
   ]
 }

@@ -45,7 +45,7 @@ export default function Settings() {
               </div>
               <div>
                 <p className="font-semibold text-foreground text-lg">{user?.name ?? "مستخدم"}</p>
-                <p className="text-sm text-muted-foreground">{user?.email ?? ""}</p>
+                <p className="text-sm text-muted-foreground" dir="ltr">{user?.email ?? user?.phone ?? ""}</p>
                 <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full mt-1 inline-block">{user?.role === "admin" ? "مدير" : "مستخدم"}</span>
               </div>
             </div>
@@ -165,7 +165,7 @@ export default function Settings() {
                   {users.map((u) => (
                     <tr key={u.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                       <td className="py-2 px-3 font-medium text-foreground">{u.name ?? "-"}</td>
-                      <td className="py-2 px-3 text-muted-foreground">{u.email ?? "-"}</td>
+                      <td className="py-2 px-3 text-muted-foreground" dir="ltr">{u.email ?? u.phone ?? "-"}</td>
                       <td className="py-2 px-3">
                         <span className={`text-xs px-2 py-0.5 rounded-full ${u.role==="admin"?"bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400":"bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"}`}>{u.role==="admin"?"مدير":"مستخدم"}</span>
                       </td>
