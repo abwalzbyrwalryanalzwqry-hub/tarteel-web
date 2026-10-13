@@ -24,10 +24,14 @@ export async function createNotification(data: typeof notifications.$inferInsert
   await db.insert(notifications).values(data);
 }
 
-export async function markNotificationRead(id: number) {
+/** يعلّم إشعاراً واحداً مقروءاً إن كان لهذا المستخدم؛ يعيد false إن لم يوجد له إشعار بهذا المعرّف. */
+export async function markNotificationRead(id: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id));
+  const owned = await db.select({ id: notifications.id }).from(notifications).where(and(eq(notifications.id, id), eq(notifications.userId, userId))).limit(1);
+  if (!owned.length) return false;
+  await db.update(notifications).set({ isRead: true }).where(and(eq(notifications.id, id), eq(notifications.userId, userId)));
+  return true;
 }
 
 export async function markAllNotificationsRead(userId: number) {
