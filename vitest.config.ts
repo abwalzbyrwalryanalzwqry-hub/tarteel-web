@@ -12,6 +12,7 @@ export default defineConfig({
       "@assets": path.resolve(templateRoot, "attached_assets"),
     },
   },
+  define: { __TARTEEL_DEVICE__: "false" },
   // Vite 8 يحوّل الشيفرة بـ oxc بدل esbuild.
   oxc: { jsx: { runtime: "automatic" } },
   test: {

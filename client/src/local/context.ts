@@ -6,7 +6,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import type { TrpcContext } from "../../../server/_core/context";
 
-const SESSION_KEY = "tarteel.local.session";
+export const SESSION_KEY = "tarteel.local.session";
 export const ROLE_SIMULATION_HEADER = "x-tarteel-role-simulation";
 
 function readToken() {
@@ -18,6 +18,11 @@ function readToken() {
 }
 
 let memoryToken: string | null = null;
+/** خروج كل الحسابات من الجهاز (بعد استعادة نسخة احتياطية مثلاً). */
+export function clearLocalSession() {
+  writeToken(null);
+}
+
 function writeToken(token: string | null) {
   memoryToken = token;
   try {

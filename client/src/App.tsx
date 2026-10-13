@@ -1,6 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Route, Switch, useLocation } from "wouter";
+import { Redirect, Route, Switch, useLocation } from "wouter";
 import { Suspense, lazy, useEffect, type ComponentType } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -135,7 +135,7 @@ function Router() {
             <LegacySessionRedirect id={Number(props.params?.id)} />
           )}
         />
-        <Route path="/assistant" component={AIAssistantRoute} />
+        <Route path="/assistant">{__TARTEEL_DEVICE__ ? <Redirect to="/dashboard" /> : <AIAssistantRoute />}</Route>
         <Route path="/quran/picker" component={MushafPickerPage} />
         <Route path="/quran/read" component={QuranReaderPage} />
         <Route path="/quran" component={QuranCenterRoute} />

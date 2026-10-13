@@ -1,10 +1,5 @@
-import PDFDocument from "pdfkit";
-import { createRequire } from "node:module";
-import { ARABIC_PDF_PAGE, ARABIC_PDF_WIDTH, toArabicPdfText, truncatePdfValue } from "./arabicPdf";
-
-const require = createRequire(import.meta.url);
-const AMIRI_REGULAR = require.resolve("@fontsource/amiri/files/amiri-arabic-400-normal.woff");
-const AMIRI_BOLD = require.resolve("@fontsource/amiri/files/amiri-arabic-700-normal.woff");
+import { ARABIC_PDF_FEATURES, ARABIC_PDF_PAGE, ARABIC_PDF_WIDTH, toArabicPdfText, truncatePdfValue } from "./arabicPdf";
+import { loadArabicPdfFonts, type ArabicPdfFonts } from "./pdfFonts";
 const BOTTOM_LIMIT = 841.89 - ARABIC_PDF_PAGE.bottom;
 
 export interface ArabicPdfColumn { label: string; width: number; align?: "right" | "center" | "left"; }
@@ -21,10 +16,10 @@ export interface ArabicPdfReport {
   logo?: Buffer;
 }
 
-function registerFonts(doc: PDFKit.PDFDocument) { doc.registerFont("TarteelArabic", AMIRI_REGULAR); doc.registerFont("TarteelArabicBold", AMIRI_BOLD); }
+function registerFonts(doc: PDFKit.PDFDocument, fonts: ArabicPdfFonts) { doc.registerFont("TarteelArabic", fonts.regular as string); doc.registerFont("TarteelArabicBold", fonts.bold as string); }
 function drawRule(doc: PDFKit.PDFDocument, y: number) { doc.moveTo(ARABIC_PDF_PAGE.left, y).lineTo(ARABIC_PDF_PAGE.left + ARABIC_PDF_WIDTH, y).lineWidth(0.8).strokeColor("#D9E4DB").stroke(); }
 function alignedText(doc: PDFKit.PDFDocument, value: string | number | null | undefined, x: number, y: number, width: number, size: number, options: { bold?: boolean; color?: string; align?: "right" | "center" | "left"; limit?: number } = {}) {
-  doc.fillColor(options.color ?? "#1D2B22").font(options.bold ? "TarteelArabicBold" : "TarteelArabic").fontSize(size).text(toArabicPdfText(value, options.limit), x, y, { width, align: options.align ?? "right", lineGap: 1 });
+  doc.fillColor(options.color ?? "#1D2B22").font(options.bold ? "TarteelArabicBold" : "TarteelArabic").fontSize(size).text(toArabicPdfText(value, options.limit), x, y, { width, align: options.align ?? "right", lineGap: 1, features: [...ARABIC_PDF_FEATURES] });
 }
 
 function header(doc: PDFKit.PDFDocument, report: ArabicPdfReport) {
@@ -117,17 +112,20 @@ function drawFooters(doc: PDFKit.PDFDocument, report: ArabicPdfReport) {
     doc.switchToPage(index);
     const y = doc.page.height - ARABIC_PDF_PAGE.bottom - 16;
     drawRule(doc, y - 8);
-    alignedText(doc, report.footerText ?? "تم التوليد بواسطة تطبيق ترتيل", ARABIC_PDF_PAGE.left, y, ARABIC_PDF_WIDTH * .68, 8, { color: "#647066", limit: 80 });
-    alignedText(doc, `صفحة ${index + 1} من ${range.count}`, ARABIC_PDF_PAGE.left + ARABIC_PDF_WIDTH * .62, y, ARABIC_PDF_WIDTH * .38, 8, { color: "#647066", align: "left" });
+    // نص التذييل في اليمين ورقم الصفحة في اليسار، دون تداخل بينهما.
+    alignedText(doc, report.footerText ?? "تم التوليد بواسطة تطبيق ترتيل", ARABIC_PDF_PAGE.left + ARABIC_PDF_WIDTH * .3, y, ARABIC_PDF_WIDTH * .7, 8, { color: "#647066", limit: 80 });
+    alignedText(doc, `صفحة ${index + 1} من ${range.count}`, ARABIC_PDF_PAGE.left, y, ARABIC_PDF_WIDTH * .26, 8, { color: "#647066", align: "left" });
   }
 }
 
-export function generateArabicReportPdf(report: ArabicPdfReport): Promise<Buffer> {
+export async function generateArabicReportPdf(report: ArabicPdfReport): Promise<Buffer> {
+  // تحميل عند الطلب: نسخة الجهاز لا تحمّل pdfkit عند فتح التطبيق، بل عند أول تصدير.
+  const [{ default: PDFDocument }, fonts] = await Promise.all([import("pdfkit"), loadArabicPdfFonts()]);
   return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    const doc = new PDFDocument({ size: "A4", margin: ARABIC_PDF_PAGE.left, bufferPages: true, info: { Title: report.title, Author: "Tarteel" } });
-    registerFonts(doc);
-    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+    const chunks: Uint8Array[] = [];
+    const doc = new PDFDocument({ size: "A4", margin: ARABIC_PDF_PAGE.left, bufferPages: true, font: fonts.regular as string, info: { Title: report.title, Author: "Tarteel" } });
+    registerFonts(doc, fonts);
+    doc.on("data", (chunk: Uint8Array) => chunks.push(chunk));
     doc.on("error", reject);
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     header(doc, report);

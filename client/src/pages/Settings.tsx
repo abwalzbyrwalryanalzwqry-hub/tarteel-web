@@ -7,6 +7,11 @@ import { Link } from "wouter";
 import { PasswordSettingsCard } from "@/components/PasswordSettingsCard";
 import { DeleteAccountCard } from "@/components/DeleteAccountCard";
 import { LEGAL_LINKS } from "@/components/LegalPage";
+import { lazy, Suspense } from "react";
+import "@/lib/edition";
+
+// نسخة الجهاز فقط (تُحذف من نسخة الخادم وقت البناء).
+const DeviceBackupCard = __TARTEEL_DEVICE__ ? lazy(() => import("@/components/DeviceBackupCard")) : null;
 
 export default function Settings() {
   const { user } = useAuth();
@@ -37,6 +42,7 @@ export default function Settings() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <PasswordSettingsCard />
+        {DeviceBackupCard ? <Suspense fallback={null}><DeviceBackupCard /></Suspense> : null}
         {/* Profile */}
         <div className="glass-card rounded-2xl p-5">
           <h2 className="font-display font-bold text-foreground text-lg mb-4 flex items-center gap-2"><Users className="w-5 h-5 text-primary"/>معلومات الحساب</h2>

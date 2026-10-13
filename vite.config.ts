@@ -52,7 +52,7 @@ function localModeOverrides(): Plugin {
     [r("server/data/connection.ts"), r("client/src/local/connection.ts")],
     [r("server/_core/logger.ts"), r("client/src/local/shims/logger.ts")],
     [r("server/storage.ts"), r("client/src/local/shims/storage.ts")],
-    [r("server/export/reportPdf.ts"), r("client/src/local/shims/reportPdf.ts")],
+    [r("server/export/pdfFonts.ts"), r("client/src/local/shims/pdfFonts.ts")],
     [r("client/src/lib/apiLink.ts"), r("client/src/local/apiLink.ts")],
   ]);
   const builtins = new Map<string, string>([
@@ -60,7 +60,6 @@ function localModeOverrides(): Plugin {
     ["crypto", r("client/src/local/shims/crypto.ts")],
     ["node:util", r("client/src/local/shims/util.ts")],
     ["util", r("client/src/local/shims/util.ts")],
-    ["node:module", r("client/src/local/shims/module.ts")],
   ]);
   return {
     name: "tarteel-local-mode-overrides",
@@ -92,7 +91,10 @@ export default defineConfig(({ mode }) => {
   root: path.resolve(import.meta.dirname, "client"),
   publicDir: path.resolve(import.meta.dirname, "client", "public"),
   // إعدادات منطق الخادم (process.env) تأتي في نسخة الجهاز من client/src/local/env.ts.
-  define: isLocal ? { "import.meta.env.VITE_TARTEEL_LOCAL": JSON.stringify("1"), "process.env": "globalThis.__TARTEEL_ENV__" } : undefined,
+  // __TARTEEL_DEVICE__ ثابت منطقي يُستبدل وقت البناء فتُحذف شيفرة نسخة الجهاز من نسخة الخادم كلياً.
+  define: isLocal
+    ? { __TARTEEL_DEVICE__: "true", "import.meta.env.VITE_TARTEEL_LOCAL": JSON.stringify("1"), "process.env": "globalThis.__TARTEEL_ENV__" }
+    : { __TARTEEL_DEVICE__: "false" },
   build: {
     outDir: path.resolve(import.meta.dirname, isLocal ? "dist/local" : "dist/public"),
     emptyOutDir: true,
