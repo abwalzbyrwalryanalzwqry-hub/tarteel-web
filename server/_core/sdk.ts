@@ -1,6 +1,6 @@
 import { COOKIE_NAME, SESSION_RENEWAL_HEADER, SESSION_RENEW_AFTER_MS, SESSION_TTL_MS } from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
-import { parse as parseCookieHeader } from "cookie";
+import { parseCookie as parseCookieHeader } from "cookie";
 import type { Request, Response } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
