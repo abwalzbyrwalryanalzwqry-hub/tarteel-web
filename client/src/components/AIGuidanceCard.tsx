@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Lightbulb, Sparkles } from "lucide-react";
 import { Link } from "wouter";
+import "@/lib/edition";
 
 type GuidanceContext = "dashboard" | "sessions" | "students" | "circles" | "reports";
 
@@ -13,6 +14,8 @@ const contextCopy: Record<GuidanceContext, { title: string; body: string }> = {
 };
 
 export function AIGuidanceCard({ context }: { context: GuidanceContext }) {
+  // المرشد الذكي يحتاج خدمة ذكاء اصطناعي على الخادم؛ لا يظهر في نسخة الجهاز.
+  if (__TARTEEL_DEVICE__) return null;
   const content = contextCopy[context];
   return (
     <section className="rounded-2xl border border-primary/15 bg-gradient-to-l from-primary/10 to-emerald-500/10 p-5">

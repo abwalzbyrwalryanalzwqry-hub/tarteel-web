@@ -7,7 +7,11 @@
  * - onDuplicateKeyUpdate (MySQL) يُترجم إلى ON CONFLICT DO UPDATE دون هدف، وهو يطابق أي قيد فريد كما في MySQL.
  * - الحفظ: IndexedDB بعد كل كتابة (مع تأخير قصير)، ونسخة احتياطية في ملف أصلي عبر جسر أندرويد.
  */
-import initSqlJs, { type Database, type SqlValue } from "sql.js";
+import initSqlJs, {
+  type Database,
+  type SqlJsStatic,
+  type SqlValue,
+} from "sql.js";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import { sql } from "drizzle-orm";
 import { drizzle, type SqliteRemoteDatabase } from "drizzle-orm/sqlite-proxy";
@@ -24,6 +28,8 @@ import {
   loadPersistedDatabase,
   persistDatabase,
   flushPersistence,
+  keepPreRestoreCopy,
+  replacePersistedDatabase,
 } from "./persistence";
 
 const migrationFiles = import.meta.glob("../../../drizzle-sqlite/*.sql", {
@@ -38,6 +44,10 @@ let sqlite: Database | null = null;
 let localDb: LocalDb | null = null;
 let initPromise: Promise<LocalDb> | null = null;
 let inTransactionDepth = 0;
+/** بعد استعادة نسخة احتياطية: لا يُحفظ شيء من القاعدة القديمة حتى إعادة تحميل الصفحة. */
+let replaced = false;
+let sqlModule: Promise<SqlJsStatic> | null = null;
+const getSql = () => (sqlModule ??= initSqlJs({ locateFile: () => wasmUrl }));
 
 /** sql.js لا يقبل Date ولا boolean؛ نحولهما كما يخزنهما مخطط SQLite (ملي ثانية و0/1). */
 function normalizeParam(value: unknown): SqlValue {
@@ -135,7 +145,7 @@ function applyMigrations(db: Database) {
 
 async function open(): Promise<LocalDb> {
   patchMysqlUpsert();
-  const SQL = await initSqlJs({ locateFile: () => wasmUrl });
+  const SQL = await getSql();
   const saved = await loadPersistedDatabase();
   sqlite = saved ? new SQL.Database(saved) : new SQL.Database();
   sqlite.run("PRAGMA foreign_keys = OFF");
@@ -178,10 +188,10 @@ async function open(): Promise<LocalDb> {
 
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 function scheduleSave() {
-  if (!sqlite) return;
+  if (!sqlite || replaced) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    if (!sqlite) return;
+    if (!sqlite || replaced) return;
     // export() في sql.js يغلق القاعدة ويعيد فتحها، فلا نصدّر أثناء معاملة مفتوحة؛ نعيد المحاولة بعدها.
     if (inTransactionDepth > 0) return scheduleSave();
     persistDatabase(exportSnapshot(sqlite));
@@ -199,7 +209,7 @@ export async function getLocalDb() {
 
 /** حفظ فوري (عند إغلاق التطبيق أو قبل تصدير نسخة احتياطية). */
 export async function saveLocalDatabaseNow() {
-  if (!sqlite) return;
+  if (!sqlite || replaced) return;
   clearTimeout(saveTimer);
   if (inTransactionDepth === 0) persistDatabase(exportSnapshot(sqlite));
   await flushPersistence();
@@ -209,6 +219,87 @@ export async function saveLocalDatabaseNow() {
 export function exportLocalDatabase(): Uint8Array {
   if (!sqlite) throw new Error("قاعدة البيانات المحلية غير جاهزة");
   return exportSnapshot(sqlite);
+}
+
+const SQLITE_HEADER = "SQLite format 3\u0000";
+const REQUIRED_TABLES = ["users", "centers", "__tarteel_migrations"];
+
+export interface LocalBackupInfo {
+  users: number;
+  centers: number;
+  students: number;
+  circles: number;
+}
+
+const knownMigrations = () =>
+  new Set(
+    Object.keys(migrationFiles).map(path =>
+      path
+        .split("/")
+        .pop()!
+        .replace(/\.sql$/, "")
+    )
+  );
+
+/** يتحقق أن الملف نسخة احتياطية من ترتيل يمكن فتحها في هذا الإصدار، ويعيد ملخص محتواها. */
+export async function inspectLocalBackup(
+  bytes: Uint8Array
+): Promise<LocalBackupInfo> {
+  const header = new TextDecoder("latin1").decode(bytes.subarray(0, 16));
+  if (bytes.length < 512 || header !== SQLITE_HEADER)
+    throw new Error("هذا الملف ليس نسخة احتياطية من ترتيل");
+  const SQL = await getSql();
+  let db: Database;
+  try {
+    db = new SQL.Database(bytes);
+  } catch {
+    throw new Error("الملف تالف أو غير مكتمل؛ تعذر فتحه");
+  }
+  try {
+    const tables = new Set(
+      selectRows(db, "SELECT name FROM sqlite_master WHERE type = 'table'", []).map(
+        row => String(row[0])
+      )
+    );
+    if (REQUIRED_TABLES.some(name => !tables.has(name)))
+      throw new Error("هذا الملف ليس نسخة احتياطية من ترتيل");
+    const integrity = String(selectRows(db, "PRAGMA quick_check", [])[0]?.[0] ?? "");
+    if (integrity !== "ok") throw new Error("الملف تالف؛ فشل فحص سلامة البيانات");
+    const known = knownMigrations();
+    const newer = selectRows(db, "SELECT name FROM __tarteel_migrations", [])
+      .map(row => String(row[0]))
+      .filter(name => !known.has(name));
+    if (newer.length)
+      throw new Error(
+        "هذه النسخة من إصدار أحدث من التطبيق؛ حدّث ترتيل ثم أعد المحاولة"
+      );
+    const count = (table: string) =>
+      tables.has(table)
+        ? Number(selectRows(db, `SELECT count(*) FROM "${table}"`, [])[0]?.[0] ?? 0)
+        : 0;
+    return {
+      users: count("users"),
+      centers: count("centers"),
+      students: count("students"),
+      circles: count("circles"),
+    };
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * يستبدل قاعدة الجهاز كلها بنسخة احتياطية. تُحفظ البيانات الحالية أولاً كنسخة أمان،
+ * ويلزم إعادة تحميل الصفحة بعدها (تُطبَّق الترحيلات على النسخة إن كانت أقدم).
+ */
+export async function replaceLocalDatabase(bytes: Uint8Array) {
+  await inspectLocalBackup(bytes);
+  await initLocalDatabase();
+  if (sqlite && inTransactionDepth === 0)
+    await keepPreRestoreCopy(exportSnapshot(sqlite)).catch(() => undefined);
+  replaced = true;
+  clearTimeout(saveTimer);
+  await replacePersistedDatabase(bytes);
 }
 
 /** وصول مباشر لجمل SQL بسيطة (ملفات الشعارات، الصيانة). */

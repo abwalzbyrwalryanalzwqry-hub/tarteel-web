@@ -8,6 +8,13 @@ import { clearPendingTeacherInvite, readPendingTeacherInvite } from "../../../sh
 import { hasActiveAccessMembership } from "../../../shared/accessMembership";
 import { AccessHelpPanel } from "@/components/AccessHelpPanel";
 import { looksLikePhone } from "../../../shared/phone";
+import { lazy, Suspense } from "react";
+import "@/lib/edition";
+
+// نسخة الجهاز فقط: استعادة نسخة احتياطية في جهاز جديد.
+const DeviceLoginRestore = __TARTEEL_DEVICE__
+  ? lazy(() => import("@/components/DeviceBackupCard").then(module => ({ default: module.DeviceLoginRestore })))
+  : null;
 
 const GOOGLE_ERRORS: Record<string, string> = {
   not_configured: "الدخول بـ Google غير مفعّل على هذا الخادم.",
@@ -248,7 +255,7 @@ export default function LoginPage() {
               {resetAvailable ? (
                 mode === "login" && <button type="button" onClick={() => { setResetOpen((v) => !v); setResetSent(false); setResetPhone(null); }} className="flex items-center gap-1.5 text-xs text-primary hover:underline"><KeyRound className="h-3.5 w-3.5 shrink-0"/>نسيت كلمة المرور؟</button>
               ) : (
-                <p className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground"><KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0"/>نسيت كلمة المرور؟ اطلب من إدارة المركز رابط تعيين كلمة مرور جديدة.</p>
+                <p className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground"><KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0"/>{__TARTEEL_DEVICE__ ? "نسيت كلمة المرور؟ يعيّنها لك مالك المركز على هذا الجهاز من «المستخدمون والصلاحيات»." : "نسيت كلمة المرور؟ اطلب من إدارة المركز رابط تعيين كلمة مرور جديدة."}</p>
               )}
             </form>
           )}
@@ -304,6 +311,7 @@ export default function LoginPage() {
             <a href="/privacy" className="font-medium text-primary underline-offset-4 hover:underline">سياسة الخصوصية</a>
           </p>
           <AccessHelpPanel />
+          {DeviceLoginRestore ? <Suspense fallback={null}><DeviceLoginRestore /></Suspense> : null}
         </div>
 
         {/* Bottom text */}

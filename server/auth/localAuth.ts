@@ -38,6 +38,8 @@ import {
   verifyPassword,
 } from "./password";
 import { logger } from "../_core/logger";
+import { isSqliteDialect } from "../data/dialect";
+import { getUserCenterMemberships } from "../data/access-control";
 
 const SETUP_TOKEN_TTL_MS = 72 * 60 * 60 * 1000;
 const ADMIN_ROLES = new Set(["admin", "super_admin"]);
@@ -131,6 +133,17 @@ async function requireDb() {
   const database = await db.getDb();
   if (!database) throw fail("INTERNAL_SERVER_ERROR", "قاعدة البيانات غير متاحة");
   return database;
+}
+
+/** المستخدم مالك نشط لمركز فيه عضوية للمستخدم الآخر (ليس مالكاً فيه)، ولا يصدر لنفسه. */
+async function ownsCenterOf(ownerId: number, targetId: number) {
+  if (ownerId === targetId) return false;
+  const now = Date.now();
+  const live = (membership: { status: string; revokedAt: Date | null; expiresAt: Date | null }) =>
+    membership.status === "active" && !membership.revokedAt && (!membership.expiresAt || membership.expiresAt.getTime() > now);
+  const owned = new Set((await getUserCenterMemberships(ownerId)).filter((membership) => membership.isOwner && live(membership)).map((membership) => membership.centerId));
+  if (!owned.size) return false;
+  return (await getUserCenterMemberships(targetId)).some((membership) => owned.has(membership.centerId) && !membership.isOwner && !membership.revokedAt);
 }
 
 function assertPolicy(password: string) {
@@ -623,14 +636,19 @@ export const localAuthRouter = {
     return { success: true } as const;
   }),
 
-  /** المدير العام ينشئ رابط تعيين كلمة مرور لمستخدم (صالح 72 ساعة ولمرة واحدة). */
+  /**
+   * رابط تعيين كلمة مرور لمستخدم (صالح 72 ساعة ولمرة واحدة): من صلاحية المدير العام.
+   * في نسخة الجهاز (دون SMS أو بريد) يصدره أيضاً مالك المركز لعضو في مركزه ليفتحه على الجهاز نفسه.
+   */
   createSetupLink: protectedProcedure
     .input(z.object({ userId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
-      if (!ADMIN_ROLES.has(ctx.user.role)) throw fail("FORBIDDEN", "إنشاء روابط كلمة المرور من صلاحية المدير العام");
+      const isAdmin = ADMIN_ROLES.has(ctx.user.role);
+      if (!isAdmin && !(isSqliteDialect() && (await ownsCenterOf(ctx.user.id, input.userId)))) throw fail("FORBIDDEN", "إنشاء روابط كلمة المرور من صلاحية المدير العام");
       const database = await requireDb();
       const target = (await database.select().from(users).where(eq(users.id, input.userId)).limit(1))[0];
       if (!target || target.deletedAt) throw fail("NOT_FOUND", "المستخدم غير موجود");
+      if (!isAdmin && ADMIN_ROLES.has(target.role)) throw fail("FORBIDDEN", "لا يمكن تعيين كلمة مرور المدير العام");
       const link = await createPasswordSetupToken(target.id, ctx.user.id);
       await audit(ctx.user.id, "auth.setup_link_created", target.id, ctx);
       return link;

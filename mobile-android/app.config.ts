@@ -3,17 +3,18 @@ import type { ExpoConfig } from "expo/config";
 const config: ExpoConfig = {
   name: "ترتيل",
   slug: "tarteel-android",
-  version: "0.3.0",
+  version: "0.4.0",
   orientation: "default",
   scheme: "tarteel",
   userInterfaceStyle: "automatic",
+  icon: "./assets/icon.png",
   newArchEnabled: true,
   ios: { supportsTablet: true, bundleIdentifier: "com.tarteel.quranapp" },
   android: {
     package: "com.tarteel.quranapp",
     adaptiveIcon: {
       foregroundImage: "./assets/icon-foreground.png",
-      backgroundColor: "#E89B00"
+      backgroundColor: "#EC8C06"
     },
     permissions: ["android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE", "android.permission.POST_NOTIFICATIONS"],
     // تمنع إعادة إضافتها عند expo prebuild (انظر AndroidManifest.xml).

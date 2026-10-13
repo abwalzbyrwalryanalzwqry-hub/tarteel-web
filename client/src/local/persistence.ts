@@ -59,12 +59,12 @@ async function idbGet(): Promise<Uint8Array | null> {
   }
 }
 
-async function idbPut(bytes: Uint8Array) {
+async function idbPut(bytes: Uint8Array, key = IDB_KEY) {
   const db = await openIdb();
   try {
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(IDB_STORE, "readwrite");
-      tx.objectStore(IDB_STORE).put(bytes, IDB_KEY);
+      tx.objectStore(IDB_STORE).put(bytes, key);
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
       tx.onabort = () => reject(tx.error);
@@ -164,6 +164,21 @@ export function persistDatabase(bytes: Uint8Array) {
     () => latest && mirrorToNative(latest),
     NATIVE_MIRROR_DELAY_MS
   );
+}
+
+/** نسخة أمان من البيانات الحالية قبل استعادة نسخة احتياطية (تبقى في IndexedDB). */
+export function keepPreRestoreCopy(bytes: Uint8Array) {
+  return idbPut(bytes, "before-restore");
+}
+
+/** يستبدل البيانات المحفوظة كلها (IndexedDB ونسخة التطبيق) ثم ينتظر اكتمال الكتابة. */
+export async function replacePersistedDatabase(bytes: Uint8Array) {
+  await writing;
+  pending = null;
+  latest = bytes;
+  await idbPut(bytes);
+  clearTimeout(nativeTimer);
+  mirrorToNative(bytes);
 }
 
 export async function flushPersistence() {

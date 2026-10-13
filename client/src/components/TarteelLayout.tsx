@@ -48,7 +48,8 @@ const navItems = [
   { path: "/quran", label: "القرآن الكريم", icon: BookOpenText, permission: "quran:view" as const },
   { path: "/parent-messages", label: "رسائل أولياء الأمور", icon: MessageSquareText, permission: "messages:manage" as const },
   { path: "/reports", label: "التقارير", icon: BarChart3, permission: "reports:view" as const },
-  { path: "/assistant", label: "المرشد الذكي", icon: Sparkles, permission: "ai:use" as const },
+  // المرشد الذكي يحتاج الخادم؛ لا يظهر في نسخة الجهاز.
+  ...(__TARTEEL_DEVICE__ ? [] : [{ path: "/assistant", label: "المرشد الذكي", icon: Sparkles, permission: "ai:use" as const }]),
   { path: "/notifications", label: "الإشعارات", icon: Bell, permission: "notifications:view" as const },
   { path: "/settings", label: "الإعدادات", icon: Settings, permission: "settings:view" as const },
   { path: "/trash", label: "سلة المحذوفات", icon: ArchiveRestore, permission: "trash:manage" as const },
