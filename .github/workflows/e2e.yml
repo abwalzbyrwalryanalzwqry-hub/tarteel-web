@@ -1,0 +1,80 @@
+name: اختبارات الواجهة (E2E)
+
+# المسارات الأساسية في متصفح حقيقي على الخادم المبني وMySQL حقيقية:
+# الدخول، والفترة اليومية (حضور وحفظ واعتماد)، والتقرير التنفيذي وتصدير PDF.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["mobile-android/**", "docs/**", "**/*.md"]
+  pull_request:
+    paths-ignore: ["mobile-android/**", "docs/**", "**/*.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Playwright (Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: tarteel_e2e
+          MYSQL_USER: tarteel
+          MYSQL_PASSWORD: tarteel
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      DATABASE_URL: mysql://tarteel:tarteel@127.0.0.1:3306/tarteel_e2e
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: تثبيت حزم التطبيق
+        run: pnpm install --frozen-lockfile
+
+      - name: البناء
+        run: pnpm build
+
+      - name: الترحيلات
+        run: pnpm exec drizzle-kit migrate
+
+      - name: تثبيت Playwright
+        working-directory: e2e
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: الاختبارات
+        working-directory: e2e
+        run: npx playwright test
+
+      - name: رفع التقرير والآثار عند الفشل
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7
