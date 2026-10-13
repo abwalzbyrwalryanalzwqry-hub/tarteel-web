@@ -1,4 +1,4 @@
-import { COOKIE_NAME, SESSION_RENEW_AFTER_MS, SESSION_TTL_MS } from "@shared/const";
+import { COOKIE_NAME, SESSION_RENEWAL_HEADER, SESSION_RENEW_AFTER_MS, SESSION_TTL_MS } from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request, Response } from "express";
@@ -67,6 +67,20 @@ class SessionService {
       expiresInMs: SESSION_TTL_MS,
     });
     res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(req), maxAge: SESSION_TTL_MS });
+    return token;
+  }
+
+  /**
+   * عملاء Bearer (تطبيق أو سكربت يرسل ترويسة Authorization) لا يستقبلون كوكي،
+   * فنعيد لهم الرمز المجدَّد في ترويسة الاستجابة ليحفظه العميل بدل القديم.
+   */
+  async issueBearerRenewal(res: Response, user: Pick<User, "openId" | "name" | "email" | "sessionVersion">) {
+    const token = await this.createSessionToken(user.openId, {
+      name: user.name || user.email || "مستخدم",
+      sessionVersion: user.sessionVersion ?? 0,
+      expiresInMs: SESSION_TTL_MS,
+    });
+    res.setHeader(SESSION_RENEWAL_HEADER, token);
     return token;
   }
 

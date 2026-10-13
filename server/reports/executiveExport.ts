@@ -1,7 +1,6 @@
-import XLSX from "xlsx-js-style";
 import type { ExecutiveCircleReport } from "./reportBuilder";
 import { generateArabicReportPdf } from "../export/reportPdf";
-import { configureArabicWorkbook, styleArabicSummary, styleArabicTable, writeArabicWorkbook } from "../export/arabicExcel";
+import { buildArabicWorkbook } from "../export/arabicExcel";
 
 const format = (value: number) => new Intl.NumberFormat("ar-SA", { maximumFractionDigits: 1 }).format(value);
 const date = (value: Date) => new Date(value).toLocaleDateString("ar-SA");
@@ -17,12 +16,8 @@ export function generateExecutiveCirclePdf(report: ExecutiveCircleReport): Promi
 }
 
 export function generateExecutiveCircleExcel(report: ExecutiveCircleReport): Buffer {
-  const workbook = XLSX.utils.book_new(); configureArabicWorkbook(workbook);
-  const summarySheet = XLSX.utils.aoa_to_sheet([["تقرير ترتيل التنفيذي للحلقة"], ["الحلقة", report.meta.circleName], ["الدورية", report.meta.period === "weekly" ? "أسبوعي" : "شهري"], ["من تاريخ", date(report.meta.startDate)], ["إلى تاريخ", date(report.meta.endDate)], [], ["المؤشر", "القيمة"], ["الفترات المعتمدة", report.summary.sessions], ["حضور", report.summary.present], ["غياب", report.summary.absent], ["استئذان", report.summary.excused], ["تأخر", report.summary.late], ["نسبة الحضور", `${report.summary.attendanceRate}%`], ["سجلات الحفظ", report.summary.memorizationEntries], ["سجلات المراجعة", report.summary.revisionEntries], ["صفحات الحفظ", report.summary.memorizedPages], ["صفحات المراجعة", report.summary.reviewedPages]]);
-  const detailSheet = XLSX.utils.aoa_to_sheet([["الفترة الزمنية", "عدد الفترات", "حضور", "غياب", "استئذان", "تأخر", "سجلات الحفظ", "سجلات المراجعة", "صفحات الحفظ", "صفحات المراجعة"], ...report.buckets.map((bucket) => [bucket.label, bucket.sessions, bucket.present, bucket.absent, bucket.excused, bucket.late, bucket.memorizationEntries, bucket.revisionEntries, bucket.memorizedPages, bucket.reviewedPages])]);
-  styleArabicSummary(summarySheet, [26, 32]);
-  styleArabicTable(detailSheet, { headerRow: 1, widths: [28, 14, 12, 12, 12, 12, 16, 18, 16, 18] });
-  XLSX.utils.book_append_sheet(workbook, summarySheet, "الملخص");
-  XLSX.utils.book_append_sheet(workbook, detailSheet, "التفصيل الزمني");
-  return writeArabicWorkbook(workbook);
+  return buildArabicWorkbook([
+    { name: "الملخص", layout: "summary", widths: [26, 32], rows: [["تقرير ترتيل التنفيذي للحلقة"], ["الحلقة", report.meta.circleName], ["الدورية", report.meta.period === "weekly" ? "أسبوعي" : "شهري"], ["من تاريخ", date(report.meta.startDate)], ["إلى تاريخ", date(report.meta.endDate)], [], ["المؤشر", "القيمة"], ["الفترات المعتمدة", report.summary.sessions], ["حضور", report.summary.present], ["غياب", report.summary.absent], ["استئذان", report.summary.excused], ["تأخر", report.summary.late], ["نسبة الحضور", `${report.summary.attendanceRate}%`], ["سجلات الحفظ", report.summary.memorizationEntries], ["سجلات المراجعة", report.summary.revisionEntries], ["صفحات الحفظ", report.summary.memorizedPages], ["صفحات المراجعة", report.summary.reviewedPages]] },
+    { name: "التفصيل الزمني", layout: "table", widths: [28, 14, 12, 12, 12, 12, 16, 18, 16, 18], rows: [["الفترة الزمنية", "عدد الفترات", "حضور", "غياب", "استئذان", "تأخر", "سجلات الحفظ", "سجلات المراجعة", "صفحات الحفظ", "صفحات المراجعة"], ...report.buckets.map((bucket) => [bucket.label, bucket.sessions, bucket.present, bucket.absent, bucket.excused, bucket.late, bucket.memorizationEntries, bucket.revisionEntries, bucket.memorizedPages, bucket.reviewedPages])] },
+  ]);
 }

@@ -1,67 +1,176 @@
-import XLSX from "xlsx-js-style";
-import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+/**
+ * مولّد ملفات Excel (xlsx) عربية لتقارير ترتيل، بلا مكتبة جداول خارجية.
+ *
+ * كانت التقارير تُبنى بـ xlsx-js-style، وهي نسخة متفرعة من SheetJS 0.18 متوقفة منذ 2022
+ * ولا تصلها إصلاحات الثغرات. ملف xlsx حزمة ZIP فيها ملفات XML ثابتة البنية، وتقاريرنا جداول
+ * نصية بسيطة، فنكتب الـ XML بأنفسنا ونضغطه بـ fflate (بلا اعتماديات فرعية).
+ *
+ * كل ورقة: اتجاه من اليمين لليسار، وطباعة أفقية على A4 بملاءمة العرض، وخط Arial،
+ * ورأس جدول بلون الهوية، وصفوف متناوبة، وفلتر تلقائي لجداول التفصيل.
+ */
+import { strToU8, zipSync } from "fflate";
 
-const border = { top: { style: "thin", color: { rgb: "D9E4DB" } }, bottom: { style: "thin", color: { rgb: "D9E4DB" } }, left: { style: "thin", color: { rgb: "D9E4DB" } }, right: { style: "thin", color: { rgb: "D9E4DB" } } } as const;
+export type XlsxCell = string | number | null | undefined;
 
-type StyledSheet = XLSX.WorkSheet & { "!pageSetup"?: Record<string, unknown>; "!margins"?: Record<string, number>; "!autofilter"?: { ref: string }; "!rows"?: Array<{ hpt?: number }> };
-
-export function configureArabicWorkbook(workbook: XLSX.WorkBook) {
-  workbook.Workbook ??= {};
-  workbook.Workbook.Views = [{ RTL: true }];
+export interface ArabicSheet {
+  /** اسم الورقة (يُقص إلى 31 حرفاً وتُحذف منه الرموز التي يمنعها Excel). */
+  name: string;
+  rows: XlsxCell[][];
+  /** عرض كل عمود بعدد الحروف التقريبي. */
+  widths: number[];
+  /**
+   * table: الصف الأول رأس جدول ملون، مع فلتر تلقائي.
+   * summary: الصف الأول عنوان كبير، والعمود الأول تسميات بخط عريض.
+   */
+  layout: "table" | "summary";
 }
 
-export function writeArabicWorkbook(workbook: XLSX.WorkBook): Buffer {
-  // xlsx ملف ZIP؛ نضيف إعداد الطباعة (أفقي، A4، ملاءمة العرض) لكل ورقة ثم نعيد ضغطه.
-  // المصدر ملف أنشأناه نحن للتو، لا ملف يرفعه مستخدم.
-  const files = unzipSync(new Uint8Array(XLSX.write(workbook, { bookType: "xlsx", type: "buffer", compression: true }) as Buffer));
-  const pageSetup = '<pageSetup orientation="landscape" paperSize="9" fitToWidth="1" fitToHeight="0"/>';
-  for (const name of Object.keys(files)) {
-    if (!/^xl\/worksheets\/sheet\d+\.xml$/.test(name)) continue;
-    const source = strFromU8(files[name]);
-    const withSheetProperties = source.includes("<sheetPr>")
-      ? source.replace("<sheetPr>", '<sheetPr><pageSetUpPr fitToPage="1"/>')
-      : source.replace(/(<worksheet[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>');
-    files[name] = strToU8(withSheetProperties.replace("</worksheet>", `${pageSetup}</worksheet>`));
-  }
+// ── أنماط الخلايا (فهارس cellXfs في styles.xml) ──
+const STYLE = { bodyEven: 1, bodyOdd: 2, header: 3, title: 4, label: 5 } as const;
+
+const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<fonts count="5">
+<font><sz val="10"/><name val="Arial"/><family val="2"/></font>
+<font><sz val="10"/><color rgb="FF1D2B22"/><name val="Arial"/><family val="2"/></font>
+<font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Arial"/><family val="2"/></font>
+<font><b/><sz val="15"/><color rgb="FF0B4F39"/><name val="Arial"/><family val="2"/></font>
+<font><b/><sz val="10"/><color rgb="FF0B4F39"/><name val="Arial"/><family val="2"/></font>
+</fonts>
+<fills count="6">
+<fill><patternFill patternType="none"/></fill>
+<fill><patternFill patternType="gray125"/></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFF8FBF8"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFFFFFFF"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FF0B4F39"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFF1F6F2"/><bgColor indexed="64"/></patternFill></fill>
+</fills>
+<borders count="2">
+<border><left/><right/><top/><bottom/><diagonal/></border>
+<border><left style="thin"><color rgb="FFD9E4DB"/></left><right style="thin"><color rgb="FFD9E4DB"/></right><top style="thin"><color rgb="FFD9E4DB"/></top><bottom style="thin"><color rgb="FFD9E4DB"/></bottom><diagonal/></border>
+</borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="6">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="1" readingOrder="2"/></xf>
+<xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="1" readingOrder="2"/></xf>
+<xf numFmtId="0" fontId="2" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1" readingOrder="2"/></xf>
+<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center" readingOrder="2"/></xf>
+<xf numFmtId="0" fontId="4" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="1" readingOrder="2"/></xf>
+</cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+
+/** يهرّب النص لـ XML ويحذف محارف التحكم التي تجعل الملف تالفاً في Excel. */
+export function escapeXml(value: string) {
+  return value
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** 0 → A، و25 → Z، و26 → AA. */
+export function columnName(index: number) {
+  let name = "";
+  for (let n = index + 1; n > 0; n = Math.floor((n - 1) / 26)) name = String.fromCharCode(65 + ((n - 1) % 26)) + name;
+  return name;
+}
+
+/** اسم ورقة مقبول في Excel: بلا [ ] : * ? / \ وطوله 31 حرفاً على الأكثر، وغير مكرر. */
+export function sanitizeSheetNames(names: string[]) {
+  const used = new Set<string>();
+  return names.map((raw, index) => {
+    const base = raw.replace(/[[\]:*?/\\]/g, " ").replace(/^'+|'+$/g, "").trim().slice(0, 31) || `ورقة ${index + 1}`;
+    let name = base;
+    for (let n = 2; used.has(name.toLowerCase()); n += 1) name = `${base.slice(0, 31 - String(n).length - 1)} ${n}`;
+    used.add(name.toLowerCase());
+    return name;
+  });
+}
+
+function cellStyle(layout: ArabicSheet["layout"], row: number, column: number) {
+  if (row === 0) return layout === "summary" ? STYLE.title : STYLE.header;
+  if (layout === "summary" && column === 0) return STYLE.label;
+  return row % 2 === 0 ? STYLE.bodyEven : STYLE.bodyOdd;
+}
+
+function cellXml(value: XlsxCell, ref: string, style: number) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "number" && Number.isFinite(value)) return `<c r="${ref}" s="${style}"><v>${value}</v></c>`;
+  const text = escapeXml(String(value));
+  // النص المضمّن لا يُفسَّر أبداً كمعادلة، حتى لو بدأ بـ "=".
+  return `<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${text}</t></is></c>`;
+}
+
+/** عرض العمود كما يكتبه Excel لعدد حروف معيّن (نفس صيغة الملفات السابقة، فلا يتغير شكل التقارير). */
+function columnWidth(characters: number) {
+  return characters + 0.83203125;
+}
+
+function sheetBounds(sheet: ArabicSheet) {
+  const lastRow = Math.max(sheet.rows.length - 1, 0);
+  const lastColumn = Math.max(0, sheet.widths.length - 1, ...sheet.rows.map((row) => row.length - 1));
+  return { lastRow, lastColumn, ref: `A1:${columnName(lastColumn)}${lastRow + 1}` };
+}
+
+function hasFilter(sheet: ArabicSheet) {
+  return sheet.layout === "table" && sheet.rows.length > 1;
+}
+
+function sheetXml(sheet: ArabicSheet) {
+  const { ref } = sheetBounds(sheet);
+  const cols = sheet.widths
+    .map((width, index) => `<col min="${index + 1}" max="${index + 1}" width="${columnWidth(width)}" customWidth="1"/>`)
+    .join("");
+  const rows = sheet.rows
+    .map((row, rowIndex) => {
+      const height = rowIndex === 0 ? (sheet.layout === "summary" ? 30 : 28) : null;
+      const cells = row.map((value, column) => cellXml(value, `${columnName(column)}${rowIndex + 1}`, cellStyle(sheet.layout, rowIndex, column))).join("");
+      if (!cells && height === null) return "";
+      return `<row r="${rowIndex + 1}"${height ? ` ht="${height}" customHeight="1"` : ""}>${cells}</row>`;
+    })
+    .join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">`
+    + `<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>`
+    + `<dimension ref="${ref}"/>`
+    + `<sheetViews><sheetView rightToLeft="1" workbookViewId="0"/></sheetViews>`
+    + (cols ? `<cols>${cols}</cols>` : "")
+    + `<sheetData>${rows}</sheetData>`
+    + (hasFilter(sheet) ? `<autoFilter ref="${ref}"/>` : "")
+    + `<pageMargins left="0.25" right="0.25" top="0.45" bottom="0.45" header="0.15" footer="0.15"/>`
+    + `<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>`
+    + `</worksheet>`;
+}
+
+/** يبني ملف xlsx كاملاً من أوراق التقرير. */
+export function buildArabicWorkbook(sheets: ArabicSheet[]): Buffer {
+  if (!sheets.length) throw new Error("المصنف يحتاج ورقة واحدة على الأقل");
+  const names = sanitizeSheetNames(sheets.map((sheet) => sheet.name));
+  const absoluteRef = (ref: string) => ref.replace(/([A-Z]+)(\d+)/g, "$$$1$$$2");
+  const definedNames = sheets
+    .map((sheet, index) => (hasFilter(sheet)
+      ? `<definedName name="_xlnm._FilterDatabase" localSheetId="${index}" hidden="1">'${escapeXml(names[index].replace(/'/g, "''"))}'!${absoluteRef(sheetBounds(sheet).ref)}</definedName>`
+      : ""))
+    .join("");
+
+  const files: Record<string, Uint8Array> = {
+    "[Content_Types].xml": strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`),
+    "_rels/.rels": strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`),
+    "docProps/app.xml": strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Tarteel</Application></Properties>`),
+    "xl/workbook.xml": strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets>${names.map((name, i) => `<sheet name="${escapeXml(name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join("")}</sheets>${definedNames ? `<definedNames>${definedNames}</definedNames>` : ""}</workbook>`),
+    "xl/_rels/workbook.xml.rels": strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join("")}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`),
+    "xl/styles.xml": strToU8(STYLES_XML),
+  };
+  sheets.forEach((sheet, index) => {
+    files[`xl/worksheets/sheet${index + 1}.xml`] = strToU8(sheetXml(sheet));
+  });
   return Buffer.from(zipSync(files, { level: 6 }));
-}
-
-export function styleArabicTable(sheet: XLSX.WorkSheet, options: { headerRow: number; widths: number[]; titleRow?: number; filter?: boolean }) {
-  const worksheet = sheet as StyledSheet;
-  const range = XLSX.utils.decode_range(worksheet["!ref"] ?? "A1:A1");
-  worksheet["!cols"] = options.widths.map((wch) => ({ wch }));
-  worksheet["!pageSetup"] = { orientation: "landscape", fitToWidth: 1, fitToHeight: 0, paperSize: 9 };
-  worksheet["!margins"] = { left: 0.25, right: 0.25, top: 0.45, bottom: 0.45, header: 0.15, footer: 0.15 };
-  worksheet["!rows"] = [];
-  for (let row = range.s.r; row <= range.e.r; row += 1) {
-    for (let column = range.s.c; column <= range.e.c; column += 1) {
-      const address = XLSX.utils.encode_cell({ r: row, c: column });
-      const cell = worksheet[address];
-      if (!cell) continue;
-      cell.s = { font: { name: "Arial", sz: 10, color: { rgb: "1D2B22" } }, alignment: { horizontal: "right", vertical: "center", wrapText: true, readingOrder: 2 }, border, fill: { fgColor: { rgb: row % 2 === 0 ? "F8FBF8" : "FFFFFF" } } };
-    }
-  }
-  const headerIndex = options.headerRow - 1;
-  for (let column = range.s.c; column <= range.e.c; column += 1) {
-    const cell = worksheet[XLSX.utils.encode_cell({ r: headerIndex, c: column })];
-    if (cell) cell.s = { font: { name: "Arial", sz: 10, bold: true, color: { rgb: "FFFFFF" } }, alignment: { horizontal: "center", vertical: "center", wrapText: true, readingOrder: 2 }, border, fill: { fgColor: { rgb: "0B4F39" } } };
-  }
-  worksheet["!rows"][headerIndex] = { hpt: 28 };
-  if (options.titleRow) {
-    const titleIndex = options.titleRow - 1;
-    const titleCell = worksheet[XLSX.utils.encode_cell({ r: titleIndex, c: range.s.c })];
-    if (titleCell) titleCell.s = { font: { name: "Arial", sz: 15, bold: true, color: { rgb: "0B4F39" } }, alignment: { horizontal: "right", vertical: "center", readingOrder: 2 } };
-    worksheet["!rows"][titleIndex] = { hpt: 30 };
-  }
-  if (options.filter !== false && range.e.r > headerIndex) worksheet["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: headerIndex, c: range.s.c }, e: range.e }) };
-}
-
-export function styleArabicSummary(sheet: XLSX.WorkSheet, widths: number[]) {
-  styleArabicTable(sheet, { headerRow: 1, widths, titleRow: 1, filter: false });
-  const worksheet = sheet as StyledSheet;
-  const range = XLSX.utils.decode_range(worksheet["!ref"] ?? "A1:A1");
-  for (let row = range.s.r + 1; row <= range.e.r; row += 1) {
-    const label = worksheet[XLSX.utils.encode_cell({ r: row, c: range.s.c })];
-    if (label) label.s = { font: { name: "Arial", sz: 10, bold: true, color: { rgb: "0B4F39" } }, alignment: { horizontal: "right", vertical: "center", wrapText: true, readingOrder: 2 }, border, fill: { fgColor: { rgb: "F1F6F2" } } };
-  }
 }

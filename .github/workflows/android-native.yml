@@ -1,8 +1,16 @@
 name: Build Tarteel native Android
 
+# الدفع إلى main فقط، وطلبات الدمج التي تلمس تطبيق أندرويد.
+# سابقاً كان الفلتر على كل الفروع، فيعمل البناء (قرابة 9 دقائق) عند إنشاء أي فرع جديد،
+# ومنها فروع Dependabot الخاصة بالويب، لأن GitHub لا يملك أساساً يقارن به أول دفع للفرع.
 on:
   workflow_dispatch:
   push:
+    branches: [main]
+    paths:
+      - "mobile-android/**"
+      - ".github/workflows/android-native.yml"
+  pull_request:
     paths:
       - "mobile-android/**"
       - ".github/workflows/android-native.yml"
