@@ -21,7 +21,7 @@ export default function RedeemTeacherInvite() {
 
   const startClaimLogin = () => {
     if (code.trim()) savePendingTeacherInvite(code);
-    navigate("/login");
+    navigate(code.trim() ? `/login?mode=register&code=${encodeURIComponent(code.trim())}` : "/login");
   };
 
   if (!loading && !isAuthenticated) return <div className="mx-auto max-w-xl space-y-6" dir="rtl">

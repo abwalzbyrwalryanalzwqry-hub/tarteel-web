@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { invokeLLM } from "../_core/llm";
 import { ENV } from "../_core/env";
+import { consumeDailyQuota, resetUsageLimitsMemoryForTests } from "../data/usage-limits";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
 import {
@@ -30,27 +31,14 @@ const assistantPolicy = (context: AiContext) => `
 5) اجعل الإجابة موجزة، ثم أضف قسم «خطوات مقترحة» من 2 إلى 4 نقاط عند ملاءمة السؤال.
 `;
 
-// ── حد يومي لكل مستخدم يحمي رصيد مفتاح LLM من الاستهلاك المفرط ──
-const dailyUsage = new Map<number, { day: string; count: number }>();
-const dayKey = (now: Date) => now.toISOString().slice(0, 10);
-
+// ── حد يومي لكل مستخدم يحمي رصيد مفتاح LLM؛ يُحفظ في MySQL (انظر data/usage-limits) ──
 /** يستهلك رسالة من حصة اليوم؛ يعيد false إن تجاوز المستخدم الحد. */
-export function consumeAiQuota(userId: number, limit = ENV.aiDailyLimit, now = new Date()): boolean {
-  if (limit <= 0) return false;
-  const day = dayKey(now);
-  const entry = dailyUsage.get(userId);
-  if (!entry || entry.day !== day) {
-    dailyUsage.set(userId, { day, count: 1 });
-    if (dailyUsage.size > 50_000) dailyUsage.forEach((value, key) => { if (value.day !== day) dailyUsage.delete(key); });
-    return true;
-  }
-  if (entry.count >= limit) return false;
-  entry.count += 1;
-  return true;
+export function consumeAiQuota(userId: number, limit = ENV.aiDailyLimit, now = new Date()): Promise<boolean> {
+  return consumeDailyQuota(userId, limit, now);
 }
 
 export function resetAiQuotaForTests() {
-  dailyUsage.clear();
+  resetUsageLimitsMemoryForTests();
 }
 
 export const aiRouter = router({
@@ -73,7 +61,7 @@ export const aiRouter = router({
       }
 
       // الأسئلة خارج النطاق لا تصل إلى LLM فلا تُحسب من الحصة.
-      if (!consumeAiQuota(ctx.user.id)) {
+      if (!(await consumeAiQuota(ctx.user.id))) {
         throw new TRPCError({
           code: "TOO_MANY_REQUESTS",
           message: ENV.aiDailyLimit > 0 ? `بلغت الحد اليومي للمساعد الذكي (${ENV.aiDailyLimit} رسالة). حاول غداً.` : "المساعد الذكي غير مفعّل على هذا الخادم.",
