@@ -1,12 +1,13 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { BookOpen, KeyRound, LogIn, Mail, MessageSquare, Phone, Star, UserPlus } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { clearPendingTeacherInvite, readPendingTeacherInvite } from "../../../shared/teacherInviteFlow";
 import { hasActiveAccessMembership } from "../../../shared/accessMembership";
 import { AccessHelpPanel } from "@/components/AccessHelpPanel";
+import { WhatsAppVerifyPanel, type WhatsAppSession } from "@/components/WhatsAppVerifyPanel";
 import { looksLikePhone } from "../../../shared/phone";
 import { lazy, Suspense } from "react";
 import "@/lib/edition";
@@ -64,6 +65,21 @@ export default function LoginPage() {
     onSuccess: (result) => { setResetPhone(result.phone); setResetCode(""); startCooldown(); },
     onError: (e) => toast.error(e.message),
   });
+  /** التحقق العكسي عبر واتساب: جلسة التسجيل وجلسة الاستعادة، والتذكرة بعد التأكيد. */
+  const [signupWa, setSignupWa] = useState<WhatsAppSession | null>(null);
+  const [signupTicket, setSignupTicket] = useState<string | null>(null);
+  const [resetWa, setResetWa] = useState<WhatsAppSession | null>(null);
+  const [resetTicket, setResetTicket] = useState<string | null>(null);
+  const startSignupWa = trpc.auth.startWhatsAppVerification.useMutation({
+    onSuccess: (result) => { setSignupWa(result); setSignupTicket(null); },
+    onError: (e) => toast.error(e.message),
+  });
+  const startResetWa = trpc.auth.startWhatsAppVerification.useMutation({
+    onSuccess: (result) => { setResetWa(result); setResetTicket(null); },
+    onError: (e) => toast.error(e.message),
+  });
+  const onSignupVerified = useCallback((ticket: string) => setSignupTicket(ticket), []);
+  const onResetVerified = useCallback((ticket: string) => setResetTicket(ticket), []);
   const googleHref = `/api/auth/google${mode === "register" && inviteCode.trim() ? `?invite=${encodeURIComponent(inviteCode.trim())}` : ""}`;
   const canRegister = signupOpen || Boolean(providers?.inviteSignup);
   const [name, setName] = useState("");
@@ -77,26 +93,33 @@ export default function LoginPage() {
   const phoneEnabled = providers?.phone !== false;
   const countryCode = providers?.phoneCountryCode ?? "967";
   const identifierIsPhone = looksLikePhone(identifier);
-  const smsEnabled = Boolean(providers?.phoneVerification);
-  const resetAvailable = Boolean(providers?.passwordReset || smsEnabled);
+  /** طرق تأكيد الرقم: واتساب (مجاني، المستخدم يرسل الرمز) وSMS عبر Twilio احتياطياً. */
+  const whatsappEnabled = Boolean(providers?.whatsappVerification);
+  const smsEnabled = Boolean(providers?.smsVerification);
+  const phoneVerifyEnabled = whatsappEnabled || smsEnabled;
+  const [proofMethod, setProofMethod] = useState<"whatsapp" | "sms" | null>(null);
+  const proof = proofMethod === "sms" && smsEnabled ? "sms" : whatsappEnabled ? "whatsapp" : "sms";
+  const resetAvailable = Boolean(providers?.passwordReset || phoneVerifyEnabled);
   const onAuthSuccess = async () => { setPassword(""); try { sessionStorage.removeItem("tarteel-switch-account"); } catch {} await utils.auth.me.invalidate(); };
   const loginMutation = trpc.auth.login.useMutation({ onSuccess: onAuthSuccess, onError: (e) => toast.error(e.message) });
   const registerMutation = trpc.auth.register.useMutation({
     onSuccess: async (result) => {
       // الدعوة استُردت مع إنشاء الحساب؛ لا نعيد المستخدم إلى صفحة استردادها.
-      if (result.role) clearPendingTeacherInvite();
-      toast.success(result.role ? "تم إنشاء حسابك وتفعيل الدعوة" : "تم إنشاء حسابك");
+      if (result.role && !result.linkedChildren) clearPendingTeacherInvite();
+      if (result.linkedChildren) toast.success(`تم إنشاء حسابك وربطه بـ ${result.linkedChildren === 1 ? "ابنك المسجل" : `${result.linkedChildren} من أبنائك المسجلين`} برقمك`);
+      else toast.success(result.role ? "تم إنشاء حسابك وتفعيل الدعوة" : "تم إنشاء حسابك");
       await onAuthSuccess();
     },
     onError: (e) => toast.error(e.message),
   });
   const resetWithPhone = trpc.auth.resetPasswordWithPhone.useMutation({
-    onSuccess: async () => { toast.success("تم تعيين كلمة المرور الجديدة"); setResetOpen(false); setResetPhone(null); setResetPassword(""); setResetConfirm(""); await onAuthSuccess(); },
+    onSuccess: async () => { toast.success("تم تعيين كلمة المرور الجديدة"); setResetOpen(false); setResetPhone(null); setResetWa(null); setResetTicket(null); setResetPassword(""); setResetConfirm(""); await onAuthSuccess(); },
     onError: (e) => toast.error(e.message),
   });
   const busy = loginMutation.isPending || registerMutation.isPending;
   const phoneSignup = mode === "register" && phoneEnabled && signupMethod === "phone";
-  const needsSignupCode = phoneSignup && smsEnabled;
+  const needsSignupCode = phoneSignup && phoneVerifyEnabled;
+  const signupProofReady = proof === "whatsapp" ? Boolean(signupTicket && signupWa) : Boolean(signupCodeSentTo && phoneCode.trim());
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (mode === "login") loginMutation.mutate({ identifier, password });
@@ -105,10 +128,11 @@ export default function LoginPage() {
       registerMutation.mutate({
         name,
         email: usePhone ? undefined : email,
-        phone: usePhone ? phone : undefined,
+        phone: usePhone ? (proof === "whatsapp" && signupWa ? signupWa.phone : phone) : undefined,
         password,
         inviteCode: inviteCode.trim() || undefined,
-        phoneCode: usePhone && smsEnabled ? phoneCode.trim() : undefined,
+        phoneCode: usePhone && phoneVerifyEnabled && proof === "sms" ? phoneCode.trim() : undefined,
+        phoneTicket: usePhone && phoneVerifyEnabled && proof === "whatsapp" ? signupTicket ?? undefined : undefined,
       });
     }
   };
@@ -202,7 +226,7 @@ export default function LoginPage() {
               {mode === "login" ? (
                 <label className="block text-sm">
                   <span className="mb-1 block font-medium text-foreground">{phoneEnabled ? "البريد الإلكتروني أو رقم الهاتف" : "البريد الإلكتروني"}</span>
-                  <input required type="text" dir="ltr" inputMode={identifierIsPhone ? "tel" : "email"} autoComplete="username" autoCapitalize="none" spellCheck={false} value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
+                  <input required type="text" dir="ltr" inputMode={identifierIsPhone ? "tel" : "email"} autoComplete="username" autoCapitalize="none" spellCheck={false} value={identifier} onChange={(e) => { setIdentifier(e.target.value); setResetWa(null); setResetTicket(null); }} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
                 </label>
               ) : (
                 <>
@@ -215,11 +239,25 @@ export default function LoginPage() {
                   {phoneEnabled && signupMethod === "phone" ? (
                     <label className="block text-sm">
                       <span className="mb-1 block font-medium text-foreground">رقم الهاتف</span>
-                      <input required type="tel" dir="ltr" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => { setPhone(e.target.value); setSignupCodeSentTo(null); }} placeholder={`+${countryCode} …`} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
+                      <input required type="tel" dir="ltr" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => { setPhone(e.target.value); setSignupCodeSentTo(null); setSignupWa(null); setSignupTicket(null); }} placeholder={`+${countryCode} …`} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
                       <span className="mt-1 block text-xs leading-5 text-muted-foreground">الرقم المحلي يُكمَّل برمز الدولة <bdi dir="ltr">+{countryCode}</bdi>؛ لرقم من دولة أخرى اكتبه كاملاً مع رمزها. ستدخل لاحقاً بهذا الرقم.</span>
                     </label>
                   ) : null}
-                  {needsSignupCode ? (
+                  {needsSignupCode && proof === "whatsapp" ? (
+                    <div className="space-y-2 rounded-xl border border-emerald-600/20 bg-emerald-600/5 p-3 text-sm">
+                      <WhatsAppVerifyPanel
+                        session={signupWa}
+                        starting={startSignupWa.isPending}
+                        disabled={!phone.trim()}
+                        onStart={() => startSignupWa.mutate({ purpose: "signup", phone, inviteCode: inviteCode.trim() || undefined })}
+                        onVerified={onSignupVerified}
+                        idleHint="ستُرسل أنت رسالة واتساب فيها رمز إلى رقم ترتيل، فنتأكد أن الرقم لك. لا تصلك أي رسالة منا."
+                      />
+                      {smsEnabled && !signupTicket ? (
+                        <button type="button" onClick={() => setProofMethod("sms")} className="w-full text-xs text-primary hover:underline">لا يوجد واتساب على هذا الرقم؟ أرسل رمزاً برسالة SMS</button>
+                      ) : null}
+                    </div>
+                  ) : needsSignupCode ? (
                     <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm">
                       <button type="button" disabled={requestSignupCode.isPending || !phone.trim() || cooldown > 0} onClick={() => requestSignupCode.mutate({ phone, inviteCode: inviteCode.trim() || undefined })} className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary/40 py-2 font-semibold text-primary hover:bg-primary/10 disabled:opacity-60">
                         <MessageSquare className="h-4 w-4" />
@@ -233,6 +271,9 @@ export default function LoginPage() {
                       ) : (
                         <p className="text-xs leading-5 text-muted-foreground">سنرسل رمزاً من 6 أرقام برسالة SMS لتأكيد أن الرقم لك.</p>
                       )}
+                      {whatsappEnabled ? (
+                        <button type="button" onClick={() => setProofMethod("whatsapp")} className="w-full text-xs text-primary hover:underline">التحقق عبر واتساب بدلاً من ذلك</button>
+                      ) : null}
                     </div>
                   ) : null}
                   {phoneEnabled && signupMethod === "phone" ? null : (
@@ -248,12 +289,12 @@ export default function LoginPage() {
                 <input required type="password" dir="ltr" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
                 {mode === "register" && <span className="mt-1 block text-xs text-muted-foreground">8 أحرف على الأقل وتحتوي على حروف وأرقام.</span>}
               </label>
-              <button type="submit" disabled={busy || (needsSignupCode && (!signupCodeSentTo || !phoneCode.trim()))} className="btn-gold w-full text-base py-3 flex items-center justify-center gap-2 disabled:opacity-60">
+              <button type="submit" disabled={busy || (needsSignupCode && !signupProofReady)} className="btn-gold w-full text-base py-3 flex items-center justify-center gap-2 disabled:opacity-60">
                 {mode === "login" ? <LogIn className="w-5 h-5"/> : <UserPlus className="w-5 h-5"/>}
                 {busy ? "جارٍ التحقق…" : mode === "login" ? "الدخول إلى ترتيل" : "إنشاء الحساب"}
               </button>
               {resetAvailable ? (
-                mode === "login" && <button type="button" onClick={() => { setResetOpen((v) => !v); setResetSent(false); setResetPhone(null); }} className="flex items-center gap-1.5 text-xs text-primary hover:underline"><KeyRound className="h-3.5 w-3.5 shrink-0"/>نسيت كلمة المرور؟</button>
+                mode === "login" && <button type="button" onClick={() => { setResetOpen((v) => !v); setResetSent(false); setResetPhone(null); setResetWa(null); setResetTicket(null); }} className="flex items-center gap-1.5 text-xs text-primary hover:underline"><KeyRound className="h-3.5 w-3.5 shrink-0"/>نسيت كلمة المرور؟</button>
               ) : (
                 <p className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground"><KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0"/>{__TARTEEL_DEVICE__ ? "نسيت كلمة المرور؟ يعيّنها لك مالك المركز على هذا الجهاز من «المستخدمون والصلاحيات»." : "نسيت كلمة المرور؟ اطلب من إدارة المركز رابط تعيين كلمة مرور جديدة."}</p>
               )}
@@ -262,7 +303,32 @@ export default function LoginPage() {
 
           {resetOpen && mode === "login" && resetAvailable && (
             <div className="mt-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-right text-sm">
-              {identifierIsPhone && smsEnabled ? (
+              {identifierIsPhone && whatsappEnabled && proof === "whatsapp" ? (
+                <div className="space-y-2">
+                  {resetTicket && resetWa ? (
+                    <form onSubmit={(event) => { event.preventDefault(); if (resetPassword !== resetConfirm) { toast.error("كلمتا المرور غير متطابقتين"); return; } resetWithPhone.mutate({ phone: resetWa.phone, ticket: resetTicket, newPassword: resetPassword }); }} className="space-y-2">
+                      <WhatsAppVerifyPanel session={resetWa} starting={false} onStart={() => undefined} onVerified={onResetVerified} idleHint="" />
+                      <input required type="password" dir="ltr" autoComplete="new-password" minLength={8} aria-label="كلمة المرور الجديدة" placeholder="كلمة المرور الجديدة" value={resetPassword} onChange={(e) => setResetPassword(e.target.value)} className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-left outline-none focus:border-primary placeholder:text-right" />
+                      <input required type="password" dir="ltr" autoComplete="new-password" minLength={8} aria-label="تأكيد كلمة المرور" placeholder="تأكيد كلمة المرور" value={resetConfirm} onChange={(e) => setResetConfirm(e.target.value)} className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-left outline-none focus:border-primary placeholder:text-right" />
+                      <span className="block text-xs text-muted-foreground">8 أحرف على الأقل وتحتوي على حروف وأرقام.</span>
+                      <button type="submit" disabled={resetWithPhone.isPending} className="btn-gold w-full py-2.5 disabled:opacity-60">{resetWithPhone.isPending ? "جارٍ الحفظ…" : "تعيين كلمة المرور والدخول"}</button>
+                    </form>
+                  ) : (
+                    <WhatsAppVerifyPanel
+                      session={resetWa}
+                      starting={startResetWa.isPending}
+                      disabled={!identifier.trim()}
+                      onStart={() => startResetWa.mutate({ purpose: "reset", phone: identifier.trim() })}
+                      onVerified={onResetVerified}
+                      startLabel="استعد كلمة المرور عبر واتساب"
+                      idleHint="سترسل من واتساب الرقم المكتوب أعلاه رمزاً إلى رقم ترتيل. الاستعادة بالهاتف متاحة للأرقام المؤكدة فقط."
+                    />
+                  )}
+                  {smsEnabled && !resetTicket ? (
+                    <button type="button" onClick={() => { setProofMethod("sms"); setResetWa(null); }} className="w-full text-xs text-primary hover:underline">أرسل رمزاً برسالة SMS بدلاً من ذلك</button>
+                  ) : null}
+                </div>
+              ) : identifierIsPhone && smsEnabled ? (
                 resetPhone ? (
                   <form onSubmit={(event) => { event.preventDefault(); if (resetPassword !== resetConfirm) { toast.error("كلمتا المرور غير متطابقتين"); return; } resetWithPhone.mutate({ phone: resetPhone, code: resetCode.trim(), newPassword: resetPassword }); }} className="space-y-2">
                     <p className="text-xs leading-6 text-muted-foreground">إن كان الرقم <bdi dir="ltr">{resetPhone}</bdi> مؤكداً لحساب في ترتيل فستصله رسالة فيها رمز صالح 10 دقائق.</p>
@@ -277,17 +343,18 @@ export default function LoginPage() {
                   <form onSubmit={(event) => { event.preventDefault(); requestPhoneReset.mutate({ phone: identifier.trim() }); }} className="space-y-2">
                     <p className="text-xs leading-6 text-muted-foreground">سنرسل رمزاً برسالة SMS إلى الرقم المكتوب أعلاه. الاستعادة بالهاتف متاحة للأرقام المؤكدة فقط.</p>
                     <button type="submit" disabled={requestPhoneReset.isPending || cooldown > 0} className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/40 py-2.5 font-semibold text-primary hover:bg-primary/10 disabled:opacity-60"><MessageSquare className="h-4 w-4" />{requestPhoneReset.isPending ? "جارٍ الإرسال…" : cooldown > 0 ? `إعادة الإرسال بعد ${cooldown} ث` : "أرسل رمز الاستعادة"}</button>
+                    {whatsappEnabled ? <button type="button" onClick={() => setProofMethod("whatsapp")} className="w-full text-xs text-primary hover:underline">الاستعادة عبر واتساب بدلاً من ذلك</button> : null}
                   </form>
                 )
               ) : identifierIsPhone ? (
                 <p className="text-xs leading-6 text-muted-foreground">الاستعادة برقم الهاتف غير مفعّلة على هذا الخادم. اطلب من إدارة المركز رابط تعيين كلمة مرور جديدة.</p>
               ) : !providers?.passwordReset ? (
-                <p className="text-xs leading-6 text-muted-foreground">{identifier.trim() ? "الاستعادة بالبريد غير مفعّلة؛ اكتب رقم هاتفك المؤكد في الحقل أعلاه لنرسل لك رمزاً." : "اكتب رقم هاتفك المؤكد في الحقل أعلاه لنرسل لك رمز الاستعادة برسالة SMS."}</p>
+                <p className="text-xs leading-6 text-muted-foreground">{identifier.trim() ? "الاستعادة بالبريد غير مفعّلة؛ اكتب رقم هاتفك المؤكد في الحقل أعلاه بدلاً منه." : (whatsappEnabled ? "اكتب رقم هاتفك المؤكد في الحقل أعلاه لتستعيد كلمة المرور عبر واتساب." : "اكتب رقم هاتفك المؤكد في الحقل أعلاه لنرسل لك رمز الاستعادة برسالة SMS.")}</p>
               ) : resetSent ? (
                 <p className="leading-7 text-foreground">إن كان البريد مسجّلاً فستصلك رسالة فيها رابط صالح 30 دقيقة. افحص مجلد الرسائل غير المرغوب فيها أيضاً.</p>
               ) : (
                 <form onSubmit={(event) => { event.preventDefault(); requestReset.mutate({ email: identifier.trim() }); }} className="space-y-2">
-                  <p className="text-xs leading-6 text-muted-foreground">{smsEnabled ? "أدخل بريد حسابك أو رقم هاتفك المؤكد في الحقل أعلاه ثم اضغط الزر." : "أدخل بريد حسابك في الحقل أعلاه ثم اضغط الزر لنرسل لك رابط تعيين كلمة مرور جديدة."}</p>
+                  <p className="text-xs leading-6 text-muted-foreground">{phoneVerifyEnabled ? "أدخل بريد حسابك أو رقم هاتفك المؤكد في الحقل أعلاه ثم اضغط الزر." : "أدخل بريد حسابك في الحقل أعلاه ثم اضغط الزر لنرسل لك رابط تعيين كلمة مرور جديدة."}</p>
                   <button type="submit" disabled={requestReset.isPending || !identifier.trim()} className="w-full rounded-xl border border-primary/40 py-2.5 font-semibold text-primary hover:bg-primary/10 disabled:opacity-60">{requestReset.isPending ? "جارٍ الإرسال…" : "أرسل رابط الاستعادة"}</button>
                 </form>
               )}

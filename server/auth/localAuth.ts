@@ -1,8 +1,11 @@
 /**
  * الدخول المحلي لترتيل: بريد أو رقم هاتف + كلمة مرور، وجلسة JWT في كوكي httpOnly.
- * رقم الهاتف يُحفظ بصيغة E.164 الموحّدة. مع Twilio Verify (server/_core/sms.ts) يُؤكَّد الرقم برمز SMS
- * عند التسجيل وعند إضافته، وتصبح استعادة كلمة المرور برمز إلى الهاتف ممكنة؛ وبدونه يبقى الرقم معرّف دخول
- * غير مؤكد، والاستعادة برابط تعيين من إدارة المركز.
+ * رقم الهاتف يُحفظ بصيغة E.164 الموحّدة. يُؤكَّد الرقم عند التسجيل وعند إضافته، وتصبح استعادة كلمة المرور
+ * بالهاتف ممكنة، بإحدى طريقتين أو كلتيهما:
+ *  - واتساب عكسي مجاني (server/_core/whatsapp.ts): المستخدم يرسل رمزاً من واتساب رقمه؛ الإثبات تذكرة (phoneTicket).
+ *  - رمز SMS عبر Twilio Verify (server/_core/sms.ts) احتياطياً؛ الإثبات رمز (phoneCode/code).
+ * بدونهما يبقى الرقم معرّف دخول غير مؤكد، والاستعادة برابط تعيين من إدارة المركز.
+ * بعد تأكيد الرقم يُربط الحساب تلقائياً بكل طالب سجّل المركز هذا الرقم رقماً لولي أمره (server/data/guardian-links.ts).
  * لا يعتمد على أي خدمة خارجية أو بريد أو نطاق؛ يعمل على أي استضافة Node + MySQL.
  */
 import { COOKIE_NAME } from "@shared/const";
@@ -23,6 +26,9 @@ import type { TrpcContext } from "../_core/context";
 import * as db from "../db";
 import { looksLikePhone, normalizePhone } from "../../shared/phone";
 import { SMS_FAILURE_MESSAGES, SmsError, checkPhoneVerification, isSmsConfigured, startPhoneVerification } from "../_core/sms";
+import { isWhatsAppConfigured } from "../_core/whatsapp";
+import { consumeWhatsAppVerification, getWhatsAppVerificationStatus, startWhatsAppVerification } from "./whatsappVerification";
+import { linkGuardianChildrenByPhone } from "../data/guardian-links";
 import { INVALID_INVITE_MESSAGE, classifyInviteCode, discardNewAccount, isInviteUsable, redeemSignupInvite } from "./inviteSignup";
 import {
   LOCK_DURATION_MS,
@@ -92,6 +98,66 @@ function smsFailure(error: unknown): never {
 
 function requireSms() {
   if (!isSmsConfigured()) throw fail("PRECONDITION_FAILED", "التحقق برسالة SMS غير مفعّل على هذا الخادم");
+}
+
+const phoneTicketSchema = z.string().trim().min(20).max(100);
+export const INVALID_WHATSAPP_PROOF_MESSAGE = "لم يكتمل التحقق عبر واتساب أو انتهت مهلته؛ ابدأ التحقق من جديد";
+type VerificationPurpose = "signup" | "reset" | "verify" | "add_phone";
+/** أي طريقة لإثبات امتلاك الرقم مفعّلة (واتساب أو SMS). */
+const isPhoneVerificationEnabled = () => isWhatsAppConfigured() || isSmsConfigured();
+
+function requirePhoneVerification() {
+  if (!isPhoneVerificationEnabled()) throw fail("PRECONDITION_FAILED", "التحقق من رقم الهاتف غير مفعّل على هذا الخادم");
+}
+
+function requireWhatsApp() {
+  if (!isWhatsAppConfigured()) throw fail("PRECONDITION_FAILED", "التحقق عبر واتساب غير مفعّل على هذا الخادم");
+}
+
+function missingProofMessage() {
+  const whatsapp = isWhatsAppConfigured();
+  const sms = isSmsConfigured();
+  if (whatsapp && sms) return "أكّد رقمك عبر واتساب، أو أدخل رمز التحقق الذي وصلك برسالة SMS";
+  if (whatsapp) return "أكّد رقمك عبر واتساب أولاً";
+  return "أدخل رمز التحقق الذي وصلك برسالة SMS";
+}
+
+/**
+ * يثبت امتلاك الرقم: تذكرة واتساب مؤكدة لهذا الرقم والغرض (تُستهلك مرة واحدة)، أو رمز SMS من Twilio.
+ */
+async function verifyPhoneProof(phone: string, proof: { code?: string; ticket?: string }, purpose: VerificationPurpose, userId?: number) {
+  if (proof.ticket) {
+    requireWhatsApp();
+    if (!(await consumeWhatsAppVerification({ ticket: proof.ticket, phone, purpose, userId }))) throw fail("BAD_REQUEST", INVALID_WHATSAPP_PROOF_MESSAGE);
+    return;
+  }
+  if (proof.code) {
+    requireSms();
+    await verifyPhoneCode(phone, proof.code);
+    return;
+  }
+  throw fail("BAD_REQUEST", missingProofMessage());
+}
+
+/** ربط الأبناء بعد تأكيد الرقم؛ فشله لا يُفشل الدخول أو التسجيل. */
+async function linkChildrenSafely(userId: number, phone: string) {
+  try {
+    return (await linkGuardianChildrenByPhone(userId, phone)).linked;
+  } catch (error) {
+    logger.warn({ err: error }, "[Auth] guardian auto-link failed");
+    return 0;
+  }
+}
+
+/** حدود بدء جلسات واتساب: لكل IP ولكل رقم ولكل حساب إن وُجد. */
+async function limitWhatsAppStart(ctx: TrpcContext, phone: string, userId?: number) {
+  if (!(await hitRateLimit(`wa-start-ip:${clientKey(ctx)}`, { max: 15, windowMs: SMS_WINDOW_MS }))) throw fail("TOO_MANY_REQUESTS", "طلبات تحقق كثيرة من هذا الجهاز؛ حاول بعد ساعة");
+  if (!(await hitRateLimit(`wa-start-phone:${phone}`, { max: 6, windowMs: SMS_WINDOW_MS }))) throw fail("TOO_MANY_REQUESTS", "طلبات تحقق كثيرة لهذا الرقم؛ حاول بعد ساعة");
+  if (userId && !(await hitRateLimit(`wa-start-user:${userId}`, { max: 8, windowMs: SMS_WINDOW_MS }))) throw fail("TOO_MANY_REQUESTS", "طلبات تحقق كثيرة؛ حاول بعد ساعة");
+}
+
+function publicStart(start: Awaited<ReturnType<typeof startWhatsAppVerification>>, phone: string) {
+  return { phone, ticket: start.ticket, code: start.code, message: start.message, link: start.link, businessNumber: start.businessNumber, expiresAt: start.expiresAt };
 }
 
 /**
@@ -315,8 +381,12 @@ export const localAuthRouter = {
     /** الدخول والتسجيل برقم الهاتف وكلمة المرور (بلا SMS). */
     phone: true,
     phoneCountryCode: ENV.phoneDefaultCountryCode,
-    /** Twilio Verify مضبوط: التسجيل برقم الهاتف يتطلب رمز SMS، واستعادة كلمة المرور بالهاتف متاحة. */
-    phoneVerification: isSmsConfigured(),
+    /** طريقة تحقق مفعّلة (واتساب أو SMS): التسجيل برقم الهاتف يتطلب إثبات الرقم، واستعادة كلمة المرور بالهاتف متاحة. */
+    phoneVerification: isPhoneVerificationEnabled(),
+    /** Twilio Verify مضبوط: رمز برسالة SMS. */
+    smsVerification: isSmsConfigured(),
+    /** WhatsApp Cloud API مضبوط: التحقق العكسي المجاني (المستخدم يرسل الرمز من واتساب). */
+    whatsappVerification: isWhatsAppConfigured(),
   })),
 
   /** يرسل رابط استعادة إن وُجد حساب بهذا البريد. الرد واحد دائماً حتى لا يكشف أي البريدات مسجّلة. */
@@ -383,6 +453,60 @@ export const localAuthRouter = {
     return { success: true, alreadyVerified: false } as const;
   }),
 
+  /**
+   * يبدأ التحقق العكسي عبر واتساب قبل التسجيل أو لاستعادة كلمة المرور. يعيد الرمز ورابط wa.me
+   * وتذكرة سرية يستعلم بها المتصفح عن الحالة ثم يقدّمها لإكمال العملية.
+   * للاستعادة: الرد واحد دائماً حتى لا يكشف أي الأرقام مسجّلة؛ التذكرة لا تفيد إلا لرقم مؤكد لحساب نشط.
+   */
+  startWhatsAppVerification: publicProcedure
+    .input(z.object({ purpose: z.enum(["signup", "reset"]), phone: phoneInputSchema, inviteCode: z.string().trim().max(128).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      requireWhatsApp();
+      const phone = requirePhone(input.phone);
+      if (input.purpose === "signup") {
+        const invite = input.inviteCode ? classifyInviteCode(input.inviteCode) : null;
+        if (input.inviteCode && !invite) throw fail("BAD_REQUEST", INVALID_INVITE_MESSAGE);
+        if (!ENV.allowSignup && !invite) throw fail("FORBIDDEN", "إنشاء الحسابات مغلق إلا برمز دعوة؛ أدخل رمز الدعوة أو كود الدخول أولاً");
+        if (invite && !(await isInviteUsable(invite))) throw fail("BAD_REQUEST", INVALID_INVITE_MESSAGE);
+        if (await findCredentialByPhone(phone)) throw fail("CONFLICT", "يوجد حساب مسجّل برقم الهاتف هذا. سجّل الدخول بدلاً من ذلك");
+      } else if (!(await consumeRateLimit(`reset:${clientKey(ctx)}`))) {
+        throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
+      }
+      await limitWhatsAppStart(ctx, phone);
+      const start = await startWhatsAppVerification({ phone, purpose: input.purpose });
+      await audit(null, "auth.whatsapp_verification_started", null, ctx, { scope: input.purpose });
+      return publicStart(start, phone);
+    }),
+
+  /** حالة جلسة واتساب للمتصفح الذي بدأها (يستعلم كل ثانيتين). التذكرة سر عشوائي لا يمكن تخمينه. */
+  whatsAppVerificationStatus: publicProcedure
+    .input(z.object({ ticket: phoneTicketSchema }))
+    .query(async ({ input }) => ({ status: await getWhatsAppVerificationStatus(input.ticket) })),
+
+  /** يبدأ تأكيد رقم الدخول الحالي (verify) أو رقم جديد (add_phone، بكلمة المرور الحالية) عبر واتساب. */
+  startMyWhatsAppVerification: protectedProcedure
+    .input(z.object({ purpose: z.enum(["verify", "add_phone"]), phone: phoneInputSchema.optional(), currentPassword: passwordSchema.optional() }))
+    .mutation(async ({ ctx, input }) => {
+      requireWhatsApp();
+      const credential = await findCredentialByUserId(ctx.user.id);
+      let phone: string;
+      if (input.purpose === "verify") {
+        if (!credential?.phone) throw fail("BAD_REQUEST", "لا يوجد رقم هاتف للدخول في هذا الحساب");
+        if (credential.phoneVerifiedAt) throw fail("BAD_REQUEST", "رقمك مؤكد مسبقاً");
+        phone = credential.phone;
+      } else {
+        if (!credential) throw fail("BAD_REQUEST", "عيّن كلمة مرور أولاً");
+        if (!input.currentPassword || !(await verifyPassword(input.currentPassword, credential.passwordHash))) throw fail("UNAUTHORIZED", "كلمة المرور الحالية غير صحيحة");
+        if (!input.phone) throw fail("BAD_REQUEST", INVALID_PHONE_MESSAGE);
+        phone = requirePhone(input.phone);
+        await assertIdentityFree({ phone }, ctx.user.id);
+      }
+      await limitWhatsAppStart(ctx, phone, ctx.user.id);
+      const start = await startWhatsAppVerification({ phone, purpose: input.purpose, userId: ctx.user.id });
+      await audit(ctx.user.id, "auth.whatsapp_verification_started", ctx.user.id, ctx, { scope: input.purpose });
+      return publicStart(start, phone);
+    }),
+
   /** رمز SMS قبل إنشاء حساب برقم الهاتف. لا يُرسل إلا حين يكون التسجيل مسموحاً لهذا الشخص (عام أو برمز دعوة صالح). */
   requestSignupPhoneCode: publicProcedure
     .input(z.object({ phone: phoneInputSchema, inviteCode: z.string().trim().max(128).optional() }))
@@ -421,11 +545,11 @@ export const localAuthRouter = {
       return { success: true, phone } as const;
     }),
 
-  /** يعيّن كلمة مرور جديدة برمز SMS، ويؤكد الرقم، ويُخرج كل الأجهزة الأخرى ويدخل بهذا الجهاز. */
+  /** يعيّن كلمة مرور جديدة برمز SMS أو بتذكرة واتساب مؤكدة، ويُخرج كل الأجهزة الأخرى ويدخل بهذا الجهاز. */
   resetPasswordWithPhone: publicProcedure
-    .input(z.object({ phone: phoneInputSchema, code: phoneCodeSchema, newPassword: passwordSchema }))
+    .input(z.object({ phone: phoneInputSchema, code: phoneCodeSchema.optional(), ticket: phoneTicketSchema.optional(), newPassword: passwordSchema }))
     .mutation(async ({ ctx, input }) => {
-      requireSms();
+      requirePhoneVerification();
       if (!(await consumeRateLimit(`reset-check:${clientKey(ctx)}`))) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
       assertPolicy(input.newPassword);
       const phone = requirePhone(input.phone);
@@ -434,10 +558,11 @@ export const localAuthRouter = {
       const database = await requireDb();
       const user = (await database.select().from(users).where(eq(users.id, credential.userId)).limit(1))[0];
       if (!user || !isUserActive(user)) throw fail("BAD_REQUEST", INVALID_PHONE_CODE_MESSAGE);
-      await verifyPhoneCode(phone, input.code);
+      await verifyPhoneProof(phone, { code: input.code, ticket: input.ticket }, "reset");
       await database.update(localCredentials).set({ passwordHash: await hashPassword(input.newPassword), failedAttempts: 0, lockedUntil: null, passwordChangedAt: new Date(), phoneVerifiedAt: new Date() }).where(eq(localCredentials.id, credential.id));
       await rotateSessions(ctx, user);
-      await audit(user.id, "auth.password_reset_phone", user.id, ctx);
+      await audit(user.id, "auth.password_reset_phone", user.id, ctx, { method: input.ticket ? "whatsapp" : "sms" });
+      await linkChildrenSafely(user.id, phone);
       return { success: true } as const;
     }),
 
@@ -449,8 +574,10 @@ export const localAuthRouter = {
       phone: phoneInputSchema.optional(),
       password: passwordSchema,
       inviteCode: z.string().trim().max(128).optional(),
-      /** رمز SMS المرسل بـ requestSignupPhoneCode؛ مطلوب للتسجيل برقم الهاتف حين يكون Twilio مضبوطاً. */
+      /** رمز SMS المرسل بـ requestSignupPhoneCode (Twilio). */
       phoneCode: phoneCodeSchema.optional(),
+      /** تذكرة واتساب من startWhatsAppVerification بعد تأكيدها. يلزم أحدهما حين يكون التحقق مفعّلاً. */
+      phoneTicket: phoneTicketSchema.optional(),
     }).refine((input) => Boolean(input.email || input.phone), { message: "أدخل البريد الإلكتروني أو رقم الهاتف", path: ["email"] }))
     .mutation(async ({ ctx, input }) => {
       const email = input.email ? normalizeEmail(input.email) : null;
@@ -468,11 +595,8 @@ export const localAuthRouter = {
       const legacy = email ? await database.select({ id: users.id }).from(users).where(and(eq(users.email, email), isNull(users.deletedAt))).limit(1) : [];
       if (legacy.length) throw fail("CONFLICT", "هذا البريد مرتبط بحساب موجود. سجّل الدخول بالطريقة السابقة وعيّن كلمة مرور من الإعدادات، أو اطلب من المدير رابط تعيين كلمة المرور.");
       if (invite && !(await isInviteUsable(invite))) throw fail("BAD_REQUEST", INVALID_INVITE_MESSAGE);
-      const phoneVerified = Boolean(phone && isSmsConfigured());
-      if (phone && phoneVerified) {
-        if (!input.phoneCode) throw fail("BAD_REQUEST", "أدخل رمز التحقق الذي وصلك برسالة SMS");
-        await verifyPhoneCode(phone, input.phoneCode);
-      }
+      const phoneVerified = Boolean(phone && isPhoneVerificationEnabled());
+      if (phone && phoneVerified) await verifyPhoneProof(phone, { code: input.phoneCode, ticket: input.phoneTicket }, "signup");
 
       const user = await createLocalUser({ name: input.name, email, phone, phoneVerified, password: input.password });
       let granted: { role: string; centerId?: number } | null = null;
@@ -485,12 +609,14 @@ export const localAuthRouter = {
           throw fail("BAD_REQUEST", error instanceof Error ? error.message : INVALID_INVITE_MESSAGE);
         }
       }
+      // بعد الدعوة: إن منحت الدعوة دوراً آخر (معلم مثلاً) لا يُغيَّر إلى ولي أمر.
+      const linkedChildren = phone && phoneVerified ? await linkChildrenSafely(user.id, phone) : 0;
       const fresh = (await database.select().from(users).where(eq(users.id, user.id)).limit(1))[0] ?? user;
       await issueSession(ctx, fresh);
       // تأكيد البريد لا يمنع الدخول؛ يُرسل في الخلفية إن كان البريد مفعّلاً.
       if (email) void sendVerificationEmail(fresh, email).catch((error) => logger.warn({ err: error }, "[Auth] verification email failed"));
-      await audit(user.id, invite ? "auth.register_invite" : "auth.register", user.id, ctx, { method: phone && !email ? "phone" : "email", ...(granted ? { inviteKind: invite!.kind, role: granted.role, centerId: granted.centerId } : {}) });
-      return { success: true, role: granted?.role ?? null } as const;
+      await audit(user.id, invite ? "auth.register_invite" : "auth.register", user.id, ctx, { method: phone && !email ? "phone" : "email", ...(phoneVerified ? { phoneProof: input.phoneTicket ? "whatsapp" : "sms" } : {}), ...(granted ? { inviteKind: invite!.kind, role: granted.role, centerId: granted.centerId } : {}) });
+      return { success: true, role: granted?.role ?? (linkedChildren ? "guardian" : null), ...(linkedChildren ? { linkedChildren } : {}) } as const;
     }),
 
   login: publicProcedure
@@ -543,6 +669,8 @@ export const localAuthRouter = {
       phoneVerified: Boolean(credential?.phoneVerifiedAt),
       /** Twilio مضبوط: يمكن تأكيد الرقم برمز SMS. */
       smsEnabled: isSmsConfigured(),
+      /** WhatsApp Cloud API مضبوط: يمكن تأكيد الرقم برسالة واتساب يرسلها المستخدم. */
+      whatsappEnabled: isWhatsAppConfigured(),
     };
   }),
 
@@ -591,23 +719,24 @@ export const localAuthRouter = {
     return { success: true, alreadyVerified: false } as const;
   }),
 
-  /** يؤكد رقم الدخول الحالي بالرمز الذي وصله. */
+  /** يؤكد رقم الدخول الحالي برمز SMS أو بتذكرة واتساب مؤكدة، ثم يربط الأبناء المسجلين بهذا الرقم. */
   verifyPhone: protectedProcedure
-    .input(z.object({ code: phoneCodeSchema }))
+    .input(z.object({ code: phoneCodeSchema.optional(), ticket: phoneTicketSchema.optional() }))
     .mutation(async ({ ctx, input }) => {
-      requireSms();
+      requirePhoneVerification();
       const credential = await findCredentialByUserId(ctx.user.id);
       if (!credential?.phone) throw fail("BAD_REQUEST", "لا يوجد رقم هاتف للدخول في هذا الحساب");
       if (credential.phoneVerifiedAt) return { success: true } as const;
-      await verifyPhoneCode(credential.phone, input.code);
+      await verifyPhoneProof(credential.phone, { code: input.code, ticket: input.ticket }, "verify", ctx.user.id);
       const database = await requireDb();
       await database.update(localCredentials).set({ phoneVerifiedAt: new Date() }).where(eq(localCredentials.id, credential.id));
-      await audit(ctx.user.id, "auth.phone_verified", ctx.user.id, ctx);
-      return { success: true } as const;
+      await audit(ctx.user.id, "auth.phone_verified", ctx.user.id, ctx, { method: input.ticket ? "whatsapp" : "sms" });
+      const linkedChildren = await linkChildrenSafely(ctx.user.id, credential.phone);
+      return { success: true, ...(linkedChildren ? { linkedChildren } : {}) } as const;
     }),
 
   setLoginPhone: protectedProcedure
-    .input(z.object({ phone: phoneInputSchema, currentPassword: passwordSchema, code: phoneCodeSchema.optional() }))
+    .input(z.object({ phone: phoneInputSchema, currentPassword: passwordSchema, code: phoneCodeSchema.optional(), ticket: phoneTicketSchema.optional() }))
     .mutation(async ({ ctx, input }) => {
       if (!(await consumeRateLimit(`set-phone:${ctx.user.id}`))) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
       const credential = await findCredentialByUserId(ctx.user.id);
@@ -615,17 +744,15 @@ export const localAuthRouter = {
       if (!(await verifyPassword(input.currentPassword, credential.passwordHash))) throw fail("UNAUTHORIZED", "كلمة المرور الحالية غير صحيحة");
       const phone = requirePhone(input.phone);
       await assertIdentityFree({ phone }, ctx.user.id);
-      // مع SMS لا يُحفظ رقم دون إثبات امتلاكه، حتى لا يحجز أحد رقم غيره.
-      const smsEnabled = isSmsConfigured();
-      if (smsEnabled) {
-        if (!input.code) throw fail("BAD_REQUEST", "أدخل رمز التحقق الذي وصلك برسالة SMS");
-        await verifyPhoneCode(phone, input.code);
-      }
+      // مع التحقق المفعّل لا يُحفظ رقم دون إثبات امتلاكه، حتى لا يحجز أحد رقم غيره.
+      const verificationOn = isPhoneVerificationEnabled();
+      if (verificationOn) await verifyPhoneProof(phone, { code: input.code, ticket: input.ticket }, "add_phone", ctx.user.id);
       const database = await requireDb();
-      await database.update(localCredentials).set({ phone, phoneVerifiedAt: smsEnabled ? new Date() : null }).where(eq(localCredentials.id, credential.id));
+      await database.update(localCredentials).set({ phone, phoneVerifiedAt: verificationOn ? new Date() : null }).where(eq(localCredentials.id, credential.id));
       await database.update(users).set({ phone }).where(eq(users.id, ctx.user.id));
       await audit(ctx.user.id, credential.phone ? "auth.login_phone_changed" : "auth.login_phone_added", ctx.user.id, ctx);
-      return { success: true, phone } as const;
+      const linkedChildren = verificationOn ? await linkChildrenSafely(ctx.user.id, phone) : 0;
+      return { success: true, phone, ...(linkedChildren ? { linkedChildren } : {}) } as const;
     }),
 
   /** الخروج من كل الأجهزة: يبطل كل الجلسات بما فيها الحالية. */

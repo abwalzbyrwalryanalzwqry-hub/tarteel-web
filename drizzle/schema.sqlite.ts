@@ -938,6 +938,47 @@ export const localCredentials = sqliteTable(
 
 export type LocalCredential = typeof localCredentials.$inferSelect;
 
+/**
+ * التحقق العكسي من رقم الهاتف عبر واتساب: يعرض ترتيل رمزاً قصيراً، فيرسله المستخدم من واتساب رقمه
+ * إلى رقم المركز، ويصل إلى الخادم عبر Webhook من WhatsApp Cloud API مع رقم المرسل كما يعرفه واتساب.
+ * لا يُرسل الخادم أي رسالة، فلا تكلفة. الرمز والتذكرة يُخزّنان مُجزّأين (sha256) فقط.
+ * التذكرة سرّ يملكه المتصفح الذي بدأ التحقق، ويقدّمها لإكمال التسجيل أو الاستعادة بعد التأكيد.
+ */
+export const phoneVerifications = sqliteTable(
+  "phone_verifications",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    purpose: text("purpose", {
+      enum: ["signup", "reset", "verify", "add_phone"],
+    }).notNull(),
+    /** الرقم المطلوب تأكيده بصيغة E.164. */
+    phone: text("phone").notNull(),
+    /** صاحب الطلب عند التأكيد من داخل الحساب (verify وadd_phone). */
+    userId: integer("userId"),
+    codeHash: text("codeHash").notNull(),
+    ticketHash: text("ticketHash").notNull(),
+    /** pending: بانتظار الرسالة. verified: وصلت من الرقم نفسه. mismatch: وصل الرمز من رقم آخر. consumed: استُخدمت التذكرة. */
+    status: text("status", {
+      enum: ["pending", "verified", "mismatch", "consumed"],
+    })
+      .default("pending")
+      .notNull(),
+    expiresAt: integer("expiresAt", { mode: "timestamp_ms" }).notNull(),
+    verifiedAt: integer("verifiedAt", { mode: "timestamp_ms" }),
+    consumedAt: integer("consumedAt", { mode: "timestamp_ms" }),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+      .$defaultFn(() => new Date())
+      .notNull(),
+  },
+  table => [
+    uniqueIndex("phone_verifications_ticket_unique").on(table.ticketHash),
+    index("phone_verifications_code_idx").on(table.codeHash, table.status),
+    index("phone_verifications_phone_idx").on(table.phone, table.createdAt),
+  ]
+);
+
+export type PhoneVerification = typeof phoneVerifications.$inferSelect;
+
 /** روابط تعيين كلمة المرور لمرة واحدة: ينشئها المدير لمستخدم موجود (مثل الحسابات القديمة بلا كلمة مرور). */
 export const passwordSetupTokens = sqliteTable(
   "password_setup_tokens",

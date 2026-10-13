@@ -66,8 +66,9 @@ export const ROLE_PERMISSIONS: Record<TarteelRole, TarteelPermission[]> = {
   guide: ["circles:view", "students:view", "sessions:view", "reports:view", "quran:view"],
   teacher: ["dashboard:view", "circles:view", "students:view", "students:manage", "sessions:view", "sessions:manage", "reports:view", "notifications:view", "settings:view", "ai:use", "quran:view", "messages:manage"],
   assistant_teacher: ["dashboard:view", "circles:view", "students:view", "sessions:view", "sessions:manage", "notifications:view", "ai:use", "quran:view", "messages:manage"],
-  student: ["students:view", "quran:view"],
-  guardian: ["students:view", "quran:view"],
+  // الإعدادات هنا شخصية (كلمة المرور وتأكيد الرقم والمظهر)، والإشعارات تخص الحساب نفسه.
+  student: ["students:view", "quran:view", "notifications:view", "settings:view"],
+  guardian: ["students:view", "quran:view", "notifications:view", "settings:view"],
   user: ["dashboard:view", "ai:use", "quran:view"],
 };
 

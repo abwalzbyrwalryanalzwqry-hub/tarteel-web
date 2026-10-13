@@ -18,8 +18,10 @@ describe("أكواد القراءة والنطاق الإشرافي", () => {
     const db = readDataLayerSource(root);
     expect(db).toContain("كود الطالب أو ولي الأمر لا يمكن أن يمنح سوى طالب واحد");
     expect(db).toContain("هذا الحساب مرتبط بطالب آخر ولا يمكن منحه طالباً إضافياً");
-    expect(db).toContain("هذا الحساب مرتبط بابن آخر ولا يمكن منحه نطاقاً إضافياً");
-    expect(db).toContain("eq(students.guardianUserId, input.userId)");
+    // ولي الأمر يضيف أبناءه واحداً تلو الآخر دون أن يُسحب نطاق ابن سابق.
+    expect(db).not.toContain("هذا الحساب مرتبط بابن آخر ولا يمكن منحه نطاقاً إضافياً");
+    expect(db).toContain("هذا الطالب مرتبط بولي أمر آخر");
+    expect(db).toContain("(isReaderAccessCode && accessCode.role === \"student\")");
   });
 
   it("يلزم الموجّه بحلقات صريحة داخل المركز ويمنع نطاق المركز", () => {
