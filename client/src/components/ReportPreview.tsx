@@ -1,4 +1,4 @@
-import { BookOpen, CalendarDays, ChevronLeft, FileText, Star } from "lucide-react";
+import { BookOpen, CalendarDays, ChevronLeft, Star } from "lucide-react";
 
 export function ReportPreview({ report }: { report: any }) {
   const period = report.meta.startDate && report.meta.endDate ? `من ${new Date(report.meta.startDate).toLocaleDateString("ar-SA")} إلى ${new Date(report.meta.endDate).toLocaleDateString("ar-SA")}` : "كامل البيانات المتاحة";

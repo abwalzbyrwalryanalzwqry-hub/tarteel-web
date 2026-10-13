@@ -1,4 +1,4 @@
-import { BadgeCheck, BookOpen, GraduationCap, UsersRound } from "lucide-react";
+import { BadgeCheck, BookOpen, UsersRound } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
 export default function GuideDashboard() {

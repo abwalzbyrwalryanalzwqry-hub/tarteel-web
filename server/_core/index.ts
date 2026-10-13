@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { ENV } from "./env";
+import { initErrorReporting, logger, reportError, requestLogger } from "./logger";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -33,12 +34,14 @@ async function startServer() {
     throw new Error("JWT_SECRET is required in production");
   }
   if (ENV.cookieSecret && ENV.cookieSecret.length < 32) {
-    console.warn("[Security] JWT_SECRET is shorter than 32 characters; use `openssl rand -base64 48`.");
+    logger.warn("JWT_SECRET is shorter than 32 characters; use `openssl rand -base64 48`.");
   }
+  await initErrorReporting();
   const app = express();
   // خلف Nginx/Caddy/Render: لقراءة https وعنوان IP الحقيقي.
   app.set("trust proxy", ENV.trustProxyHops);
   app.disable("x-powered-by");
+  app.use(requestLogger);
   const server = createServer(app);
   // أكبر طلب مشروع هو رفع شعار (2MB كـ base64 ≈ 2.8MB)؛ الحد السابق 50MB كان يسمح بإغراق الخادم.
   app.use("/api/trpc", express.json({ limit: "4mb" }));
@@ -52,6 +55,11 @@ async function startServer() {
     createExpressMiddleware({
       router: appRouter,
       createContext,
+      // أخطاء الإدخال والصلاحيات متوقعة؛ نسجل فقط ما يدل على عطل حقيقي في الخادم.
+      onError({ error, path, ctx, type }) {
+        if (error.code !== "INTERNAL_SERVER_ERROR") return;
+        reportError(error.cause ?? error, { procedure: path, type, userId: ctx?.user?.id });
+      },
     })
   );
   // development mode uses Vite, production mode uses static files
@@ -69,15 +77,15 @@ async function startServer() {
   const port = ENV.isProduction ? preferredPort : await findAvailablePort(preferredPort);
 
   if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+    logger.warn(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
 
   server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+    logger.info({ port }, `Server running on http://localhost:${port}/`);
   });
 }
 
 startServer().catch((error) => {
-  console.error(error);
+  logger.fatal({ err: error }, "server failed to start");
   process.exit(1);
 });

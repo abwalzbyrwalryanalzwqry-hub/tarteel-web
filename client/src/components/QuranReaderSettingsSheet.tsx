@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import type { QuranReaderPreferences, ReaderStudyFont, ReaderTextScale } from "@/lib/quranReaderPreferences";
+import type { QuranReaderPreferences, ReaderTextScale } from "@/lib/quranReaderPreferences";
 import { Moon, Settings2, Sun, Type, Lightbulb } from "lucide-react";
 
 interface QuranReaderSettingsSheetProps {

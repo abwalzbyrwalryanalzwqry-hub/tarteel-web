@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { CircleProgressCoverage, ManagementEducationSummary } from "@/components/ManagementEducationSummary";
-import { AlertTriangle, BarChart3, Building2, CheckCircle2, ExternalLink, FileSpreadsheet, FileText, Goal, ImagePlus, LineChart as LineChartIcon, MessageCircle, RefreshCw, Save, Settings2, SlidersHorizontal, TrendingUp, UsersRound } from "lucide-react";
+import { AlertTriangle, BarChart3, Building2, CheckCircle2, ExternalLink, FileSpreadsheet, FileText, Goal, ImagePlus, LineChart as LineChartIcon, MessageCircle, RefreshCw, Save, Settings2, SlidersHorizontal, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";

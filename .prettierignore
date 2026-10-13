@@ -33,3 +33,20 @@ pnpm-lock.yaml
 # OS files
 .DS_Store
 Thumbs.db
+
+# موجّهات tRPC: نُقلت من server/routers.ts كما هي دون إعادة تنسيق، لأن عدة اختبارات
+# تبحث عن سطور بعينها في نصها (server/testing/routerSource.ts). أعد تنسيقها بعد تحويل
+# تلك الاختبارات إلى اختبارات سلوك.
+server/routers.ts
+server/routers/_shared.ts
+server/routers/access.ts
+server/routers/admin.ts
+server/routers/centers.ts
+server/routers/circles.ts
+server/routers/people.ts
+server/routers/quran.ts
+server/routers/sessions.ts
+
+# ملفات تولدها الأدوات أو منسوخة من خارج المشروع
+drizzle/meta/
+mobile-android/

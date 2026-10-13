@@ -2,12 +2,13 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { readDataLayerSource } from "./testing/dataLayerSource";
+import { readRouterSource } from "./testing/routerSource";
 
 const root = process.cwd();
 
 describe("أكواد القراءة والنطاق الإشرافي", () => {
   it("يثبت الطالب وولي الأمر على طالب واحد واستخدام واحد عند الإصدار", () => {
-    const router = readFileSync(path.join(root, "server/routers.ts"), "utf8");
+    const router = readRouterSource();
     expect(router).toContain("كود الطالب أو ولي الأمر مخصص لحساب واحد واستخدام واحد فقط");
     expect(router).toContain("? [{ scopeType: \"student\" as const, scopeId: input.studentId! }]");
     expect(router).toContain("لا يجوز منح هذا الدور نطاق المركز كاملاً");
@@ -22,7 +23,7 @@ describe("أكواد القراءة والنطاق الإشرافي", () => {
   });
 
   it("يلزم الموجّه بحلقات صريحة داخل المركز ويمنع نطاق المركز", () => {
-    const router = readFileSync(path.join(root, "server/routers.ts"), "utf8");
+    const router = readRouterSource();
     const db = readDataLayerSource(root);
     expect(router).toContain("يلزم تحديد حلقة واحدة أو أكثر للموجّه ولا يقبل كود الموجّه نطاقات أخرى");
     expect(router).toContain("كود الموجّه مخصص لحساب واحد واستخدام واحد فقط");

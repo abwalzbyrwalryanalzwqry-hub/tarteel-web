@@ -12,7 +12,7 @@ import { getSessionCookieOptions } from "../_core/cookies";
 import { ENV } from "../_core/env";
 import { getClientIp } from "../_core/request";
 import { isAccountUsable, sdk } from "../_core/sdk";
-import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import { protectedProcedure, publicProcedure } from "../_core/trpc";
 import type { TrpcContext } from "../_core/context";
 import * as db from "../db";
 import {

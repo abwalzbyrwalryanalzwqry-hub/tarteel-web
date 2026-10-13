@@ -25,8 +25,7 @@ import {
   GRADE_LABELS,
   QURAN_SURAHS,
   SESSION_STATUS_LABELS,
-  SESSION_TYPE_LABELS,
-} from "../../../shared/types";
+  } from "../../../shared/types";
 
 interface Props {
   sessionId?: number;

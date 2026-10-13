@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createAccessCodeSecret, getAccessCodeHint, hashAccessCode, normalizeAccessCode } from "./accessCodeSecurity";
 import { ROLE_PERMISSION_TEMPLATES } from "./accessControl";
 import { accessCodes, centerMemberships, permissionGrants, userScopes } from "../drizzle/schema";
-import { readFileSync } from "node:fs";
+import { readRouterSource } from "./testing/routerSource";
 
 describe("منظومة التحكم في الوصول", () => {
   it("ينشئ كوداً عشوائياً مهيأ للمشاركة ولا يعيد secret من تلميحه أو hash", () => {
@@ -35,7 +35,7 @@ describe("منظومة التحكم في الوصول", () => {
   });
 
   it("يربط إعادة الإصدار بإبطال الكود السابق وتدقيقه، ولا يكشف hash في قائمة الأكواد", () => {
-    const router = readFileSync(new URL("./routers.ts", import.meta.url), "utf8");
+    const router = readRouterSource();
     expect(router).toContain("reissue: protectedProcedure");
     expect(router).toContain("if (previous.status === \"active\") await revokeAccessCode(previous.id)");
     expect(router).toContain("access.code.reissue");
