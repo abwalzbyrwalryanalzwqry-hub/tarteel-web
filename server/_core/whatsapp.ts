@@ -52,6 +52,9 @@ export function getWhatsAppConfig(
 
 export const isWhatsAppConfigured = () => getWhatsAppConfig() !== null;
 
+/** مسار Webhook العام: {PUBLIC_APP_URL}/api/whatsapp/webhook */
+export const WHATSAPP_WEBHOOK_PATH = "/api/whatsapp/webhook";
+
 /** حروف وأرقام لا تلتبس عند القراءة (بلا 0 O 1 I L U). 30^8 ≈ 6.5×10^11 احتمالاً. */
 const CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ";
 const CODE_PATTERN = new RegExp(

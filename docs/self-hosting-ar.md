@@ -88,15 +88,43 @@ thmanyahseriftext-Black_99238822.woff2
 
 يعمل في: التسجيل برقم الهاتف، و«نسيت كلمة المرور؟» بالهاتف، وتأكيد رقم قديم وإضافة رقم من «الإعدادات ← كلمة المرور». إن ضُبط Twilio أيضاً يظهر واتساب أولاً ورابط «أرسل رمزاً برسالة SMS بدلاً من ذلك» لمن لا واتساب على رقمه.
 
-الإعداد (مرة واحدة):
+الإعداد (مرة واحدة، نحو 20 دقيقة):
 
-1. في [Meta for Developers](https://developers.facebook.com/apps) أنشئ تطبيقاً من نوع **Business** وأضف منتج **WhatsApp**.
-2. **WhatsApp ← API Setup**: أضف رقم هاتف للأعمال وأكّده (رقم **غير مسجل** في تطبيق واتساب العادي، أو احذف حسابه منه أولاً). انسخ الرقم إلى `WHATSAPP_BUSINESS_NUMBER` بصيغة دولية.
-3. **App settings ← Basic ← App secret**: انسخه إلى `WHATSAPP_APP_SECRET`.
-4. ولّد نصاً سرياً: `openssl rand -hex 16`، وضعه في `WHATSAPP_VERIFY_TOKEN`، ثم `docker compose up -d`.
-5. **WhatsApp ← Configuration ← Webhook**: Callback URL = `https://<نطاقك>/api/whatsapp/webhook`، وVerify token = القيمة نفسها، ثم **Verify and save**. بعدها **Manage** واشترك في الحقل `messages`.
-6. انشر التطبيق (**Live**) حتى تصل رسائل الأرقام غير المسجلة في التطبيق كمطوّرين.
-7. اختياري: `WHATSAPP_ACCESS_TOKEN` (رمز دائم من System User) و`WHATSAPP_PHONE_NUMBER_ID` ليرد ترتيل داخل المحادثة «تم تأكيد رقمك». بدونهما يعمل التحقق كاملاً، والتأكيد يظهر في الصفحة فقط.
+**أ. حساب Meta والتطبيق**
+
+1. ادخل [Meta for Developers](https://developers.facebook.com/apps) بحساب فيسبوك، ثم **Create app** ← حالة الاستخدام **Connect with customers through WhatsApp** (أو النوع **Business**) ← اربطه بحافظة أعمال (Business portfolio)، تُنشأ تلقائياً إن لم تكن لديك.
+2. **WhatsApp ← API Setup ← Add phone number**: أدخل اسم العرض (مثل «ترتيل — مركز النور») والرقم، وأكّده برمز SMS أو مكالمة. يجب أن يكون الرقم **غير مسجّل** في تطبيق واتساب أو واتساب للأعمال على أي هاتف (احذف حسابه من التطبيق أولاً)، ويُفضّل شريحة مخصصة للمركز.
+3. انسخ من الصفحة نفسها: **Phone number ID** و**WhatsApp Business Account ID**.
+4. **App settings ← Basic**: انسخ **App ID** و**App secret** (زر Show).
+5. رمز وصول دائم: [Business settings](https://business.facebook.com/settings) ← **Users ← System users ← Add** (دور Admin) ← **Assign assets**: التطبيق (Full control) وحساب واتساب (Full control) ← **Generate new token** للتطبيق، مع الصلاحيتين `whatsapp_business_messaging` و`whatsapp_business_management`، ومدة **Never**.
+
+**ب. الخادم**
+
+6. ولّد رمز التحقق: `docker compose exec app node dist/whatsapp-setup.js token`
+7. في `.env`:
+
+   ```
+   WHATSAPP_BUSINESS_NUMBER=+967…        # الرقم من الخطوة 2
+   WHATSAPP_APP_SECRET=…                 # الخطوة 4
+   WHATSAPP_VERIFY_TOKEN=…               # الخطوة 6
+   WHATSAPP_ACCESS_TOKEN=…               # الخطوة 5
+   WHATSAPP_PHONE_NUMBER_ID=…            # الخطوة 3
+   WHATSAPP_WABA_ID=…                    # الخطوة 3
+   WHATSAPP_APP_ID=…                     # الخطوة 4
+   ```
+
+   ثم `docker compose up -d` (يعيد إنشاء الحاوية بالقيم الجديدة).
+8. افحص: `docker compose exec app node dist/whatsapp-setup.js check`. يجب أن تنجح بنود «متغيرات البيئة» و«Webhook» قبل المتابعة.
+
+**ج. ربط Webhook**
+
+9. **WhatsApp ← Configuration ← Webhook ← Edit**: Callback URL = `https://<نطاقك>/api/whatsapp/webhook`، وVerify token = قيمة `WHATSAPP_VERIFY_TOKEN`، ثم **Verify and save**.
+10. في الصفحة نفسها: **Webhook fields ← Manage** واشترك في `messages`.
+11. **اشترك التطبيق في حساب واتساب** (خطوة لا تظهر في اللوحة، وبدونها تبقى الرسائل عند تطبيق Meta الافتراضي): `docker compose exec app node dist/whatsapp-setup.js subscribe`. يجب أن يظهر تطبيقك في «اشتراك التطبيق في WABA».
+12. انشر التطبيق: مفتاح **App mode ← Live** أعلى اللوحة (يتطلب رابط سياسة الخصوصية: `https://<نطاقك>/privacy`). في وضع Development لا تصل إلا رسائل أرقام المطوّرين.
+13. جرّب: «حساب جديد ← برقم الهاتف ← تحقق من الرقم عبر واتساب» من هاتف آخر. وإن لم يتأكد الرقم: أعد `check`، وراجع `docker compose logs app | grep -i whatsapp`.
+
+بدون الخطوة 5 (رمز الوصول) يعمل التحقق أيضاً، لكن اشتراك WABA يلزم حينها من [Graph API Explorer](https://developers.facebook.com/tools/explorer/): `POST <WABA_ID>/subscribed_apps`، ولن يصل المستخدمَ رد «تم تأكيد رقمك» داخل واتساب (التأكيد يظهر في الصفحة).
 
 ملاحظات أمان: Webhook يرفض أي طلب بلا توقيع `X-Hub-Signature-256` صحيح من App secret. الرمز صالح 10 دقائق ولمرة واحدة، ومرتبط بالرقم والغرض (تسجيل/استعادة/تأكيد/إضافة) والحساب. وصول الرمز من رقم آخر يغلق الجلسة ويلزم رمزاً جديداً. نص الرسالة يذكر الغرض صراحة («لاستعادة كلمة مروري») حتى لا يُخدع أحد بإرسال رمز لا يعرف غرضه. وحدود: 6 جلسات في الساعة لكل رقم، و15 لكل IP.
 

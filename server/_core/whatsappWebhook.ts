@@ -15,9 +15,10 @@ import {
   getWhatsAppConfig,
   isValidWebhookSignature,
   sendWhatsAppReply,
+  WHATSAPP_WEBHOOK_PATH,
 } from "./whatsapp";
 
-export const WHATSAPP_WEBHOOK_PATH = "/api/whatsapp/webhook";
+export { WHATSAPP_WEBHOOK_PATH };
 
 const sameSecret = (a: string, b: string) => {
   const left = Buffer.from(a);
