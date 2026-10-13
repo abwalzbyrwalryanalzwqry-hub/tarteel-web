@@ -170,13 +170,11 @@ describeWithDb("استعادة كلمة المرور وتأكيد البريد (
   it("التسجيل يرسل رابط تأكيد يؤكد البريد، ولا يصلح لتعيين كلمة مرور", async () => {
     Object.assign(ENV, { allowSignup: true });
     const s = uniqueSuffix();
-    await appRouter
-      .createCaller(ctx())
-      .auth.register({
-        name: "جديد",
-        email: `verify_${s}@t.test`,
-        password: "Quran1234",
-      });
+    await appRouter.createCaller(ctx()).auth.register({
+      name: "جديد",
+      email: `verify_${s}@t.test`,
+      password: "Quran1234",
+    });
     await vi.waitFor(() => expect(sent).toHaveLength(1));
     const token = tokenFrom(sent[0].text);
     expect(sent[0].text).toContain("https://tarteel.test/verify-email?token=");

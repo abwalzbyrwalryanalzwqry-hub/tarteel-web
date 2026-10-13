@@ -194,15 +194,13 @@ export async function resolveGoogleUser(
       .limit(1);
     if (!user || !isAccountUsable(user))
       throw new GoogleLoginFailure("inactive");
-    await database
-      .insert(oauthAccounts)
-      .values({
-        provider: "google",
-        providerUserId: profile.sub,
-        userId: user.id,
-        email,
-        lastUsedAt: now,
-      });
+    await database.insert(oauthAccounts).values({
+      provider: "google",
+      providerUserId: profile.sub,
+      userId: user.id,
+      email,
+      lastUsedAt: now,
+    });
     // Google أكد أن البريد لصاحبه.
     if (credential && !credential.emailVerifiedAt)
       await database
@@ -232,15 +230,13 @@ export async function resolveGoogleUser(
   });
   const created = await db.getUserByOpenId(openId);
   if (!created) throw new Error("user creation failed");
-  await database
-    .insert(oauthAccounts)
-    .values({
-      provider: "google",
-      providerUserId: profile.sub,
-      userId: created.id,
-      email,
-      lastUsedAt: now,
-    });
+  await database.insert(oauthAccounts).values({
+    provider: "google",
+    providerUserId: profile.sub,
+    userId: created.id,
+    email,
+    lastUsedAt: now,
+  });
   if (invite) {
     try {
       await redeemSignupInvite(invite, created.id, {
