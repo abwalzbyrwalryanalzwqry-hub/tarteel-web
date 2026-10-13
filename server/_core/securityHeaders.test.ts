@@ -14,12 +14,12 @@ async function headersFor(options: Parameters<typeof securityHeaders>[0]) {
 }
 
 describe("ترويسات الأمان (M2)", () => {
-  it("سياسة ضيقة: لا سكربت مضمن ولا خارجي، ولا object، ولا تضمين من مواقع أخرى", () => {
+  it("سياسة ضيقة: لا سكربت مضمن ولا خارجي، ولا object خارجي، ولا تضمين من مواقع أخرى", () => {
     const policy = buildContentSecurityPolicy();
     expect(policy).toContain("script-src 'self';");
     expect(policy).not.toMatch(/script-src[^;]*unsafe-inline/);
     expect(policy).not.toContain("unsafe-eval");
-    expect(policy).toContain("object-src 'none'");
+    expect(policy).toContain("object-src 'self' blob:;");
     expect(policy).toContain("frame-ancestors 'self'");
     expect(policy).toContain("frame-src 'self' blob:");
   });
@@ -27,6 +27,7 @@ describe("ترويسات الأمان (M2)", () => {
   it("المصادر الإضافية تُقبل بصيغة https فقط", () => {
     const policy = buildContentSecurityPolicy(["https://stats.example.com", "javascript:alert(1)", "*", "http://plain.test"]);
     expect(policy).toContain("script-src 'self' https://stats.example.com;");
+    expect(policy).toContain("connect-src 'self' blob: https://stats.example.com;");
     expect(policy).not.toContain("javascript:");
     expect(policy).not.toContain(" * ");
     expect(policy).not.toContain("http://plain.test");

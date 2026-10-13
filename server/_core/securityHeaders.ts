@@ -5,7 +5,8 @@
  * - script-src 'self': لا سكربت مضمن ولا خارجي؛ أي حقن HTML لا ينفّذ شيئاً.
  * - style-src يسمح بـ 'unsafe-inline' لأن React وRadix يضعان أنماطاً في خاصية style.
  * - img-src يسمح بـ https: لأن /storage/ مع محرك s3 يحوّل إلى رابط موقّع على نطاق التخزين.
- * - frame-src blob: لمعاينة تقارير PDF داخل الصفحة.
+ * - frame-src وobject-src وconnect-src تسمح بـ blob: لمعاينة تقارير PDF وتنزيلها: مستند blob يرث سياسة الصفحة،
+ *   وobject-src 'none' يمنع عارض PDF في Chrome من عرضه داخل الإطار. blob: لا يُنشأ إلا من نفس الأصل.
  *
  *   CSP_MODE=enforce (الافتراضي) | report-only | off
  *   CSP_EXTRA_SOURCES="https://analytics.example.com"  تُضاف إلى script-src وconnect-src (مثل Umami)
@@ -22,12 +23,12 @@ export function buildContentSecurityPolicy(extraSources: string[] = []) {
     "style-src": ["'self'", "'unsafe-inline'"],
     "img-src": ["'self'", "data:", "blob:", "https:"],
     "font-src": ["'self'", "data:"],
-    "connect-src": ["'self'", ...extra],
+    "connect-src": ["'self'", "blob:", ...extra],
     "media-src": ["'self'", "blob:", "https:"],
     "frame-src": ["'self'", "blob:"],
     "worker-src": ["'self'"],
     "manifest-src": ["'self'"],
-    "object-src": ["'none'"],
+    "object-src": ["'self'", "blob:"],
     "base-uri": ["'self'"],
     "form-action": ["'self'"],
     "frame-ancestors": ["'self'"],
