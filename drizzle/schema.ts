@@ -469,6 +469,8 @@ export const localCredentials = mysqlTable("local_credentials", {
   userId: int("userId").notNull(),
   email: varchar("email", { length: 320 }).notNull(),
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
+  /** وقت تأكيد البريد (برابط مرسل إليه أو بدخول Google ببريد مؤكد). */
+  emailVerifiedAt: timestamp("emailVerifiedAt"),
   failedAttempts: int("failedAttempts").default(0).notNull(),
   lockedUntil: timestamp("lockedUntil"),
   passwordChangedAt: timestamp("passwordChangedAt").defaultNow().notNull(),
@@ -483,6 +485,8 @@ export const passwordSetupTokens = mysqlTable("password_setup_tokens", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
   tokenHash: varchar("tokenHash", { length: 128 }).notNull(),
+  /** setup: رابط من المدير (72 ساعة). reset: استعادة بالبريد (30 دقيقة). verify_email: تأكيد البريد. */
+  purpose: mysqlEnum("purpose", ["setup", "reset", "verify_email"]).default("setup").notNull(),
   createdBy: int("createdBy"),
   expiresAt: timestamp("expiresAt").notNull(),
   usedAt: timestamp("usedAt"),
@@ -490,3 +494,32 @@ export const passwordSetupTokens = mysqlTable("password_setup_tokens", {
 }, (table) => [uniqueIndex("password_setup_tokens_hash_unique").on(table.tokenHash), index("password_setup_tokens_user_idx").on(table.userId)]);
 
 export type PasswordSetupToken = typeof passwordSetupTokens.$inferSelect;
+
+// ===================== حدود الاستخدام (مشتركة بين نسخ الخادم وتبقى بعد إعادة التشغيل) =====================
+/** نوافذ حد المحاولات لكل مفتاح (مثل login:IP). */
+export const rateLimitBuckets = mysqlTable("rate_limit_buckets", {
+  bucketKey: varchar("bucketKey", { length: 191 }).primaryKey(),
+  count: int("count").default(0).notNull(),
+  resetAt: timestamp("resetAt").notNull(),
+}, (table) => [index("rate_limit_buckets_reset_idx").on(table.resetAt)]);
+
+/** عدد رسائل المساعد الذكي لكل مستخدم في كل يوم (UTC). */
+export const aiDailyUsage = mysqlTable("ai_daily_usage", {
+  userId: int("userId").notNull(),
+  day: varchar("day", { length: 10 }).notNull(),
+  count: int("count").default(0).notNull(),
+}, (table) => [uniqueIndex("ai_daily_usage_user_day_unique").on(table.userId, table.day), index("ai_daily_usage_day_idx").on(table.day)]);
+
+// ===================== الدخول بحسابات خارجية (Google) =====================
+/** ربط حساب خارجي بمستخدم ترتيل. providerUserId هو sub الثابت من Google، لا البريد. */
+export const oauthAccounts = mysqlTable("oauth_accounts", {
+  id: int("id").autoincrement().primaryKey(),
+  provider: varchar("provider", { length: 32 }).notNull(),
+  providerUserId: varchar("providerUserId", { length: 191 }).notNull(),
+  userId: int("userId").notNull(),
+  email: varchar("email", { length: 320 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  lastUsedAt: timestamp("lastUsedAt"),
+}, (table) => [uniqueIndex("oauth_accounts_provider_user_unique").on(table.provider, table.providerUserId), index("oauth_accounts_user_idx").on(table.userId)]);
+
+export type OauthAccount = typeof oauthAccounts.$inferSelect;

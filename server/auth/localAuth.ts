@@ -4,17 +4,21 @@
  */
 import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { localCredentials, passwordSetupTokens, users, type User } from "../../drizzle/schema";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { ENV } from "../_core/env";
+import { actionEmail, isEmailConfigured, sendEmail } from "../_core/email";
+import { hitRateLimit } from "../data/usage-limits";
+import { isGoogleConfigured } from "./google";
 import { getClientIp } from "../_core/request";
 import { isAccountUsable, sdk } from "../_core/sdk";
-import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import { protectedProcedure, publicProcedure } from "../_core/trpc";
 import type { TrpcContext } from "../_core/context";
 import * as db from "../db";
+import { INVALID_INVITE_MESSAGE, classifyInviteCode, discardNewAccount, isInviteUsable, redeemSignupInvite } from "./inviteSignup";
 import {
   LOCK_DURATION_MS,
   MAX_FAILED_ATTEMPTS,
@@ -127,8 +131,38 @@ export async function createLocalUser(input: { name: string; email: string; pass
 export async function createPasswordSetupToken(userId: number, createdBy: number | null) {
   const database = await requireDb();
   const token = createSetupToken();
-  await database.insert(passwordSetupTokens).values({ userId, tokenHash: hashSetupToken(token), createdBy, expiresAt: new Date(Date.now() + SETUP_TOKEN_TTL_MS) });
+  await database.insert(passwordSetupTokens).values({ userId, tokenHash: hashSetupToken(token), createdBy, purpose: "setup", expiresAt: new Date(Date.now() + SETUP_TOKEN_TTL_MS) });
   return { token, path: `/set-password?token=${encodeURIComponent(token)}`, expiresInHours: SETUP_TOKEN_TTL_MS / 3_600_000 };
+}
+
+// ── البريد التشغيلي: استعادة كلمة المرور وتأكيد البريد (يعمل فقط مع مزود بريد وPUBLIC_APP_URL) ──
+export const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
+export const VERIFY_TOKEN_TTL_MS = 48 * 60 * 60 * 1000;
+
+/** البريد جاهز فقط مع عنوان عام ثابت؛ لا نبني روابط البريد من ترويسة Host. */
+export const isEmailFlowReady = () => isEmailConfigured() && Boolean(ENV.publicAppUrl);
+
+async function issueEmailToken(userId: number, purpose: "reset" | "verify_email", ttlMs: number) {
+  const database = await requireDb();
+  // رابط واحد صالح لكل غرض: الروابط الأقدم لم تعد تعمل.
+  await database.update(passwordSetupTokens).set({ usedAt: new Date() }).where(and(eq(passwordSetupTokens.userId, userId), eq(passwordSetupTokens.purpose, purpose), isNull(passwordSetupTokens.usedAt)));
+  const token = createSetupToken();
+  await database.insert(passwordSetupTokens).values({ userId, tokenHash: hashSetupToken(token), purpose, createdBy: null, expiresAt: new Date(Date.now() + ttlMs) });
+  return token;
+}
+
+export async function sendVerificationEmail(user: Pick<User, "id" | "name">, email: string) {
+  if (!isEmailFlowReady()) return false;
+  const token = await issueEmailToken(user.id, "verify_email", VERIFY_TOKEN_TTL_MS);
+  return sendEmail(actionEmail({
+    to: email,
+    subject: "تأكيد بريدك في ترتيل",
+    greeting: `مرحباً ${user.name ?? ""}،`.replace(" ،", "،"),
+    body: "اضغط الزر لتأكيد أن هذا البريد لك. التأكيد يتيح استعادة كلمة المرور إن نسيتها.",
+    actionLabel: "تأكيد البريد",
+    actionUrl: `${ENV.publicAppUrl}/verify-email?token=${encodeURIComponent(token)}`,
+    footer: "الرابط صالح 48 ساعة. إن لم تنشئ حساباً في ترتيل فتجاهل هذه الرسالة.",
+  }));
 }
 
 export const localAuthRouter = {
@@ -136,14 +170,90 @@ export const localAuthRouter = {
   providers: publicProcedure.query(() => ({
     local: true,
     allowSignup: ENV.allowSignup,
+    /** إنشاء حساب برمز دعوة أو كود دخول متاح دائماً، حتى حين يكون التسجيل العام مغلقاً. */
+    inviteSignup: true,
+    /** «نسيت كلمة المرور» بالبريد: يلزم مزود بريد وPUBLIC_APP_URL. */
+    passwordReset: isEmailFlowReady(),
+    google: isGoogleConfigured(),
   })),
 
+  /** يرسل رابط استعادة إن وُجد حساب بهذا البريد. الرد واحد دائماً حتى لا يكشف أي البريدات مسجّلة. */
+  requestPasswordReset: publicProcedure
+    .input(z.object({ email: emailSchema }))
+    .mutation(async ({ ctx, input }) => {
+      if (!isEmailFlowReady()) throw fail("PRECONDITION_FAILED", "استعادة كلمة المرور بالبريد غير مفعّلة؛ اطلب من إدارة المركز رابط تعيين كلمة مرور.");
+      if (!(await consumeRateLimit(`reset:${clientKey(ctx)}`))) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
+      const email = normalizeEmail(input.email);
+      // حد لكل بريد أيضاً: لا يُستخدم النموذج لإغراق صندوق شخص بالرسائل.
+      if (!(await hitRateLimit(`reset-email:${email}`, { max: 3, windowMs: 60 * 60 * 1000 }))) return { success: true } as const;
+      const credential = await findCredentialByEmail(email);
+      if (credential) {
+        const database = await requireDb();
+        const user = (await database.select().from(users).where(eq(users.id, credential.userId)).limit(1))[0];
+        if (user && isUserActive(user)) {
+          const token = await issueEmailToken(user.id, "reset", RESET_TOKEN_TTL_MS);
+          await sendEmail(actionEmail({
+            to: credential.email,
+            subject: "استعادة كلمة المرور في ترتيل",
+            greeting: `مرحباً ${user.name ?? ""}،`.replace(" ،", "،"),
+            body: "وصلنا طلب لتعيين كلمة مرور جديدة لحسابك. اضغط الزر لاختيارها؛ ستُغلق بعدها كل الجلسات المفتوحة على الأجهزة الأخرى.",
+            actionLabel: "تعيين كلمة مرور جديدة",
+            actionUrl: `${ENV.publicAppUrl}/set-password?token=${encodeURIComponent(token)}&reset=1`,
+            footer: "الرابط صالح 30 دقيقة ولمرة واحدة. إن لم تطلب ذلك فتجاهل الرسالة؛ كلمة مرورك الحالية لم تتغير.",
+          }));
+          await audit(user.id, "auth.password_reset_requested", user.id, ctx);
+        }
+      }
+      return { success: true } as const;
+    }),
+
+  verifyEmail: publicProcedure
+    .input(z.object({ token: z.string().trim().min(20).max(200) }))
+    .mutation(async ({ ctx, input }) => {
+      if (!(await consumeRateLimit(`verify:${clientKey(ctx)}`))) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
+      const database = await requireDb();
+      const row = (await database.select().from(passwordSetupTokens).where(and(
+        eq(passwordSetupTokens.tokenHash, hashSetupToken(input.token)),
+        eq(passwordSetupTokens.purpose, "verify_email"),
+        isNull(passwordSetupTokens.usedAt),
+        gt(passwordSetupTokens.expiresAt, new Date()),
+      )).limit(1))[0];
+      if (!row) throw fail("BAD_REQUEST", "رابط التأكيد غير صالح أو منتهٍ؛ اطلب رابطاً جديداً من الإعدادات");
+      await database.update(passwordSetupTokens).set({ usedAt: new Date() }).where(eq(passwordSetupTokens.id, row.id));
+      await database.update(localCredentials).set({ emailVerifiedAt: new Date() }).where(eq(localCredentials.userId, row.userId));
+      await audit(row.userId, "auth.email_verified", row.userId, ctx);
+      return { success: true } as const;
+    }),
+
+  emailStatus: protectedProcedure.query(async ({ ctx }) => {
+    const credential = await findCredentialByUserId(ctx.user.id);
+    return { email: credential?.email ?? null, verified: Boolean(credential?.emailVerifiedAt), canSend: isEmailFlowReady() && Boolean(credential) };
+  }),
+
+  resendVerification: protectedProcedure.mutation(async ({ ctx }) => {
+    if (!isEmailFlowReady()) throw fail("PRECONDITION_FAILED", "إرسال البريد غير مفعّل على هذا الخادم");
+    const credential = await findCredentialByUserId(ctx.user.id);
+    if (!credential) throw fail("BAD_REQUEST", "لا يوجد بريد دخول لهذا الحساب");
+    if (credential.emailVerifiedAt) return { success: true, alreadyVerified: true } as const;
+    if (!(await hitRateLimit(`verify-send:${ctx.user.id}`, { max: 3, windowMs: 60 * 60 * 1000 }))) throw fail("TOO_MANY_REQUESTS", "أُرسلت عدة رسائل؛ حاول بعد ساعة");
+    const sent = await sendVerificationEmail(ctx.user, credential.email);
+    if (!sent) throw fail("INTERNAL_SERVER_ERROR", "تعذر إرسال الرسالة الآن؛ حاول لاحقاً");
+    return { success: true, alreadyVerified: false } as const;
+  }),
+
   register: publicProcedure
-    .input(z.object({ name: z.string().trim().min(2, "الاسم قصير جداً").max(120), email: emailSchema, password: passwordSchema }))
+    .input(z.object({
+      name: z.string().trim().min(2, "الاسم قصير جداً").max(120),
+      email: emailSchema,
+      password: passwordSchema,
+      inviteCode: z.string().trim().max(128).optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
       const email = normalizeEmail(input.email);
-      if (!ENV.allowSignup) throw fail("FORBIDDEN", "إنشاء الحسابات مغلق؛ اطلب من إدارة المركز رابط تفعيل");
-      if (!consumeRateLimit(`register:${clientKey(ctx)}`)) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
+      const invite = input.inviteCode ? classifyInviteCode(input.inviteCode) : null;
+      if (input.inviteCode && !invite) throw fail("BAD_REQUEST", INVALID_INVITE_MESSAGE);
+      if (!ENV.allowSignup && !invite) throw fail("FORBIDDEN", "إنشاء الحسابات مغلق إلا برمز دعوة؛ أدخل رمز الدعوة أو كود الدخول الذي وصلك من إدارة المركز");
+      if (!(await consumeRateLimit(`register:${clientKey(ctx)}`))) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
       assertPolicy(input.password);
       // لا نربط تلقائياً بحساب قديم يحمل البريد نفسه (مثل حساب أُنشئ بنظام الدخول السابق) لأن البريد غير مُتحقق منه؛
       // صاحب الحساب القديم يعيّن كلمة مروره من الإعدادات أو برابط من المدير.
@@ -151,17 +261,32 @@ export const localAuthRouter = {
       const database = await requireDb();
       const legacy = await database.select({ id: users.id }).from(users).where(and(eq(users.email, email), isNull(users.deletedAt))).limit(1);
       if (legacy.length) throw fail("CONFLICT", "هذا البريد مرتبط بحساب موجود. سجّل الدخول بالطريقة السابقة وعيّن كلمة مرور من الإعدادات، أو اطلب من المدير رابط تعيين كلمة المرور.");
+      if (invite && !(await isInviteUsable(invite))) throw fail("BAD_REQUEST", INVALID_INVITE_MESSAGE);
+
       const user = await createLocalUser({ name: input.name, email, password: input.password });
-      await issueSession(ctx, user);
-      await audit(user.id, "auth.register", user.id, ctx);
-      return { success: true } as const;
+      let granted: { role: string; centerId?: number } | null = null;
+      if (invite) {
+        try {
+          granted = await redeemSignupInvite(invite, user.id, { ipAddress: clientKey(ctx), userAgent: String(ctx.req.headers?.["user-agent"] ?? "").slice(0, 512) || undefined });
+        } catch (error) {
+          // الرمز صار غير صالح بين الفحص والاسترداد: لا نترك حساباً بلا دعوة.
+          await discardNewAccount(user.id).catch((discardError) => console.warn("[Auth] discard failed", String(discardError)));
+          throw fail("BAD_REQUEST", error instanceof Error ? error.message : INVALID_INVITE_MESSAGE);
+        }
+      }
+      const fresh = (await database.select().from(users).where(eq(users.id, user.id)).limit(1))[0] ?? user;
+      await issueSession(ctx, fresh);
+      // تأكيد البريد لا يمنع الدخول؛ يُرسل في الخلفية إن كان البريد مفعّلاً.
+      void sendVerificationEmail(fresh, email).catch((error) => console.warn("[Auth] verification email failed", String(error)));
+      await audit(user.id, invite ? "auth.register_invite" : "auth.register", user.id, ctx, granted ? { inviteKind: invite!.kind, role: granted.role, centerId: granted.centerId } : undefined);
+      return { success: true, role: granted?.role ?? null } as const;
     }),
 
   login: publicProcedure
     .input(z.object({ email: emailSchema, password: passwordSchema }))
     .mutation(async ({ ctx, input }) => {
       const email = normalizeEmail(input.email);
-      if (!consumeRateLimit(`login:${clientKey(ctx)}`)) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول بعد ربع ساعة");
+      if (!(await consumeRateLimit(`login:${clientKey(ctx)}`))) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول بعد ربع ساعة");
       const credential = await findCredentialByEmail(email);
       const invalid = fail("UNAUTHORIZED", "البريد أو كلمة المرور غير صحيحة");
       if (!credential) {
@@ -240,11 +365,13 @@ export const localAuthRouter = {
   completeSetup: publicProcedure
     .input(z.object({ token: z.string().trim().min(20).max(200), email: emailSchema.optional(), password: passwordSchema }))
     .mutation(async ({ ctx, input }) => {
-      if (!consumeRateLimit(`setup:${clientKey(ctx)}`)) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
+      if (!(await consumeRateLimit(`setup:${clientKey(ctx)}`))) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
       assertPolicy(input.password);
       const database = await requireDb();
       const row = (await database.select().from(passwordSetupTokens).where(and(
         eq(passwordSetupTokens.tokenHash, hashSetupToken(input.token)),
+        // رابط تأكيد البريد لا يصلح لتعيين كلمة مرور.
+        inArray(passwordSetupTokens.purpose, ["setup", "reset"]),
         isNull(passwordSetupTokens.usedAt),
         gt(passwordSetupTokens.expiresAt, new Date()),
       )).limit(1))[0];
@@ -259,8 +386,10 @@ export const localAuthRouter = {
       const affected = (marked as unknown as [{ affectedRows?: number }])[0]?.affectedRows;
       if (affected === 0) throw fail("BAD_REQUEST", "الرابط مستخدم من قبل");
       await saveCredential(user.id, email, input.password);
+      // رابط الاستعادة وصل إلى هذا البريد، فهو مؤكد.
+      if (row.purpose === "reset") await database.update(localCredentials).set({ emailVerifiedAt: new Date() }).where(eq(localCredentials.userId, user.id));
       await rotateSessions(ctx, user);
-      await audit(user.id, "auth.setup_completed", user.id, ctx);
+      await audit(user.id, row.purpose === "reset" ? "auth.password_reset_completed" : "auth.setup_completed", user.id, ctx);
       return { success: true, email } as const;
     }),
 };

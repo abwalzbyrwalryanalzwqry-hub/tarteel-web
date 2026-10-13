@@ -64,6 +64,7 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 /** يهرّب النص لـ XML ويحذف محارف التحكم التي تجعل الملف تالفاً في Excel. */
 export function escapeXml(value: string) {
   return value
+    // eslint-disable-next-line no-control-regex -- محارف التحكم هذه ممنوعة في XML فتُحذف عمداً.
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

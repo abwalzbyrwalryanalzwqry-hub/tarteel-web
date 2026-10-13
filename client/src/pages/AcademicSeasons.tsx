@@ -1,6 +1,6 @@
 import EntityForm, { FormInput } from "@/components/EntityForm";
 import { trpc } from "@/lib/trpc";
-import { BookText, Calendar, Edit, Plus, Trash2 } from "lucide-react";
+import { BookText, Calendar, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { SEASON_TYPE_LABELS } from "../../../shared/types";

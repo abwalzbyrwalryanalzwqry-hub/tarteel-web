@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { ROLE_PERMISSION_TEMPLATES } from "./accessControl";
+import { readRouterSource } from "./testing/routerSource";
 
 const root = process.cwd();
 
@@ -14,14 +15,14 @@ describe("إدارة المعلم لحلقته", () => {
   });
 
   it("يفرض الحلقة على إنشاء الطالب للمعلم ويمنع تجاوز مركز الحلقة", () => {
-    const router = readFileSync(path.join(root, "server/routers.ts"), "utf8");
+    const router = readRouterSource();
     expect(router).toContain("يلزم ربط الطالب بحلقة المعلم عند الإنشاء أو الإدارة");
     expect(router).toContain("الحلقة لا تنتمي إلى المركز المحدد");
     expect(router).toContain("assertStudentManageAccess(ctx.user, input.circleId, \"students.create\"");
   });
 
   it("يثبت معلم الجلسة وموسمها على الحلقة المرتبطة بحسابه", () => {
-    const router = readFileSync(path.join(root, "server/routers.ts"), "utf8");
+    const router = readRouterSource();
     expect(router).toContain("resolveSessionCreateInput");
     expect(router).toContain("circle.teacherId !== teacher.id && circle.assistantTeacherId !== teacher.id");
     expect(router).toContain("لا يمكنك تعيين معلم آخر لجلسة حلقتك");

@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { CheckCircle2, ClipboardCopy, Clock3, KeyRound, Plus, ShieldAlert, Trash2, UserRoundPlus } from "lucide-react";
+import { CheckCircle2, ClipboardCopy, KeyRound, Plus, ShieldAlert, Trash2, UserRoundPlus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 

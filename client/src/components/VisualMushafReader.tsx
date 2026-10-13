@@ -231,7 +231,7 @@ export function VisualMushafReader({ startSurah, startAyah, selectionContext, fo
     }
     revealControls();
   // إعادة إظهار الأدوات عقب تغيير الصفحة أو إغلاق اللوحات ثم إخفاؤها بهدوء.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [focusMode, pageNumber, showInfo, indexOpen, settingsOpen, studyVerse]);
 
   const setActivePage = (next: number) => {
@@ -266,7 +266,7 @@ export function VisualMushafReader({ startSurah, startAyah, selectionContext, fo
   useEffect(() => {
     if (loadedPage === pageNumber && startIsOnPage) startHighlight();
   // The highlight starts only after the actual image is ready, including cached images.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [loadedPage, pageNumber, startIsOnPage]);
 
   const selectVerse = (surah: number, ayah: number) => {

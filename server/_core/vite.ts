@@ -3,8 +3,6 @@ import fs from "fs";
 import { type Server } from "http";
 import { nanoid } from "nanoid";
 import path from "path";
-import { createServer as createViteServer } from "vite";
-import viteConfig from "../../vite.config";
 
 export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
@@ -13,9 +11,10 @@ export async function setupVite(app: Express, server: Server) {
     allowedHosts: true as const,
   };
 
+  // تحميل vite وإعداداته عند الطلب فقط: صورة الإنتاج تثبّت اعتماديات الإنتاج وحدها، وvite منها خارج.
+  const { createServer: createViteServer } = await import("vite");
   const vite = await createViteServer({
-    ...viteConfig,
-    configFile: false,
+    configFile: path.resolve(import.meta.dirname, "../..", "vite.config.ts"),
     server: serverOptions,
     appType: "custom",
   });
@@ -58,10 +57,22 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, { setHeaders: setStaticCacheHeaders }));
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
+}
+
+/**
+ * ملفات /assets/ تحمل بصمة محتواها في اسمها فلا تتغير: تُحفظ سنة. أما index.html وsw.js
+ * والبيان فيجب أن يتحقق منها المتصفح كل مرة، وإلا بقي المستخدم على نسخة قديمة بعد النشر.
+ */
+export function setStaticCacheHeaders(res: { setHeader(name: string, value: string): unknown }, filePath: string) {
+  const normalized = filePath.replace(/\\/g, "/");
+  if (normalized.includes("/assets/")) res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+  else if (/\/(index\.html|sw\.js|manifest\.webmanifest)$/.test(normalized)) res.setHeader("Cache-Control", "no-cache");
+  else res.setHeader("Cache-Control", "public, max-age=86400");
 }

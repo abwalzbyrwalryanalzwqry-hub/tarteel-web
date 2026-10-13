@@ -26,6 +26,7 @@ export default function RedeemAccessCode() {
           <h1 className="mt-4 font-display text-2xl font-bold">فعّل حسابك بكود الدخول</h1>
           <p className="mt-2 text-sm leading-7 text-muted-foreground">يلزم تسجيل الدخول أولاً للتحقق من الهوية، ثم أدخل الكود الممنوح لك من المركز. لا يمنح الكود أي صلاحية خارج دوره ونطاقه.</p>
           <button onClick={() => navigate("/login")} className="btn-gold mt-6 w-full py-3">تسجيل الدخول أولاً</button>
+          <button onClick={() => navigate("/login?mode=register")} className="mt-3 w-full rounded-xl border border-primary/40 py-3 text-sm font-semibold text-primary hover:bg-primary/5">ليس لديك حساب؟ أنشئه بالكود</button>
         </section>
       </main>
     );

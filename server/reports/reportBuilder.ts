@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNull, lte, ne, or } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, ne } from "drizzle-orm";
 import { getDb, getReportingGoals, getReportingPreferences, keepLatestAttendanceRows } from "../db";
 import { attendance, branches, centers, circles, evaluation, memorization, revision, sessions, students, teachers } from "../../drizzle/schema";
 import { GRADE_LABELS, QURAN_SURAHS } from "../../shared/types";
