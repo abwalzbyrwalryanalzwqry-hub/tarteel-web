@@ -80,7 +80,8 @@ describe("الكوكي والتخزين", () => {
   it("SameSite=Lax دائماً (حماية CSRF)، و Secure على HTTPS فقط", () => {
     expect(getSessionCookieOptions({ protocol: "https", headers: {} } as any)).toMatchObject({ sameSite: "lax", secure: true, httpOnly: true });
     expect(getSessionCookieOptions({ protocol: "http", headers: {} } as any)).toMatchObject({ sameSite: "lax", secure: false });
-    expect(getSessionCookieOptions({ protocol: "http", headers: { "x-forwarded-proto": "https" } } as any)).toMatchObject({ secure: true });
+    // الترويسة وحدها لا تكفي: Express يحوّلها إلى req.protocol فقط إن جاءت من وكيل موثوق.
+    expect(getSessionCookieOptions({ protocol: "http", headers: { "x-forwarded-proto": "https" } } as any)).toMatchObject({ secure: false });
   });
 
   it("يمنع الخروج من مجلد التخزين", () => {

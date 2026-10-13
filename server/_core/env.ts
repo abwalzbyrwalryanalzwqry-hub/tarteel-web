@@ -15,8 +15,11 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
 
   // ── المصادقة: بريد وكلمة مرور داخل ترتيل ──
-  /** السماح بإنشاء حسابات جديدة من صفحة الدخول (الدور يبقى user حتى استرداد كود وصول). */
-  allowSignup: bool(process.env.ALLOW_SIGNUP, true),
+  /**
+   * السماح بإنشاء حسابات جديدة من صفحة الدخول (الدور يبقى user حتى استرداد كود وصول).
+   * مغلق افتراضياً: الخادم المنشور دون ضبط هذا المتغير لا يقبل حسابات من أي زائر.
+   */
+  allowSignup: bool(process.env.ALLOW_SIGNUP, false),
   /** عدد الوكلاء العكسيين (Caddy/Nginx/Render) أمام الخادم؛ يحدد كيف يُقرأ IP العميل الحقيقي. */
   trustProxyHops: int(process.env.TRUST_PROXY_HOPS, 1),
   /** الحد اليومي لرسائل المساعد الذكي لكل مستخدم (0 = تعطيل المساعد). */

@@ -8,17 +8,15 @@ function isIpAddress(host: string) {
   return host.includes(":");
 }
 
-function isSecureRequest(req: Request) {
-  if (req.protocol === "https") return true;
-
-  const forwardedProto = req.headers["x-forwarded-proto"];
-  if (!forwardedProto) return false;
-
-  const protoList = Array.isArray(forwardedProto)
-    ? forwardedProto
-    : forwardedProto.split(",");
-
-  return protoList.some(proto => proto.trim().toLowerCase() === "https");
+/**
+ * هل وصل الطلب عبر HTTPS؟
+ *
+ * لا نقرأ X-Forwarded-Proto مباشرة: العميل يستطيع إرسالها بنفسه. `req.protocol`
+ * في Express يأخذ بها فقط إن جاء الطلب من وكيل موثوق حسب `trust proxy`
+ * (TRUST_PROXY_HOPS)، وهو الإعداد نفسه الذي يحمي حد المحاولات من تزوير IP.
+ */
+export function isSecureRequest(req: Pick<Request, "protocol">) {
+  return req.protocol === "https";
 }
 
 export function getSessionCookieOptions(
