@@ -15,6 +15,7 @@
  */
 
 import { toLatinDigits } from "../../shared/phone";
+import { logger } from "./logger";
 
 export type SmsConfig = {
   accountSid: string;
@@ -132,17 +133,19 @@ export async function startPhoneVerification(
       fetchImpl
     );
   } catch (error) {
-    console.warn("[SMS] Twilio request failed", String(error));
+    logger.warn({ err: error }, "[SMS] Twilio request failed");
     throw new SmsError("unavailable");
   }
   if (!result.ok) {
     const reason = classifyTwilioError(result.body.code);
     if (reason === "unavailable")
-      console.warn(
-        "[SMS] Twilio rejected verification",
-        result.httpStatus,
-        result.body.code,
-        result.body.message
+      logger.warn(
+        {
+          status: result.httpStatus,
+          code: result.body.code,
+          detail: result.body.message,
+        },
+        "[SMS] Twilio rejected verification"
       );
     throw new SmsError(reason, result.body.code);
   }
@@ -170,18 +173,20 @@ export async function checkPhoneVerification(
       fetchImpl
     );
   } catch (error) {
-    console.warn("[SMS] Twilio check failed", String(error));
+    logger.warn({ err: error }, "[SMS] Twilio check failed");
     throw new SmsError("unavailable");
   }
   if (result.httpStatus === 404) return false;
   if (!result.ok) {
     const reason = classifyTwilioError(result.body.code);
     if (reason === "too_many") return false;
-    console.warn(
-      "[SMS] Twilio rejected check",
-      result.httpStatus,
-      result.body.code,
-      result.body.message
+    logger.warn(
+      {
+        status: result.httpStatus,
+        code: result.body.code,
+        detail: result.body.message,
+      },
+      "[SMS] Twilio rejected check"
     );
     throw new SmsError(reason, result.body.code);
   }

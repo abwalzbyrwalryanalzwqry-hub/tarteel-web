@@ -7,6 +7,7 @@ import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { ENV } from "./env";
+import { logger } from "./logger";
 
 /** `sv` = رقم إصدار الجلسة، يجب أن يطابق users.sessionVersion وإلا تُرفض الجلسة. */
 export type SessionPayload = { openId: string; appId: string; name: string; sv: number };
@@ -54,7 +55,7 @@ class SessionService {
       if (typeof sv !== "number" || !Number.isInteger(sv) || typeof iat !== "number") return null;
       return { openId, appId, name, sv, issuedAtMs: iat * 1000 };
     } catch (error) {
-      console.warn("[Auth] Session verification failed", String(error));
+      logger.debug({ err: error }, "[Auth] session verification failed");
       return null;
     }
   }
@@ -102,7 +103,7 @@ class SessionService {
     if (!isAccountUsable(user)) throw ForbiddenError("User is not active");
     if ((user.sessionVersion ?? 0) !== session.sv) throw ForbiddenError("Session revoked");
 
-    await db.touchLastSignedIn(user).catch((error) => console.warn("[Auth] lastSignedIn update failed", String(error)));
+    await db.touchLastSignedIn(user).catch((error) => logger.warn({ err: error }, "[Auth] lastSignedIn update failed"));
     return { user, session, source };
   }
 

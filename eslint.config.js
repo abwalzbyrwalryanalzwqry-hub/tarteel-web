@@ -39,6 +39,12 @@ export default tseslint.config(
     },
   },
   {
+    // سجلات الخادم عبر logger (pino): JSON مع إخفاء الحقول الحساسة. console يتجاوز ذلك.
+    files: ["server/**/*.ts"],
+    ignores: ["server/**/*.test.ts", "server/testing/**"],
+    rules: { "no-console": "error" },
+  },
+  {
     files: ["**/*.test.{ts,tsx}", "server/testing/**"],
     rules: { "@typescript-eslint/no-non-null-assertion": "off" },
   }

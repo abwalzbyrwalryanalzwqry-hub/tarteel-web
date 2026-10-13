@@ -8,6 +8,7 @@
 import { lt, sql } from "drizzle-orm";
 import { aiDailyUsage, rateLimitBuckets } from "../../drizzle/schema";
 import { getDb } from "./connection";
+import { logger } from "../_core/logger";
 
 type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
@@ -68,7 +69,7 @@ export async function hitRateLimit(key: string, options: { max: number; windowMs
     try {
       return (await dbHit(db, k, options.windowMs, now)) <= options.max;
     } catch (error) {
-      console.warn("[RateLimit] database unavailable, using memory", String(error));
+      logger.warn({ err: error }, "[RateLimit] database unavailable, using memory");
     }
   }
   return memoryHit(k, options.windowMs, now) <= options.max;
@@ -90,7 +91,7 @@ export async function consumeDailyQuota(userId: number, limit: number, now = new
       }
       return counterFromResult(result) <= limit;
     } catch (error) {
-      console.warn("[AiQuota] database unavailable, using memory", String(error));
+      logger.warn({ err: error }, "[AiQuota] database unavailable, using memory");
     }
   }
   const key = `${userId}:${day}`;

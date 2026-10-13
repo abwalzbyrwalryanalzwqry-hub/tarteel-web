@@ -33,6 +33,7 @@ import {
   redeemSignupInvite,
 } from "./inviteSignup";
 import { consumeRateLimit, normalizeEmail } from "./password";
+import { logger } from "../_core/logger";
 
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -127,7 +128,7 @@ async function audit(
       userAgent: String(req.headers["user-agent"] ?? "").slice(0, 512) || null,
     });
   } catch (error) {
-    console.warn("[Google] audit failed", String(error));
+    logger.warn({ err: error }, "[Google] audit failed");
   }
 }
 
@@ -370,7 +371,7 @@ export function registerGoogleAuth(app: Express) {
       const code =
         error instanceof GoogleLoginFailure ? error.code : "exchange";
       if (!(error instanceof GoogleLoginFailure) || code === "exchange")
-        console.warn("[Google] login failed", String(error));
+        logger.warn({ err: error }, "[Google] login failed");
       redirectToLogin(res, code);
     }
   });

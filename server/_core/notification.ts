@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { ENV } from "./env";
+import { logger } from "./logger";
 
 export type NotificationPayload = {
   title: string;
@@ -64,14 +65,14 @@ export async function notifyOwner(
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ title, content, text: `${title}\n\n${content}` }),
       });
-      if (!response.ok) console.warn(`[Notification] webhook failed (${response.status})`);
+      if (!response.ok) logger.warn({ status: response.status }, "[Notification] webhook failed");
       return response.ok;
     } catch (error) {
-      console.warn("[Notification] webhook error:", error);
+      logger.warn({ err: error }, "[Notification] webhook error");
       return false;
     }
   }
 
-  console.info(`[Notification] (no channel configured) ${title}: ${content.slice(0, 500)}`);
+  logger.info({ title, content: content.slice(0, 500) }, "[Notification] no channel configured");
   return false;
 }
