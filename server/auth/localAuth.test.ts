@@ -58,9 +58,9 @@ describe("auth.providers", () => {
 
   it("صفحة الدخول تعرض البريد وكلمة المرور، والتسجيل حسب ALLOW_SIGNUP", async () => {
     Object.assign(ENV, { allowSignup: true });
-    expect(await appRouter.createCaller(publicCtx()).auth.providers()).toEqual({ local: true, allowSignup: true, inviteSignup: true });
+    expect(await appRouter.createCaller(publicCtx()).auth.providers()).toMatchObject({ local: true, allowSignup: true, inviteSignup: true, passwordReset: false, google: false });
     Object.assign(ENV, { allowSignup: false });
-    expect(await appRouter.createCaller(publicCtx()).auth.providers()).toEqual({ local: true, allowSignup: false, inviteSignup: true });
+    expect(await appRouter.createCaller(publicCtx()).auth.providers()).toMatchObject({ local: true, allowSignup: false, inviteSignup: true });
   });
 
   it("إغلاق التسجيل يرفض كل الحسابات الجديدة، ولا استثناء لأي بريد (لا تصعيد صلاحيات بالبريد)", async () => {

@@ -8,3 +8,4 @@ artifacts
 *.apk
 *.aab
 .env
+backups

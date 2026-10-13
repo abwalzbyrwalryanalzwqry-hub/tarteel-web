@@ -39,6 +39,16 @@ export const ENV = {
   s3AccessKeyId: str(process.env.S3_ACCESS_KEY_ID),
   s3SecretAccessKey: str(process.env.S3_SECRET_ACCESS_KEY),
 
+  /**
+   * العنوان العام للمنصة (مثل https://tarteel.example.com). يلزم لروابط البريد ولـ Google:
+   * لا نبني الروابط من ترويسة Host لأن المهاجم يتحكم بها (تسميم رابط استعادة كلمة المرور).
+   */
+  publicAppUrl: str(process.env.PUBLIC_APP_URL).replace(/\/+$/, ""),
+
+  // ── الدخول بـ Google (اختياري) ──
+  googleClientId: str(process.env.GOOGLE_CLIENT_ID),
+  googleClientSecret: str(process.env.GOOGLE_CLIENT_SECRET),
+
   // ── إشعارات المالك: Webhook عام (Telegram/Slack/Discord عبر وسيط) ──
   ownerWebhookUrl: str(process.env.OWNER_NOTIFY_WEBHOOK_URL),
 };
