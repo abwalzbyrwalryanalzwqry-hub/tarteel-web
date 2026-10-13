@@ -297,8 +297,11 @@ export default function LoginPage() {
             </div>
           )}
 
-          <p className="text-xs text-muted-foreground mt-4">
-            بتسجيل الدخول، أنت توافق على شروط الاستخدام وسياسة الخصوصية
+          <p className="text-xs text-muted-foreground mt-4 leading-6">
+            بتسجيل الدخول، أنت توافق على{" "}
+            <a href="/terms" className="font-medium text-primary underline-offset-4 hover:underline">شروط الاستخدام</a>
+            {" "}و
+            <a href="/privacy" className="font-medium text-primary underline-offset-4 hover:underline">سياسة الخصوصية</a>
           </p>
           <AccessHelpPanel />
         </div>
