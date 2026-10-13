@@ -12,7 +12,8 @@ export default defineConfig({
       "@assets": path.resolve(templateRoot, "attached_assets"),
     },
   },
-  esbuild: { jsx: "automatic" },
+  // Vite 8 يحوّل الشيفرة بـ oxc بدل esbuild.
+  oxc: { jsx: { runtime: "automatic" } },
   test: {
     environment: "node",
     include: ["server/**/*.test.ts", "server/**/*.spec.ts", "shared/**/*.test.ts", "client/src/**/*.test.tsx"],
