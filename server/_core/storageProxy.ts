@@ -12,8 +12,10 @@ const IMMUTABLE = "public, max-age=31536000, immutable";
  * أسماء الملفات تحمل بصمة (hash) فيمكن تخزينها مؤقتاً لمدة طويلة.
  */
 export function registerStorageProxy(app: Express) {
-  app.get("/storage/*", async (req, res) => {
-    const key = (req.params as Record<string, string>)[0];
+  // Express 5: المحرف البديل يجب أن يُسمّى، ويعيد مقاطع المسار مصفوفة.
+  app.get("/storage/*key", async (req, res) => {
+    const segments = req.params.key;
+    const key = Array.isArray(segments) ? segments.join("/") : segments;
     if (!key) {
       res.status(400).send("Missing storage key");
       return;

@@ -8,6 +8,17 @@ import { clearPendingTeacherInvite, readPendingTeacherInvite } from "../../../sh
 import { hasActiveAccessMembership } from "../../../shared/accessMembership";
 import { AccessHelpPanel } from "@/components/AccessHelpPanel";
 
+const GOOGLE_ERRORS: Record<string, string> = {
+  not_configured: "الدخول بـ Google غير مفعّل على هذا الخادم.",
+  state: "انتهت مهلة الدخول بـ Google أو فُتح من نافذة أخرى؛ حاول مجدداً.",
+  exchange: "تعذر إكمال الدخول بـ Google؛ حاول مجدداً.",
+  unverified_email: "بريد حساب Google غير مؤكد، فلا يمكن ربطه بحساب في ترتيل.",
+  signup_closed: "لا يوجد حساب في ترتيل بهذا البريد. أنشئ حساباً برمز الدعوة من تبويب «حساب جديد» ثم اضغط «المتابعة بـ Google».",
+  invite_invalid: "رمز الدعوة أو كود الدخول غير صالح أو منتهٍ.",
+  inactive: "هذا الحساب موقوف؛ تواصل مع إدارة المركز.",
+  rate_limited: "محاولات كثيرة، حاول بعد ربع ساعة.",
+};
+
 export default function LoginPage() {
   const { isAuthenticated, loading } = useAuth();
   const { data: memberships, isLoading: membershipsLoading } = trpc.access.mine.useQuery(undefined, { enabled: isAuthenticated });
@@ -18,6 +29,10 @@ export default function LoginPage() {
   const [mode, setMode] = useState<"login" | "register">(() => (initialParams.get("mode") === "register" || initialParams.get("code") ? "register" : "login"));
   const [inviteCode, setInviteCode] = useState(() => (initialParams.get("code") ?? readPendingTeacherInvite() ?? "").toUpperCase());
   const signupOpen = Boolean(providers?.allowSignup);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const requestReset = trpc.auth.requestPasswordReset.useMutation({ onSuccess: () => setResetSent(true), onError: (e) => toast.error(e.message) });
+  const googleHref = `/api/auth/google${mode === "register" && inviteCode.trim() ? `?invite=${encodeURIComponent(inviteCode.trim())}` : ""}`;
   const canRegister = signupOpen || Boolean(providers?.inviteSignup);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -42,6 +57,11 @@ export default function LoginPage() {
   const [switchAccount] = useState(() => {
     try { return sessionStorage.getItem("tarteel-switch-account") === "1"; } catch { return false; }
   });
+
+  useEffect(() => {
+    const code = initialParams.get("google_error");
+    if (code) toast.error(GOOGLE_ERRORS[code] ?? GOOGLE_ERRORS.exchange, { duration: 8000 });
+  }, [initialParams]);
 
   useEffect(() => {
     if (!loading && !membershipsLoading && isAuthenticated) {
@@ -134,8 +154,35 @@ export default function LoginPage() {
                 {mode === "login" ? <LogIn className="w-5 h-5"/> : <UserPlus className="w-5 h-5"/>}
                 {busy ? "جارٍ التحقق…" : mode === "login" ? "الدخول إلى ترتيل" : "إنشاء الحساب"}
               </button>
-              <p className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground"><KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0"/>نسيت كلمة المرور؟ اطلب من إدارة المركز رابط تعيين كلمة مرور جديدة.</p>
+              {providers?.passwordReset ? (
+                mode === "login" && <button type="button" onClick={() => { setResetOpen((v) => !v); setResetSent(false); }} className="flex items-center gap-1.5 text-xs text-primary hover:underline"><KeyRound className="h-3.5 w-3.5 shrink-0"/>نسيت كلمة المرور؟</button>
+              ) : (
+                <p className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground"><KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0"/>نسيت كلمة المرور؟ اطلب من إدارة المركز رابط تعيين كلمة مرور جديدة.</p>
+              )}
             </form>
+          )}
+
+          {resetOpen && mode === "login" && providers?.passwordReset && (
+            <div className="mt-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-right text-sm">
+              {resetSent ? (
+                <p className="leading-7 text-foreground">إن كان البريد مسجّلاً فستصلك رسالة فيها رابط صالح 30 دقيقة. افحص مجلد الرسائل غير المرغوب فيها أيضاً.</p>
+              ) : (
+                <form onSubmit={(event) => { event.preventDefault(); requestReset.mutate({ email }); }} className="space-y-2">
+                  <p className="text-xs leading-6 text-muted-foreground">أدخل بريد حسابك في الحقل أعلاه ثم اضغط الزر لنرسل لك رابط تعيين كلمة مرور جديدة.</p>
+                  <button type="submit" disabled={requestReset.isPending || !email.trim()} className="w-full rounded-xl border border-primary/40 py-2.5 font-semibold text-primary hover:bg-primary/10 disabled:opacity-60">{requestReset.isPending ? "جارٍ الإرسال…" : "أرسل رابط الاستعادة"}</button>
+                </form>
+              )}
+            </div>
+          )}
+
+          {providers?.google && (
+            <div className="mt-4">
+              <div className="mb-3 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border"/>أو<span className="h-px flex-1 bg-border"/></div>
+              <a href={googleHref} className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-background py-3 text-sm font-semibold text-foreground shadow-sm hover:bg-muted/40">
+                <svg aria-hidden="true" viewBox="0 0 48 48" className="h-5 w-5"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+                {mode === "register" ? "إنشاء الحساب بـ Google" : "المتابعة بـ Google"}
+              </a>
+            </div>
           )}
 
           <p className="text-xs text-muted-foreground mt-4">
