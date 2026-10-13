@@ -29,7 +29,15 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 900 } } }],
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1280, height: 900 },
+      },
+    },
+  ],
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {
@@ -43,7 +51,9 @@ export default defineConfig({
           NODE_ENV: "production",
           PORT: String(port),
           DATABASE_URL: process.env.DATABASE_URL ?? "",
-          JWT_SECRET: process.env.JWT_SECRET ?? "e2e-secret-e2e-secret-e2e-secret-e2e-secret-0",
+          JWT_SECRET:
+            process.env.JWT_SECRET ??
+            "e2e-secret-e2e-secret-e2e-secret-e2e-secret-0",
           ALLOW_SIGNUP: "true",
           TRUST_PROXY_HOPS: "0",
         },
