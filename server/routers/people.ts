@@ -32,6 +32,7 @@ import {
   updateStudent,
   updateTeacher,
 } from "../db";
+import { autoLinkGuardianByPhone, normalizeGuardianPhone } from "../data/guardian-links";
 import { assertStudentManageAccess, assertStudentReadAccess, getAccessibleCenterIds, getTeacherCircleScope, toReaderStudent } from "./_shared";
 
 export const peopleRouters = {
@@ -182,7 +183,10 @@ export const peopleRouters = {
         if (input.circleId && input.centerId && input.centerId !== circleCenterId) throw new TRPCError({ code: "BAD_REQUEST", message: "الحلقة لا تنتمي إلى المركز المحدد" });
         await assertStudentManageAccess(ctx.user, input.circleId, "students.create", circleCenterId ?? input.centerId);
         if (!circleCenterId) throw new TRPCError({ code: "BAD_REQUEST", message: "يلزم تحديد المركز للطالب غير المرتبط بحلقة" });
-        return createStudent({ ...input, centerId: circleCenterId });
+        const guardianPhone = normalizeGuardianPhone(input.guardianPhone);
+        const created = await createStudent({ ...input, guardianPhone, centerId: circleCenterId });
+        await autoLinkGuardianByPhone(guardianPhone, circleCenterId, ctx.user.id);
+        return created;
       }),
     update: protectedProcedure
       .input(z.object({
@@ -205,7 +209,9 @@ export const peopleRouters = {
         const student = await getStudentById(id);
         await assertStudentManageAccess(ctx.user, student?.circleId, "students.edit", student?.centerId);
         if (data.circleId) await assertStudentManageAccess(ctx.user, data.circleId, "students.edit");
-        await updateStudent(id, data);
+        const guardianPhone = normalizeGuardianPhone(data.guardianPhone);
+        await updateStudent(id, { ...data, guardianPhone });
+        if (student && guardianPhone !== undefined && guardianPhone !== student.guardianPhone) await autoLinkGuardianByPhone(guardianPhone, student.centerId, ctx.user.id);
       }),
     delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => { const student = await getStudentById(input.id); await assertStudentManageAccess(ctx.user, student?.circleId, "students.delete", student?.centerId); return softDeleteStudent(input.id); }),
     memorizationHistory: protectedProcedure.input(z.object({ studentId: z.number() })).query(async ({ ctx, input }) => { const student = await getStudentById(input.studentId); await assertStudentReadAccess(ctx.user, student); return getMemorizationByStudent(input.studentId); }),

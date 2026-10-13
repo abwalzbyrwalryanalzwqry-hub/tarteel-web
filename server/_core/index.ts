@@ -5,6 +5,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerStorageProxy } from "./storageProxy";
 import { registerGoogleAuth } from "../auth/google";
+import { registerWhatsAppWebhook } from "./whatsappWebhook";
 import { securityHeaders } from "./securityHeaders";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -47,6 +48,8 @@ async function startServer() {
   app.use(securityHeaders());
   const server = createServer(app);
   // أكبر طلب مشروع هو رفع شعار (2MB كـ base64 ≈ 2.8MB)؛ الحد السابق 50MB كان يسمح بإغراق الخادم.
+  // Webhook واتساب يحتاج الجسم الخام للتحقق من التوقيع، فيُسجَّل قبل express.json.
+  registerWhatsAppWebhook(app);
   app.use("/api/trpc", express.json({ limit: "4mb" }));
   app.use(express.json({ limit: "1mb" }));
   app.use(express.urlencoded({ limit: "1mb", extended: true }));

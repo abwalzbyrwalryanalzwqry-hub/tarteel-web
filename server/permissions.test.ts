@@ -46,7 +46,9 @@ describe("صلاحيات أدوار ترتيل", () => {
     expect(studentPaths).toContain("/quran");
     expect(studentPaths).not.toContain("/parent-messages");
     expect(guardianPaths).not.toContain("/reports");
-    expect(guardianPaths).toEqual(["/students", "/quran"]);
+    // ولي الأمر: إنجازات أبنائه والمصحف، وإشعاراته وإعدادات حسابه الشخصية (كلمة المرور وتأكيد الرقم).
+    expect(guardianPaths).toEqual(["/students", "/quran", "/notifications", "/settings"]);
+    expect(guardianPaths).not.toContain("/dashboard");
     expect(getVisibleNavigationPaths("center_manager")).toContain("/teacher-invites");
   });
 });

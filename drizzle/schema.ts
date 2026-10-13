@@ -485,6 +485,31 @@ export const localCredentials = mysqlTable("local_credentials", {
 
 export type LocalCredential = typeof localCredentials.$inferSelect;
 
+/**
+ * التحقق العكسي من رقم الهاتف عبر واتساب: يعرض ترتيل رمزاً قصيراً، فيرسله المستخدم من واتساب رقمه
+ * إلى رقم المركز، ويصل إلى الخادم عبر Webhook من WhatsApp Cloud API مع رقم المرسل كما يعرفه واتساب.
+ * لا يُرسل الخادم أي رسالة، فلا تكلفة. الرمز والتذكرة يُخزّنان مُجزّأين (sha256) فقط.
+ * التذكرة سرّ يملكه المتصفح الذي بدأ التحقق، ويقدّمها لإكمال التسجيل أو الاستعادة بعد التأكيد.
+ */
+export const phoneVerifications = mysqlTable("phone_verifications", {
+  id: int("id").autoincrement().primaryKey(),
+  purpose: mysqlEnum("purpose", ["signup", "reset", "verify", "add_phone"]).notNull(),
+  /** الرقم المطلوب تأكيده بصيغة E.164. */
+  phone: varchar("phone", { length: 20 }).notNull(),
+  /** صاحب الطلب عند التأكيد من داخل الحساب (verify وadd_phone). */
+  userId: int("userId"),
+  codeHash: varchar("codeHash", { length: 64 }).notNull(),
+  ticketHash: varchar("ticketHash", { length: 64 }).notNull(),
+  /** pending: بانتظار الرسالة. verified: وصلت من الرقم نفسه. mismatch: وصل الرمز من رقم آخر. consumed: استُخدمت التذكرة. */
+  status: mysqlEnum("status", ["pending", "verified", "mismatch", "consumed"]).default("pending").notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  verifiedAt: timestamp("verifiedAt"),
+  consumedAt: timestamp("consumedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [uniqueIndex("phone_verifications_ticket_unique").on(table.ticketHash), index("phone_verifications_code_idx").on(table.codeHash, table.status), index("phone_verifications_phone_idx").on(table.phone, table.createdAt)]);
+
+export type PhoneVerification = typeof phoneVerifications.$inferSelect;
+
 /** روابط تعيين كلمة المرور لمرة واحدة: ينشئها المدير لمستخدم موجود (مثل الحسابات القديمة بلا كلمة مرور). */
 export const passwordSetupTokens = mysqlTable("password_setup_tokens", {
   id: int("id").autoincrement().primaryKey(),

@@ -274,10 +274,10 @@ async function redeemAccessCodeInTransaction(
         if (linkedStudents.some((student) => student.id !== accessCode.studentId)) throw new Error("هذا الحساب مرتبط بطالب آخر ولا يمكن منحه طالباً إضافياً");
       } else {
         if (targetStudent.guardianUserId && targetStudent.guardianUserId !== input.userId) throw new Error("هذا الطالب مرتبط بولي أمر آخر");
-        const [linkedParent] = await tx.select({ studentId: parentStudentLinks.studentId }).from(parentStudentLinks).where(and(eq(parentStudentLinks.guardianUserId, input.userId), eq(parentStudentLinks.centerId, accessCode.centerId))).limit(1);
-        if (linkedParent && linkedParent.studentId !== accessCode.studentId) throw new Error("هذا الحساب مرتبط بابن آخر ولا يمكن منحه نطاقاً إضافياً");
-        const linkedGuardianStudents = await tx.select({ id: students.id }).from(students).where(and(eq(students.guardianUserId, input.userId), eq(students.centerId, accessCode.centerId), isNull(students.deletedAt)));
-        if (linkedGuardianStudents.some((student) => student.id !== accessCode.studentId)) throw new Error("هذا الحساب مرتبط بابن آخر ولا يمكن منحه نطاقاً إضافياً");
+        // ولي الأمر قد يكون له أكثر من ابن في المركز: كل كود يضيف ابناً واحداً إلى أبنائه السابقين ولا يستبدلهم.
+        // لكن لا يتحول حساب بدور آخر في المركز (معلم أو مشرف…) إلى ولي أمر بكود.
+        const [existingMembership] = await tx.select({ role: centerMemberships.role, status: centerMemberships.status, revokedAt: centerMemberships.revokedAt }).from(centerMemberships).where(and(eq(centerMemberships.userId, input.userId), eq(centerMemberships.centerId, accessCode.centerId))).limit(1);
+        if (existingMembership && existingMembership.role !== "guardian" && existingMembership.status === "active" && !existingMembership.revokedAt) throw new Error("هذا الحساب له دور آخر في المركز ولا يمكن منحه دور ولي أمر");
       }
     }
     const nextCount = accessCode.usedCount + 1;
@@ -303,7 +303,9 @@ async function redeemAccessCodeInTransaction(
         if (Array.isArray(embedded)) for (const scope of embedded) if (["center", "circle", "teacher", "student"].includes(scope?.scopeType)) scopes.push({ scopeType: scope.scopeType, scopeId: scope.scopeId });
       } catch { /* مخطط النطاق غير صالح؛ يظل الرمز بنطاقه الصريح فقط. */ }
     }
-    if (isTeacherAccessCode || isReaderAccessCode || isGuideAccessCode) await tx.update(userScopes).set({ revokedAt: now }).where(and(eq(userScopes.userId, input.userId), eq(userScopes.centerId, accessCode.centerId), isNull(userScopes.revokedAt)));
+    // كود ولي الأمر يضيف نطاق الابن دون سحب نطاقات أبنائه الآخرين.
+    const replacesScopes = isTeacherAccessCode || isGuideAccessCode || (isReaderAccessCode && accessCode.role === "student");
+    if (replacesScopes) await tx.update(userScopes).set({ revokedAt: now }).where(and(eq(userScopes.userId, input.userId), eq(userScopes.centerId, accessCode.centerId), isNull(userScopes.revokedAt)));
     if (scopes.length) await tx.insert(userScopes).values(scopes.map((scope) => ({ userId: input.userId, centerId: accessCode.centerId, scopeType: scope.scopeType, scopeId: scope.scopeId ?? null, grantedBy: accessCode.createdBy })));
     if (isTeacherAccessCode) {
       const [existingTeacher] = await tx.select().from(teachers).where(and(eq(teachers.userId, input.userId), eq(teachers.centerId, accessCode.centerId), isNull(teachers.deletedAt))).limit(1);

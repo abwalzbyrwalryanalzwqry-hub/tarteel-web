@@ -85,6 +85,11 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
       location === item.path || (item.path !== "/dashboard" && location.startsWith(`${item.path}/`))
     );
   const mayViewCurrentRoute = !currentNav || can(currentNav.permission);
+  /** ولي الأمر والطالب لا لوحة تحكم لهما: صفحتهما الأولى «إنجازات الابن» بدل رسالة «ليس لديك صلاحية». */
+  const homeFallback = location === "/dashboard" && !mayViewCurrentRoute && !loading && can("students:view") ? "/students" : null;
+  useEffect(() => {
+    if (homeFallback) navigate(homeFallback, { replace: true });
+  }, [homeFallback, navigate]);
 
   const { data: unreadCount } = trpc.notifications.unreadCount.useQuery(undefined, {
     enabled: isAuthenticated,
