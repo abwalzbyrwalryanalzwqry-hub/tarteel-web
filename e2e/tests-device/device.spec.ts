@@ -3,7 +3,13 @@
  * عدة حسابات على الجهاز نفسه بأدوار مختلفة، والبيانات تبقى بعد إعادة فتح التطبيق.
  */
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
-import { PASSWORD, createCenterViaUi, seedCircle, trpcMutation, trpcQuery } from "../tests/helpers";
+import {
+  PASSWORD,
+  createCenterViaUi,
+  seedCircle,
+  trpcMutation,
+  trpcQuery,
+} from "../tests/helpers";
 
 test.describe.configure({ mode: "serial" });
 
@@ -15,7 +21,11 @@ let page: Page;
 
 /** بعد كل فتح للصفحة: انتظر تحميل قاعدة SQLite المحلية وتثبيت الجسر. */
 async function ready(target: Page = page) {
-  await target.waitForFunction(() => (globalThis as { __tarteelLocalReady?: boolean }).__tarteelLocalReady === true);
+  await target.waitForFunction(
+    () =>
+      (globalThis as { __tarteelLocalReady?: boolean }).__tarteelLocalReady ===
+      true
+  );
 }
 
 async function open(path: string, target: Page = page) {
@@ -33,7 +43,11 @@ test.afterAll(async () => {
   await context?.close();
 });
 
-async function registerByPhone(name: string, phone: string, inviteCode?: string) {
+async function registerByPhone(
+  name: string,
+  phone: string,
+  inviteCode?: string
+) {
   await open("/login");
   await page.getByRole("tab", { name: "حساب جديد" }).click();
   if (inviteCode) await page.getByPlaceholder("TRTL-1234ABCD").fill(inviteCode);
@@ -42,7 +56,7 @@ async function registerByPhone(name: string, phone: string, inviteCode?: string)
   await page.getByLabel("رقم الهاتف").fill(phone);
   await page.getByLabel("كلمة المرور").fill(PASSWORD);
   await page.locator("form button[type=submit]").click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/login"));
+  await page.waitForURL(url => !url.pathname.startsWith("/login"));
   await ready();
 }
 
@@ -58,14 +72,20 @@ async function logout() {
   await open("/login");
 }
 
-const me = () => trpcQuery<{ name: string; phone: string | null } | null>(page, "auth.me", undefined);
+const me = () =>
+  trpcQuery<{ name: string; phone: string | null } | null>(
+    page,
+    "auth.me",
+    undefined
+  );
 
 let teacherCode = "";
 
 test("لا يوجد خادم: الصفحة تعمل وطلبات /api لا تخرج إلى الشبكة", async () => {
   const outgoing: string[] = [];
-  page.on("request", (request) => {
-    if (new URL(request.url()).pathname.startsWith("/api/")) outgoing.push(request.url());
+  page.on("request", request => {
+    if (new URL(request.url()).pathname.startsWith("/api/"))
+      outgoing.push(request.url());
   });
   await open("/login");
   await expect(page.getByRole("tab", { name: "حساب جديد" })).toBeVisible();
@@ -77,8 +97,17 @@ test("مدير المركز ينشئ حسابه برقم الهاتف دون ر�
   await registerByPhone("مدير المركز", `0${MANAGER_PHONE}`);
   await expect(page).toHaveURL(/\/start/);
   await createCenterViaUi(page, "مركز النور");
-  const { centerId, circleId } = await seedCircle(page, ["عبدالله أحمد", "محمد علي"]);
-  const created = await trpcMutation(page, "access.codes.create", { centerId, role: "teacher", circleId, maxUses: 1, scopes: [] });
+  const { centerId, circleId } = await seedCircle(page, [
+    "عبدالله أحمد",
+    "محمد علي",
+  ]);
+  const created = await trpcMutation(page, "access.codes.create", {
+    centerId,
+    role: "teacher",
+    circleId,
+    maxUses: 1,
+    scopes: [],
+  });
   teacherCode = (created as { code: string }).code;
   expect(teacherCode).toMatch(/^TRT-/);
 });
@@ -87,14 +116,21 @@ test("البيانات والجلسة تبقى بعد إعادة فتح التط
   await page.reload();
   await ready();
   await open("/dashboard");
-  expect(await me()).toMatchObject({ name: "مدير المركز", phone: `+967${MANAGER_PHONE}` });
+  expect(await me()).toMatchObject({
+    name: "مدير المركز",
+    phone: `+967${MANAGER_PHONE}`,
+  });
   const centers = await trpcQuery<{ name: string }[]>(page, "centers.list", {});
-  expect(centers.map((center) => center.name)).toContain("مركز النور");
+  expect(centers.map(center => center.name)).toContain("مركز النور");
   // تبويب جديد = إغلاق التطبيق وفتحه: يقرأ القاعدة المحفوظة في IndexedDB.
   const reopened = await context.newPage();
   await open("/dashboard", reopened);
-  await expect(reopened.getByRole("heading", { name: "مدير المركز" }).first()).toBeVisible();
-  await expect(reopened.locator("select option", { hasText: "مركز النور" })).toHaveCount(1);
+  await expect(
+    reopened.getByRole("heading", { name: "مدير المركز" }).first()
+  ).toBeVisible();
+  await expect(
+    reopened.locator("select option", { hasText: "مركز النور" })
+  ).toHaveCount(1);
   await reopened.close();
 });
 
@@ -104,16 +140,25 @@ test("حساب ثانٍ على الجهاز نفسه: معلم يسجل بكود
   await registerByPhone("الشيخ خالد", TEACHER_PHONE, teacherCode);
   expect(await me()).toMatchObject({ name: "الشيخ خالد" });
   const circles = await trpcQuery<{ name: string }[]>(page, "circles.list", {});
-  expect(circles.map((circle) => circle.name)).toEqual(["حلقة أبي بكر"]);
+  expect(circles.map(circle => circle.name)).toEqual(["حلقة أبي بكر"]);
 });
 
 test("كلمة مرور خاطئة تُرفض، ثم يعود المدير بحسابه ويرى بياناته", async () => {
   await logout();
   await loginByPhone(`+967 ${MANAGER_PHONE}`, "Wrong9999");
-  await expect(page.getByText("رقم الهاتف أو كلمة المرور غير صحيحة")).toBeVisible();
+  await expect(
+    page.getByText("رقم الهاتف أو كلمة المرور غير صحيحة")
+  ).toBeVisible();
   await loginByPhone(`+967 ${MANAGER_PHONE}`);
-  await page.waitForURL((url) => !url.pathname.startsWith("/login"));
+  await page.waitForURL(url => !url.pathname.startsWith("/login"));
   expect(await me()).toMatchObject({ name: "مدير المركز" });
-  const students = await trpcQuery<{ name: string }[]>(page, "students.list", {});
-  expect(students.map((student) => student.name).sort()).toEqual(["عبدالله أحمد", "محمد علي"]);
+  const students = await trpcQuery<{ name: string }[]>(
+    page,
+    "students.list",
+    {}
+  );
+  expect(students.map(student => student.name).sort()).toEqual([
+    "عبدالله أحمد",
+    "محمد علي",
+  ]);
 });

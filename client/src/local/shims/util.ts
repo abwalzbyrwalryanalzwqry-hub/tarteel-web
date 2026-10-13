@@ -4,7 +4,8 @@ type Callback<T> = (error: Error | null, value: T) => void;
 export function promisify<T>(fn: (...args: never[]) => void) {
   return (...args: unknown[]) =>
     new Promise<T>((resolve, reject) => {
-      (fn as unknown as (...a: unknown[]) => void)(...args, ((error, value) => (error ? reject(error) : resolve(value))) as Callback<T>);
+      (fn as unknown as (...a: unknown[]) => void)(...args, ((error, value) =>
+        error ? reject(error) : resolve(value)) as Callback<T>);
     });
 }
 

@@ -13,18 +13,24 @@ const NATIVE_MIRROR_DELAY_MS = 2500;
 type NativeBridge = { postMessage: (message: string) => void };
 type BridgeWindow = Window & {
   ReactNativeWebView?: NativeBridge;
-  __tarteelNativeDb?: (payload: { requestId: string; base64: string | null }) => void;
+  __tarteelNativeDb?: (payload: {
+    requestId: string;
+    base64: string | null;
+  }) => void;
 };
 
-const bridgeWindow = () => (typeof window === "undefined" ? undefined : (window as BridgeWindow));
-export const hasNativeBridge = () => Boolean(bridgeWindow()?.ReactNativeWebView);
+const bridgeWindow = () =>
+  typeof window === "undefined" ? undefined : (window as BridgeWindow);
+export const hasNativeBridge = () =>
+  Boolean(bridgeWindow()?.ReactNativeWebView);
 
 function openIdb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(IDB_NAME, 1);
     request.onupgradeneeded = () => request.result.createObjectStore(IDB_STORE);
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("تعذر فتح IndexedDB"));
+    request.onerror = () =>
+      reject(request.error ?? new Error("تعذر فتح IndexedDB"));
   });
 }
 
@@ -32,10 +38,19 @@ async function idbGet(): Promise<Uint8Array | null> {
   const db = await openIdb();
   try {
     return await new Promise((resolve, reject) => {
-      const request = db.transaction(IDB_STORE, "readonly").objectStore(IDB_STORE).get(IDB_KEY);
+      const request = db
+        .transaction(IDB_STORE, "readonly")
+        .objectStore(IDB_STORE)
+        .get(IDB_KEY);
       request.onsuccess = () => {
         const value = request.result as Uint8Array | ArrayBuffer | undefined;
-        resolve(value ? (value instanceof Uint8Array ? value : new Uint8Array(value)) : null);
+        resolve(
+          value
+            ? value instanceof Uint8Array
+              ? value
+              : new Uint8Array(value)
+            : null
+        );
       };
       request.onerror = () => reject(request.error);
     });
@@ -62,7 +77,8 @@ async function idbPut(bytes: Uint8Array) {
 export function bytesToBase64(bytes: Uint8Array) {
   let binary = "";
   const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  for (let i = 0; i < bytes.length; i += chunk)
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   return btoa(binary);
 }
 
@@ -78,9 +94,9 @@ function requestNativeCopy(timeoutMs = 4000): Promise<Uint8Array | null> {
   const win = bridgeWindow();
   if (!win?.ReactNativeWebView) return Promise.resolve(null);
   const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const timer = setTimeout(() => resolve(null), timeoutMs);
-    win.__tarteelNativeDb = (payload) => {
+    win.__tarteelNativeDb = payload => {
       if (payload.requestId !== requestId) return;
       clearTimeout(timer);
       try {
@@ -89,7 +105,9 @@ function requestNativeCopy(timeoutMs = 4000): Promise<Uint8Array | null> {
         resolve(null);
       }
     };
-    win.ReactNativeWebView!.postMessage(JSON.stringify({ type: "tarteel:db-load", requestId }));
+    win.ReactNativeWebView!.postMessage(
+      JSON.stringify({ type: "tarteel:db-load", requestId })
+    );
   });
 }
 
@@ -122,7 +140,9 @@ let latest: Uint8Array | null = null;
 function mirrorToNative(bytes: Uint8Array) {
   const win = bridgeWindow();
   if (!win?.ReactNativeWebView) return;
-  win.ReactNativeWebView.postMessage(JSON.stringify({ type: "tarteel:db-save", base64: bytesToBase64(bytes) }));
+  win.ReactNativeWebView.postMessage(
+    JSON.stringify({ type: "tarteel:db-save", base64: bytesToBase64(bytes) })
+  );
 }
 
 /** يحفظ نسخة؛ الكتابات المتتالية تُدمج فلا يُكتب إلا آخرها. */
@@ -140,7 +160,10 @@ export function persistDatabase(bytes: Uint8Array) {
     }
   });
   clearTimeout(nativeTimer);
-  nativeTimer = setTimeout(() => latest && mirrorToNative(latest), NATIVE_MIRROR_DELAY_MS);
+  nativeTimer = setTimeout(
+    () => latest && mirrorToNative(latest),
+    NATIVE_MIRROR_DELAY_MS
+  );
 }
 
 export async function flushPersistence() {

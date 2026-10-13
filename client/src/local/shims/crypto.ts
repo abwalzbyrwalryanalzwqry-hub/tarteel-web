@@ -5,7 +5,8 @@ import { sha256, sha512 } from "@noble/hashes/sha2.js";
 import { hmac } from "@noble/hashes/hmac.js";
 
 type BinaryLike = string | Uint8Array;
-const toBytes = (value: BinaryLike) => (typeof value === "string" ? new TextEncoder().encode(value) : value);
+const toBytes = (value: BinaryLike) =>
+  typeof value === "string" ? new TextEncoder().encode(value) : value;
 
 export function randomBytes(size: number): Buffer {
   return Buffer.from(globalThis.crypto.getRandomValues(new Uint8Array(size)));
@@ -44,7 +45,7 @@ export function createHash(algorithm: string) {
       return api;
     },
     digest(encoding?: string) {
-      const total = Buffer.concat(parts.map((p) => Buffer.from(p)));
+      const total = Buffer.concat(parts.map(p => Buffer.from(p)));
       return digestOutput(fn(total), encoding) as never;
     },
   };
@@ -61,7 +62,7 @@ export function createHmac(algorithm: string, key: BinaryLike) {
       return api;
     },
     digest(encoding?: string) {
-      const total = Buffer.concat(parts.map((p) => Buffer.from(p)));
+      const total = Buffer.concat(parts.map(p => Buffer.from(p)));
       return digestOutput(hmac(fn, toBytes(key), total), encoding) as never;
     },
   };
@@ -69,26 +70,65 @@ export function createHmac(algorithm: string, key: BinaryLike) {
 }
 
 export function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.length !== b.length) throw new RangeError("Input buffers must have the same byte length");
+  if (a.length !== b.length)
+    throw new RangeError("Input buffers must have the same byte length");
   let diff = 0;
   for (let i = 0; i < a.length; i += 1) diff |= a[i] ^ b[i];
   return diff === 0;
 }
 
-type ScryptOptions = { N?: number; r?: number; p?: number; maxmem?: number; cost?: number; blockSize?: number; parallelization?: number };
+type ScryptOptions = {
+  N?: number;
+  r?: number;
+  p?: number;
+  maxmem?: number;
+  cost?: number;
+  blockSize?: number;
+  parallelization?: number;
+};
 type ScryptCallback = (error: Error | null, key: Buffer) => void;
 
-export function scrypt(password: BinaryLike, salt: BinaryLike, keylen: number, optionsOrCallback: ScryptOptions | ScryptCallback, maybeCallback?: ScryptCallback) {
-  const options = typeof optionsOrCallback === "function" ? {} : optionsOrCallback;
-  const callback = (typeof optionsOrCallback === "function" ? optionsOrCallback : maybeCallback)!;
+export function scrypt(
+  password: BinaryLike,
+  salt: BinaryLike,
+  keylen: number,
+  optionsOrCallback: ScryptOptions | ScryptCallback,
+  maybeCallback?: ScryptCallback
+) {
+  const options =
+    typeof optionsOrCallback === "function" ? {} : optionsOrCallback;
+  const callback = (
+    typeof optionsOrCallback === "function" ? optionsOrCallback : maybeCallback
+  )!;
   const N = options.N ?? options.cost ?? 16384;
   const r = options.r ?? options.blockSize ?? 8;
   const p = options.p ?? options.parallelization ?? 1;
-  scryptAsync(toBytes(password), toBytes(salt), { N, r, p, dkLen: keylen, maxmem: Math.max(options.maxmem ?? 0, 128 * N * r * p + 1024 * 1024), asyncTick: 25 })
-    .then((key) => callback(null, Buffer.from(key)))
-    .catch((error: unknown) => callback(error instanceof Error ? error : new Error(String(error)), Buffer.alloc(0)));
+  scryptAsync(toBytes(password), toBytes(salt), {
+    N,
+    r,
+    p,
+    dkLen: keylen,
+    maxmem: Math.max(options.maxmem ?? 0, 128 * N * r * p + 1024 * 1024),
+    asyncTick: 25,
+  })
+    .then(key => callback(null, Buffer.from(key)))
+    .catch((error: unknown) =>
+      callback(
+        error instanceof Error ? error : new Error(String(error)),
+        Buffer.alloc(0)
+      )
+    );
 }
 
 const webcrypto = globalThis.crypto;
 export { webcrypto };
-export default { randomBytes, randomInt, randomUUID, createHash, createHmac, timingSafeEqual, scrypt, webcrypto };
+export default {
+  randomBytes,
+  randomInt,
+  randomUUID,
+  createHash,
+  createHmac,
+  timingSafeEqual,
+  scrypt,
+  webcrypto,
+};

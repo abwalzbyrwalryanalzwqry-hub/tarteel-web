@@ -8,7 +8,9 @@ import type { AppRouter } from "../../../server/routers";
 
 export const API_MODE = "server" as "server" | "local";
 
-export async function createApiLinks(getHeaders: () => Record<string, string>): Promise<TRPCLink<AppRouter>[]> {
+export async function createApiLinks(
+  getHeaders: () => Record<string, string>
+): Promise<TRPCLink<AppRouter>[]> {
   return [
     httpBatchLink({
       url: "/api/trpc",

@@ -35,7 +35,10 @@ export function hasLocalSession() {
 export function buildLocalRequest(extraHeaders: Record<string, string> = {}) {
   const token = readToken();
   const headers: Record<string, string> = {
-    "user-agent": typeof navigator === "undefined" ? "TarteelLocal" : `${navigator.userAgent} TarteelLocal`,
+    "user-agent":
+      typeof navigator === "undefined"
+        ? "TarteelLocal"
+        : `${navigator.userAgent} TarteelLocal`,
     host: typeof location === "undefined" ? "localhost" : location.host,
     ...extraHeaders,
   };
@@ -80,9 +83,13 @@ export function buildLocalResponse() {
   return res;
 }
 
-export async function createLocalContext(extraHeaders: Record<string, string> = {}): Promise<TrpcContext> {
+export async function createLocalContext(
+  extraHeaders: Record<string, string> = {}
+): Promise<TrpcContext> {
   const { createContext } = await import("../../../server/_core/context");
   const req = buildLocalRequest(extraHeaders);
   const res = buildLocalResponse();
-  return createContext({ req, res, info: {} } as unknown as Parameters<typeof createContext>[0]);
+  return createContext({ req, res, info: {} } as unknown as Parameters<
+    typeof createContext
+  >[0]);
 }

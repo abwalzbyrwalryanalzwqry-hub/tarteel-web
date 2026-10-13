@@ -14,11 +14,23 @@ import { drizzle, type SqliteRemoteDatabase } from "drizzle-orm/sqlite-proxy";
 import { SQLiteInsertBase } from "drizzle-orm/sqlite-core";
 // mapUpdateSet موجودة في drizzle-orm/utils.js لكن غير معلنة في أنواعه.
 import * as drizzleUtils from "drizzle-orm/utils";
-const mapUpdateSet = (drizzleUtils as unknown as { mapUpdateSet: (table: never, set: never) => unknown }).mapUpdateSet;
+const mapUpdateSet = (
+  drizzleUtils as unknown as {
+    mapUpdateSet: (table: never, set: never) => unknown;
+  }
+).mapUpdateSet;
 import * as schema from "../../../drizzle/schema.sqlite";
-import { loadPersistedDatabase, persistDatabase, flushPersistence } from "./persistence";
+import {
+  loadPersistedDatabase,
+  persistDatabase,
+  flushPersistence,
+} from "./persistence";
 
-const migrationFiles = import.meta.glob("../../../drizzle-sqlite/*.sql", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+const migrationFiles = import.meta.glob("../../../drizzle-sqlite/*.sql", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
 
 export type LocalDb = SqliteRemoteDatabase<typeof schema>;
 
@@ -56,10 +68,22 @@ let patched = false;
 function patchMysqlUpsert() {
   if (patched) return;
   patched = true;
-  type InsertInternals = { config: { table: never; onConflict?: unknown[] }; dialect: { buildUpdateSet: (table: never, set: unknown) => unknown } };
-  const proto = SQLiteInsertBase.prototype as unknown as Record<string, unknown>;
-  proto.onDuplicateKeyUpdate = function onDuplicateKeyUpdate(this: InsertInternals, config: { set: Record<string, unknown> }) {
-    const setSql = this.dialect.buildUpdateSet(this.config.table, mapUpdateSet(this.config.table, config.set as never));
+  type InsertInternals = {
+    config: { table: never; onConflict?: unknown[] };
+    dialect: { buildUpdateSet: (table: never, set: unknown) => unknown };
+  };
+  const proto = SQLiteInsertBase.prototype as unknown as Record<
+    string,
+    unknown
+  >;
+  proto.onDuplicateKeyUpdate = function onDuplicateKeyUpdate(
+    this: InsertInternals,
+    config: { set: Record<string, unknown> }
+  ) {
+    const setSql = this.dialect.buildUpdateSet(
+      this.config.table,
+      mapUpdateSet(this.config.table, config.set as never)
+    );
     if (!this.config.onConflict) this.config.onConflict = [];
     this.config.onConflict.push(sql` on conflict do update set ${setSql}`);
     return this;
@@ -67,24 +91,43 @@ function patchMysqlUpsert() {
 }
 
 function applyMigrations(db: Database) {
-  db.run("CREATE TABLE IF NOT EXISTS __tarteel_migrations (name TEXT PRIMARY KEY NOT NULL, appliedAt INTEGER NOT NULL)");
-  db.run("CREATE TABLE IF NOT EXISTS __tarteel_files (fileKey TEXT PRIMARY KEY NOT NULL, contentType TEXT NOT NULL, data BLOB NOT NULL, createdAt INTEGER NOT NULL)");
-  const applied = new Set(selectRows(db, "SELECT name FROM __tarteel_migrations", []).map((row) => String(row[0])));
+  db.run(
+    "CREATE TABLE IF NOT EXISTS __tarteel_migrations (name TEXT PRIMARY KEY NOT NULL, appliedAt INTEGER NOT NULL)"
+  );
+  db.run(
+    "CREATE TABLE IF NOT EXISTS __tarteel_files (fileKey TEXT PRIMARY KEY NOT NULL, contentType TEXT NOT NULL, data BLOB NOT NULL, createdAt INTEGER NOT NULL)"
+  );
+  const applied = new Set(
+    selectRows(db, "SELECT name FROM __tarteel_migrations", []).map(row =>
+      String(row[0])
+    )
+  );
   const names = Object.keys(migrationFiles).sort();
   let changed = false;
   for (const path of names) {
-    const name = path.split("/").pop()!.replace(/\.sql$/, "");
+    const name = path
+      .split("/")
+      .pop()!
+      .replace(/\.sql$/, "");
     if (applied.has(name)) continue;
-    const statements = migrationFiles[path].split("--> statement-breakpoint").map((part) => part.trim()).filter(Boolean);
+    const statements = migrationFiles[path]
+      .split("--> statement-breakpoint")
+      .map(part => part.trim())
+      .filter(Boolean);
     db.run("BEGIN");
     try {
       for (const statement of statements) db.run(statement);
-      db.run("INSERT INTO __tarteel_migrations (name, appliedAt) VALUES (?, ?)", [name, Date.now()]);
+      db.run(
+        "INSERT INTO __tarteel_migrations (name, appliedAt) VALUES (?, ?)",
+        [name, Date.now()]
+      );
       db.run("COMMIT");
       changed = true;
     } catch (error) {
       db.run("ROLLBACK");
-      throw new Error(`تعذر تحديث قاعدة البيانات المحلية (${name}): ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `تعذر تحديث قاعدة البيانات المحلية (${name}): ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
   return changed;
@@ -100,23 +143,36 @@ async function open(): Promise<LocalDb> {
   if (migrated || !saved) persistDatabase(exportSnapshot(sqlite));
 
   const db = sqlite;
-  localDb = drizzle(async (text, params, method) => {
-    const values = params.map(normalizeParam);
-    if (method === "run") {
-      if (/^\s*begin\b/i.test(text)) inTransactionDepth += 1;
-      if (/^\s*(commit|rollback)\b/i.test(text) && !/^\s*rollback\s+to\b/i.test(text)) inTransactionDepth = Math.max(0, inTransactionDepth - 1);
-      db.run(text, values);
-      const affectedRows = db.getRowsModified();
-      const insertId = Number(selectRows(db, "SELECT last_insert_rowid()", [])[0]?.[0] ?? 0);
-      // لا نحفظ داخل معاملة مفتوحة: الحفظ بعد COMMIT يكفي ويمنع حفظ نصف معاملة.
-      if (affectedRows > 0 || /^\s*(commit|create|drop|alter)/i.test(text)) scheduleSave();
-      // صيغة نتيجة mysql2 ([ResultSetHeader]) التي يقرؤها كود الخادم.
-      return Object.assign([{ insertId, affectedRows }], { rows: [] as unknown[] }) as unknown as { rows: unknown[] };
-    }
-    const rows = selectRows(db, text, values);
-    if (method === "get") return { rows: (rows[0] ?? undefined) as unknown as unknown[] };
-    return { rows };
-  }, { schema });
+  localDb = drizzle(
+    async (text, params, method) => {
+      const values = params.map(normalizeParam);
+      if (method === "run") {
+        if (/^\s*begin\b/i.test(text)) inTransactionDepth += 1;
+        if (
+          /^\s*(commit|rollback)\b/i.test(text) &&
+          !/^\s*rollback\s+to\b/i.test(text)
+        )
+          inTransactionDepth = Math.max(0, inTransactionDepth - 1);
+        db.run(text, values);
+        const affectedRows = db.getRowsModified();
+        const insertId = Number(
+          selectRows(db, "SELECT last_insert_rowid()", [])[0]?.[0] ?? 0
+        );
+        // لا نحفظ داخل معاملة مفتوحة: الحفظ بعد COMMIT يكفي ويمنع حفظ نصف معاملة.
+        if (affectedRows > 0 || /^\s*(commit|create|drop|alter)/i.test(text))
+          scheduleSave();
+        // صيغة نتيجة mysql2 ([ResultSetHeader]) التي يقرؤها كود الخادم.
+        return Object.assign([{ insertId, affectedRows }], {
+          rows: [] as unknown[],
+        }) as unknown as { rows: unknown[] };
+      }
+      const rows = selectRows(db, text, values);
+      if (method === "get")
+        return { rows: (rows[0] ?? undefined) as unknown as unknown[] };
+      return { rows };
+    },
+    { schema }
+  );
   return localDb;
 }
 
