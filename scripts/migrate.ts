@@ -18,11 +18,16 @@ if (!url) {
 }
 
 const migrationsFolder = path.resolve(process.env.MIGRATIONS_DIR ?? "drizzle");
-const connection = await mysql.createConnection({ uri: url, multipleStatements: true });
+const connection = await mysql.createConnection({
+  uri: url,
+  multipleStatements: true,
+});
 try {
   const startedAt = Date.now();
   await migrate(drizzle(connection), { migrationsFolder });
-  console.log(`[migrate] اكتملت الترحيلات من ${migrationsFolder} في ${Date.now() - startedAt}ms`);
+  console.log(
+    `[migrate] اكتملت الترحيلات من ${migrationsFolder} في ${Date.now() - startedAt}ms`
+  );
 } catch (error) {
   console.error("[migrate] فشل تطبيق الترحيلات:", error);
   process.exitCode = 1;

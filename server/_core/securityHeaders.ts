@@ -16,7 +16,9 @@
 import type { NextFunction, Request, Response } from "express";
 
 export function buildContentSecurityPolicy(extraSources: string[] = []) {
-  const extra = extraSources.filter((source) => /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(source));
+  const extra = extraSources.filter(source =>
+    /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(source)
+  );
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
     "script-src": ["'self'", ...extra],
@@ -33,20 +35,35 @@ export function buildContentSecurityPolicy(extraSources: string[] = []) {
     "form-action": ["'self'"],
     "frame-ancestors": ["'self'"],
   };
-  return Object.entries(directives).map(([name, values]) => `${name} ${values.join(" ")}`).join("; ");
+  return Object.entries(directives)
+    .map(([name, values]) => `${name} ${values.join(" ")}`)
+    .join("; ");
 }
 
-export function securityHeaders(options: { mode?: string; extraSources?: string; isProduction?: boolean } = {}) {
-  const mode = (options.mode ?? process.env.CSP_MODE ?? "enforce").trim().toLowerCase();
-  const extra = (options.extraSources ?? process.env.CSP_EXTRA_SOURCES ?? "").split(/[\s,]+/).filter(Boolean);
-  const isProduction = options.isProduction ?? process.env.NODE_ENV === "production";
+export function securityHeaders(
+  options: { mode?: string; extraSources?: string; isProduction?: boolean } = {}
+) {
+  const mode = (options.mode ?? process.env.CSP_MODE ?? "enforce")
+    .trim()
+    .toLowerCase();
+  const extra = (options.extraSources ?? process.env.CSP_EXTRA_SOURCES ?? "")
+    .split(/[\s,]+/)
+    .filter(Boolean);
+  const isProduction =
+    options.isProduction ?? process.env.NODE_ENV === "production";
   const policy = buildContentSecurityPolicy(extra);
-  const cspHeader = mode === "report-only" ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy";
+  const cspHeader =
+    mode === "report-only"
+      ? "Content-Security-Policy-Report-Only"
+      : "Content-Security-Policy";
   return (_req: Request, res: Response, next: NextFunction) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     res.setHeader("X-Frame-Options", "SAMEORIGIN");
-    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+    res.setHeader(
+      "Permissions-Policy",
+      "camera=(), microphone=(), geolocation=(), payment=()"
+    );
     res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
     // ردود /storage/ لملفات SVG تضع سياسة أضيق بنفسها لاحقاً فتحل محل هذه.
     if (isProduction && mode !== "off") res.setHeader(cspHeader, policy);

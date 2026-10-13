@@ -11,7 +11,12 @@
  * Brevo:  https://developers.brevo.com/reference/sendtransacemail
  */
 
-export type EmailMessage = { to: string; subject: string; html: string; text: string };
+export type EmailMessage = {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+};
 type Provider = "resend" | "brevo";
 
 export function getEmailConfig(env: NodeJS.ProcessEnv = process.env) {
@@ -19,12 +24,27 @@ export function getEmailConfig(env: NodeJS.ProcessEnv = process.env) {
   const brevoKey = env.BREVO_API_KEY?.trim() ?? "";
   const requested = env.EMAIL_PROVIDER?.trim().toLowerCase();
   const provider: Provider | null =
-    requested === "resend" ? (resendKey ? "resend" : null)
-      : requested === "brevo" ? (brevoKey ? "brevo" : null)
-        : resendKey ? "resend" : brevoKey ? "brevo" : null;
+    requested === "resend"
+      ? resendKey
+        ? "resend"
+        : null
+      : requested === "brevo"
+        ? brevoKey
+          ? "brevo"
+          : null
+        : resendKey
+          ? "resend"
+          : brevoKey
+            ? "brevo"
+            : null;
   const from = env.EMAIL_FROM?.trim() ?? "";
   const fromName = env.EMAIL_FROM_NAME?.trim() || "ترتيل";
-  return { provider: from ? provider : null, apiKey: provider === "resend" ? resendKey : brevoKey, from, fromName };
+  return {
+    provider: from ? provider : null,
+    apiKey: provider === "resend" ? resendKey : brevoKey,
+    from,
+    fromName,
+  };
 }
 
 export const isEmailConfigured = () => getEmailConfig().provider !== null;
@@ -32,32 +52,61 @@ export const isEmailConfigured = () => getEmailConfig().provider !== null;
 const TIMEOUT_MS = 10_000;
 
 /** يرسل الرسالة؛ يعيد true عند القبول. لا يرمي: فشل البريد لا يجب أن يكشف وجود الحساب أو يسقط الطلب. */
-export async function sendEmail(message: EmailMessage, fetchImpl: typeof fetch = fetch): Promise<boolean> {
+export async function sendEmail(
+  message: EmailMessage,
+  fetchImpl: typeof fetch = fetch
+): Promise<boolean> {
   const config = getEmailConfig();
   if (!config.provider) {
     console.warn("[Email] not configured; message dropped:", message.subject);
     return false;
   }
-  const request: { url: string; headers: Record<string, string>; body: unknown } = config.provider === "resend"
-    ? {
-      url: "https://api.resend.com/emails",
-      headers: { Authorization: `Bearer ${config.apiKey}` },
-      body: { from: `${config.fromName} <${config.from}>`, to: [message.to], subject: message.subject, html: message.html, text: message.text },
-    }
-    : {
-      url: "https://api.brevo.com/v3/smtp/email",
-      headers: { "api-key": config.apiKey },
-      body: { sender: { email: config.from, name: config.fromName }, to: [{ email: message.to }], subject: message.subject, htmlContent: message.html, textContent: message.text },
-    };
+  const request: {
+    url: string;
+    headers: Record<string, string>;
+    body: unknown;
+  } =
+    config.provider === "resend"
+      ? {
+          url: "https://api.resend.com/emails",
+          headers: { Authorization: `Bearer ${config.apiKey}` },
+          body: {
+            from: `${config.fromName} <${config.from}>`,
+            to: [message.to],
+            subject: message.subject,
+            html: message.html,
+            text: message.text,
+          },
+        }
+      : {
+          url: "https://api.brevo.com/v3/smtp/email",
+          headers: { "api-key": config.apiKey },
+          body: {
+            sender: { email: config.from, name: config.fromName },
+            to: [{ email: message.to }],
+            subject: message.subject,
+            htmlContent: message.html,
+            textContent: message.text,
+          },
+        };
   try {
     const response = await fetchImpl(request.url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json", ...request.headers },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...request.headers,
+      },
       body: JSON.stringify(request.body),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!response.ok) {
-      console.error("[Email] provider rejected message", config.provider, response.status, (await response.text().catch(() => "")).slice(0, 300));
+      console.error(
+        "[Email] provider rejected message",
+        config.provider,
+        response.status,
+        (await response.text().catch(() => "")).slice(0, 300)
+      );
       return false;
     }
     return true;
@@ -67,10 +116,25 @@ export async function sendEmail(message: EmailMessage, fetchImpl: typeof fetch =
   }
 }
 
-const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
+const escapeHtml = (value: string) =>
+  value.replace(
+    /[&<>"']/g,
+    ch =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        ch
+      ]!
+  );
 
 /** قالب بسيط باتجاه RTL يعمل في عملاء البريد (جداول وأنماط مضمنة). */
-export function actionEmail(input: { to: string; subject: string; greeting: string; body: string; actionLabel: string; actionUrl: string; footer: string }): EmailMessage {
+export function actionEmail(input: {
+  to: string;
+  subject: string;
+  greeting: string;
+  body: string;
+  actionLabel: string;
+  actionUrl: string;
+  footer: string;
+}): EmailMessage {
   const html = `<!doctype html><html lang="ar" dir="rtl"><body style="margin:0;background:#faf7f0;font-family:Tahoma,Arial,sans-serif;color:#3b3325">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 12px">
 <table role="presentation" width="100%" style="max-width:520px;background:#ffffff;border-radius:16px;padding:28px;text-align:right" cellpadding="0" cellspacing="0">

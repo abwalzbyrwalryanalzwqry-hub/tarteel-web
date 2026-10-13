@@ -15,16 +15,24 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 const name = process.argv[2];
 const bucket = process.env.BACKUP_S3_BUCKET;
 if (!name || !/^[\w.-]+$/.test(name) || !bucket) {
-  console.error("الاستخدام: node dist/backup-upload.js <اسم-الملف> < الملف   (مع BACKUP_S3_BUCKET)");
+  console.error(
+    "الاستخدام: node dist/backup-upload.js <اسم-الملف> < الملف   (مع BACKUP_S3_BUCKET)"
+  );
   process.exit(2);
 }
-const prefix = (process.env.BACKUP_S3_PREFIX ?? "tarteel-backups/").replace(/^\/+/, "");
+const prefix = (process.env.BACKUP_S3_PREFIX ?? "tarteel-backups/").replace(
+  /^\/+/,
+  ""
+);
 const client = new S3Client({
   region: process.env.BACKUP_S3_REGION || "auto",
   endpoint: process.env.BACKUP_S3_ENDPOINT || undefined,
   forcePathStyle: Boolean(process.env.BACKUP_S3_ENDPOINT),
   credentials: process.env.BACKUP_S3_ACCESS_KEY_ID
-    ? { accessKeyId: process.env.BACKUP_S3_ACCESS_KEY_ID, secretAccessKey: process.env.BACKUP_S3_SECRET_ACCESS_KEY ?? "" }
+    ? {
+        accessKeyId: process.env.BACKUP_S3_ACCESS_KEY_ID,
+        secretAccessKey: process.env.BACKUP_S3_SECRET_ACCESS_KEY ?? "",
+      }
     : undefined,
 });
 const key = `${prefix}${name}`;
@@ -35,7 +43,15 @@ try {
   await pipeline(process.stdin, createWriteStream(tmp, { mode: 0o600 }));
   const { size } = await fs.stat(tmp);
   if (size === 0) throw new Error("الملف فارغ");
-  await client.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: createReadStream(tmp), ContentLength: size, ContentType: "application/gzip" }));
+  await client.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: createReadStream(tmp),
+      ContentLength: size,
+      ContentType: "application/gzip",
+    })
+  );
   console.log(`[backup] رُفع ${key} (${(size / 1048576).toFixed(1)} MB)`);
 } finally {
   await fs.rm(dir, { recursive: true, force: true });
