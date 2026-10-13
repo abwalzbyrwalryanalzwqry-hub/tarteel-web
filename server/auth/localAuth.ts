@@ -1,7 +1,8 @@
 /**
  * الدخول المحلي لترتيل: بريد أو رقم هاتف + كلمة مرور، وجلسة JWT في كوكي httpOnly.
- * رقم الهاتف معرّف دخول فقط (لا رسائل SMS): يُحفظ بصيغة E.164 الموحّدة، واستعادة كلمة المرور
- * لأصحاب الأرقام تكون برابط تعيين من إدارة المركز.
+ * رقم الهاتف يُحفظ بصيغة E.164 الموحّدة. مع Twilio Verify (server/_core/sms.ts) يُؤكَّد الرقم برمز SMS
+ * عند التسجيل وعند إضافته، وتصبح استعادة كلمة المرور برمز إلى الهاتف ممكنة؛ وبدونه يبقى الرقم معرّف دخول
+ * غير مؤكد، والاستعادة برابط تعيين من إدارة المركز.
  * لا يعتمد على أي خدمة خارجية أو بريد أو نطاق؛ يعمل على أي استضافة Node + MySQL.
  */
 import { COOKIE_NAME } from "@shared/const";
@@ -21,6 +22,7 @@ import { protectedProcedure, publicProcedure } from "../_core/trpc";
 import type { TrpcContext } from "../_core/context";
 import * as db from "../db";
 import { looksLikePhone, normalizePhone } from "../../shared/phone";
+import { SMS_FAILURE_MESSAGES, SmsError, checkPhoneVerification, isSmsConfigured, startPhoneVerification } from "../_core/sms";
 import { INVALID_INVITE_MESSAGE, classifyInviteCode, discardNewAccount, isInviteUsable, redeemSignupInvite } from "./inviteSignup";
 import {
   LOCK_DURATION_MS,
@@ -72,6 +74,49 @@ function identityFromInput(input: { identifier?: string; email?: string; phone?:
   if (input.email?.trim()) identity.email = normalizeEmail(input.email);
   if (input.phone?.trim()) identity.phone = requirePhone(input.phone);
   return identity.email || identity.phone ? identity : null;
+}
+
+const phoneCodeSchema = z.string().trim().min(4).max(12);
+export const INVALID_PHONE_CODE_MESSAGE = "رمز التحقق غير صحيح أو منتهٍ؛ اطلب رمزاً جديداً";
+const SMS_WINDOW_MS = 60 * 60 * 1000;
+
+function smsFailure(error: unknown): never {
+  if (error instanceof SmsError) {
+    throw fail(error.reason === "too_many" ? "TOO_MANY_REQUESTS" : error.reason === "unavailable" ? "INTERNAL_SERVER_ERROR" : "BAD_REQUEST", SMS_FAILURE_MESSAGES[error.reason]);
+  }
+  throw error;
+}
+
+function requireSms() {
+  if (!isSmsConfigured()) throw fail("PRECONDITION_FAILED", "التحقق برسالة SMS غير مفعّل على هذا الخادم");
+}
+
+/**
+ * يرسل رمز SMS بعد حدود المحاولات: لكل IP (يمنع إغراق الأرقام برسائل مدفوعة) ولكل رقم (3 في الساعة)
+ * ولكل حساب إن وُجد. Twilio يطبق حدوده أيضاً (5 رسائل لكل رقم في 10 دقائق).
+ */
+async function sendPhoneCode(ctx: TrpcContext, phone: string, scope: string, userId?: number) {
+  if (!(await hitRateLimit(`sms-ip:${clientKey(ctx)}`, { max: 10, windowMs: SMS_WINDOW_MS }))) throw fail("TOO_MANY_REQUESTS", "طلبات رموز كثيرة من هذا الجهاز؛ حاول بعد ساعة");
+  if (!(await hitRateLimit(`sms-phone:${phone}`, { max: 3, windowMs: SMS_WINDOW_MS }))) throw fail("TOO_MANY_REQUESTS", SMS_FAILURE_MESSAGES.too_many);
+  if (userId && !(await hitRateLimit(`sms-user:${userId}`, { max: 5, windowMs: SMS_WINDOW_MS }))) throw fail("TOO_MANY_REQUESTS", "طلبات رموز كثيرة؛ حاول بعد ساعة");
+  try {
+    await startPhoneVerification(phone);
+  } catch (error) {
+    smsFailure(error);
+  }
+  await audit(userId ?? null, "auth.phone_code_sent", userId ?? null, ctx, { scope });
+}
+
+/** يتحقق من رمز SMS، مع حد لمحاولات الإدخال لكل رقم فوق حد Twilio. */
+async function verifyPhoneCode(phone: string, code: string) {
+  if (!(await hitRateLimit(`sms-check:${phone}`, { max: 10, windowMs: SMS_WINDOW_MS }))) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة لإدخال الرمز؛ حاول بعد ساعة");
+  let approved = false;
+  try {
+    approved = await checkPhoneVerification(phone, code);
+  } catch (error) {
+    smsFailure(error);
+  }
+  if (!approved) throw fail("BAD_REQUEST", INVALID_PHONE_CODE_MESSAGE);
 }
 
 /** وصف معرّف الدخول للرسائل: «البريد x» أو «رقم الهاتف y». */
@@ -169,8 +214,10 @@ async function saveCredential(userId: number, identity: LoginIdentity, password:
   const email = identity.email ?? existing?.email ?? null;
   const phone = identity.phone ?? existing?.phone ?? null;
   if (!email && !phone) throw fail("BAD_REQUEST", "أدخل البريد أو رقم الهاتف الذي ستستخدمه للدخول");
+  // رقم جديد غير مؤكد حتى يُثبت برمز SMS.
+  const phoneVerifiedAt = existing && phone === existing.phone ? existing.phoneVerifiedAt : null;
   if (existing) {
-    await database.update(localCredentials).set({ email, phone, passwordHash, failedAttempts: 0, lockedUntil: null, passwordChangedAt: new Date() }).where(eq(localCredentials.id, existing.id));
+    await database.update(localCredentials).set({ email, phone, phoneVerifiedAt, passwordHash, failedAttempts: 0, lockedUntil: null, passwordChangedAt: new Date() }).where(eq(localCredentials.id, existing.id));
   } else {
     await database.insert(localCredentials).values({ userId, email, phone, passwordHash });
   }
@@ -182,7 +229,7 @@ async function saveCredential(userId: number, identity: LoginIdentity, password:
 }
 
 /** يُستخدم أيضاً من سكربت create-admin. */
-export async function createLocalUser(input: { name: string; email?: string | null; phone?: string | null; password: string; role?: User["role"] }) {
+export async function createLocalUser(input: { name: string; email?: string | null; phone?: string | null; phoneVerified?: boolean; password: string; role?: User["role"] }) {
   const database = await requireDb();
   const email = input.email ? normalizeEmail(input.email) : null;
   const phone = input.phone ? requirePhone(input.phone) : null;
@@ -200,7 +247,7 @@ export async function createLocalUser(input: { name: string; email?: string | nu
     await database.update(users).set({ phone }).where(eq(users.id, user.id));
     user = { ...user, phone };
   }
-  await database.insert(localCredentials).values({ userId: user.id, email, phone, passwordHash: await hashPassword(input.password) });
+  await database.insert(localCredentials).values({ userId: user.id, email, phone, phoneVerifiedAt: phone && input.phoneVerified ? new Date() : null, passwordHash: await hashPassword(input.password) });
   return user;
 }
 
@@ -254,6 +301,8 @@ export const localAuthRouter = {
     /** الدخول والتسجيل برقم الهاتف وكلمة المرور (بلا SMS). */
     phone: true,
     phoneCountryCode: ENV.phoneDefaultCountryCode,
+    /** Twilio Verify مضبوط: التسجيل برقم الهاتف يتطلب رمز SMS، واستعادة كلمة المرور بالهاتف متاحة. */
+    phoneVerification: isSmsConfigured(),
   })),
 
   /** يرسل رابط استعادة إن وُجد حساب بهذا البريد. الرد واحد دائماً حتى لا يكشف أي البريدات مسجّلة. */
@@ -320,6 +369,64 @@ export const localAuthRouter = {
     return { success: true, alreadyVerified: false } as const;
   }),
 
+  /** رمز SMS قبل إنشاء حساب برقم الهاتف. لا يُرسل إلا حين يكون التسجيل مسموحاً لهذا الشخص (عام أو برمز دعوة صالح). */
+  requestSignupPhoneCode: publicProcedure
+    .input(z.object({ phone: phoneInputSchema, inviteCode: z.string().trim().max(128).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      requireSms();
+      const phone = requirePhone(input.phone);
+      const invite = input.inviteCode ? classifyInviteCode(input.inviteCode) : null;
+      if (input.inviteCode && !invite) throw fail("BAD_REQUEST", INVALID_INVITE_MESSAGE);
+      if (!ENV.allowSignup && !invite) throw fail("FORBIDDEN", "إنشاء الحسابات مغلق إلا برمز دعوة؛ أدخل رمز الدعوة أو كود الدخول أولاً");
+      if (invite && !(await isInviteUsable(invite))) throw fail("BAD_REQUEST", INVALID_INVITE_MESSAGE);
+      if (await findCredentialByPhone(phone)) throw fail("CONFLICT", "يوجد حساب مسجّل برقم الهاتف هذا. سجّل الدخول بدلاً من ذلك");
+      await sendPhoneCode(ctx, phone, "signup");
+      return { success: true, phone } as const;
+    }),
+
+  /** يرسل رمز استعادة إلى رقم الهاتف إن كان لحساب نشط. الرد واحد دائماً حتى لا يكشف أي الأرقام مسجّلة. */
+  requestPhonePasswordReset: publicProcedure
+    .input(z.object({ phone: phoneInputSchema }))
+    .mutation(async ({ ctx, input }) => {
+      requireSms();
+      if (!(await consumeRateLimit(`reset:${clientKey(ctx)}`))) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
+      const phone = requirePhone(input.phone);
+      const credential = await findCredentialByPhone(phone);
+      // الاستعادة للأرقام المؤكدة فقط: رقم أُدخل دون تحقق قد يملكه شخص آخر فيستولي به على الحساب.
+      if (!credential?.phoneVerifiedAt) return { success: true, phone } as const;
+      const database = await requireDb();
+      const user = (await database.select().from(users).where(eq(users.id, credential.userId)).limit(1))[0];
+      if (!user || !isUserActive(user)) return { success: true, phone } as const;
+      try {
+        await sendPhoneCode(ctx, phone, "reset", user.id);
+      } catch (error) {
+        // حد المحاولات يظهر للمستخدم؛ أخطاء الرقم والخدمة لا تكشف وجود الحساب.
+        if (error instanceof TRPCError && error.code === "TOO_MANY_REQUESTS") throw error;
+        console.warn("[Auth] phone reset code failed", String(error));
+      }
+      return { success: true, phone } as const;
+    }),
+
+  /** يعيّن كلمة مرور جديدة برمز SMS، ويؤكد الرقم، ويُخرج كل الأجهزة الأخرى ويدخل بهذا الجهاز. */
+  resetPasswordWithPhone: publicProcedure
+    .input(z.object({ phone: phoneInputSchema, code: phoneCodeSchema, newPassword: passwordSchema }))
+    .mutation(async ({ ctx, input }) => {
+      requireSms();
+      if (!(await consumeRateLimit(`reset-check:${clientKey(ctx)}`))) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
+      assertPolicy(input.newPassword);
+      const phone = requirePhone(input.phone);
+      const credential = await findCredentialByPhone(phone);
+      if (!credential?.phoneVerifiedAt) throw fail("BAD_REQUEST", INVALID_PHONE_CODE_MESSAGE);
+      const database = await requireDb();
+      const user = (await database.select().from(users).where(eq(users.id, credential.userId)).limit(1))[0];
+      if (!user || !isUserActive(user)) throw fail("BAD_REQUEST", INVALID_PHONE_CODE_MESSAGE);
+      await verifyPhoneCode(phone, input.code);
+      await database.update(localCredentials).set({ passwordHash: await hashPassword(input.newPassword), failedAttempts: 0, lockedUntil: null, passwordChangedAt: new Date(), phoneVerifiedAt: new Date() }).where(eq(localCredentials.id, credential.id));
+      await rotateSessions(ctx, user);
+      await audit(user.id, "auth.password_reset_phone", user.id, ctx);
+      return { success: true } as const;
+    }),
+
   register: publicProcedure
     .input(z.object({
       name: z.string().trim().min(2, "الاسم قصير جداً").max(120),
@@ -328,6 +435,8 @@ export const localAuthRouter = {
       phone: phoneInputSchema.optional(),
       password: passwordSchema,
       inviteCode: z.string().trim().max(128).optional(),
+      /** رمز SMS المرسل بـ requestSignupPhoneCode؛ مطلوب للتسجيل برقم الهاتف حين يكون Twilio مضبوطاً. */
+      phoneCode: phoneCodeSchema.optional(),
     }).refine((input) => Boolean(input.email || input.phone), { message: "أدخل البريد الإلكتروني أو رقم الهاتف", path: ["email"] }))
     .mutation(async ({ ctx, input }) => {
       const email = input.email ? normalizeEmail(input.email) : null;
@@ -345,8 +454,13 @@ export const localAuthRouter = {
       const legacy = email ? await database.select({ id: users.id }).from(users).where(and(eq(users.email, email), isNull(users.deletedAt))).limit(1) : [];
       if (legacy.length) throw fail("CONFLICT", "هذا البريد مرتبط بحساب موجود. سجّل الدخول بالطريقة السابقة وعيّن كلمة مرور من الإعدادات، أو اطلب من المدير رابط تعيين كلمة المرور.");
       if (invite && !(await isInviteUsable(invite))) throw fail("BAD_REQUEST", INVALID_INVITE_MESSAGE);
+      const phoneVerified = Boolean(phone && isSmsConfigured());
+      if (phone && phoneVerified) {
+        if (!input.phoneCode) throw fail("BAD_REQUEST", "أدخل رمز التحقق الذي وصلك برسالة SMS");
+        await verifyPhoneCode(phone, input.phoneCode);
+      }
 
-      const user = await createLocalUser({ name: input.name, email, phone, password: input.password });
+      const user = await createLocalUser({ name: input.name, email, phone, phoneVerified, password: input.password });
       let granted: { role: string; centerId?: number } | null = null;
       if (invite) {
         try {
@@ -408,7 +522,14 @@ export const localAuthRouter = {
   /** حالة كلمة المرور للمستخدم الحالي (لصفحة الإعدادات). */
   myCredential: protectedProcedure.query(async ({ ctx }) => {
     const credential = await findCredentialByUserId(ctx.user.id);
-    return { hasPassword: Boolean(credential), email: credential?.email ?? ctx.user.email ?? null, phone: credential?.phone ?? null };
+    return {
+      hasPassword: Boolean(credential),
+      email: credential?.email ?? ctx.user.email ?? null,
+      phone: credential?.phone ?? null,
+      phoneVerified: Boolean(credential?.phoneVerifiedAt),
+      /** Twilio مضبوط: يمكن تأكيد الرقم برمز SMS. */
+      smsEnabled: isSmsConfigured(),
+    };
   }),
 
   /** تعيين/تغيير كلمة المرور من داخل الجلسة — وهو أيضاً مسار المستخدمين القدامى لتعيين أول كلمة مرور. */
@@ -432,8 +553,47 @@ export const localAuthRouter = {
     }),
 
   /** يضيف رقم هاتف للدخول (أو يغيّره) لحساب له كلمة مرور، بعد التحقق من كلمة المرور الحالية. */
-  setLoginPhone: protectedProcedure
+  /** الخطوة الأولى لإضافة رقم مؤكد: يتحقق من كلمة المرور ثم يرسل رمز SMS إلى الرقم الجديد. */
+  requestLoginPhoneCode: protectedProcedure
     .input(z.object({ phone: phoneInputSchema, currentPassword: passwordSchema }))
+    .mutation(async ({ ctx, input }) => {
+      requireSms();
+      const credential = await findCredentialByUserId(ctx.user.id);
+      if (!credential) throw fail("BAD_REQUEST", "عيّن كلمة مرور أولاً");
+      if (!(await verifyPassword(input.currentPassword, credential.passwordHash))) throw fail("UNAUTHORIZED", "كلمة المرور الحالية غير صحيحة");
+      const phone = requirePhone(input.phone);
+      await assertIdentityFree({ phone }, ctx.user.id);
+      await sendPhoneCode(ctx, phone, "add_phone", ctx.user.id);
+      return { success: true, phone } as const;
+    }),
+
+  /** يرسل رمز SMS لتأكيد رقم الدخول الحالي غير المؤكد. */
+  sendPhoneVerification: protectedProcedure.mutation(async ({ ctx }) => {
+    requireSms();
+    const credential = await findCredentialByUserId(ctx.user.id);
+    if (!credential?.phone) throw fail("BAD_REQUEST", "لا يوجد رقم هاتف للدخول في هذا الحساب");
+    if (credential.phoneVerifiedAt) return { success: true, alreadyVerified: true } as const;
+    await sendPhoneCode(ctx, credential.phone, "verify", ctx.user.id);
+    return { success: true, alreadyVerified: false } as const;
+  }),
+
+  /** يؤكد رقم الدخول الحالي بالرمز الذي وصله. */
+  verifyPhone: protectedProcedure
+    .input(z.object({ code: phoneCodeSchema }))
+    .mutation(async ({ ctx, input }) => {
+      requireSms();
+      const credential = await findCredentialByUserId(ctx.user.id);
+      if (!credential?.phone) throw fail("BAD_REQUEST", "لا يوجد رقم هاتف للدخول في هذا الحساب");
+      if (credential.phoneVerifiedAt) return { success: true } as const;
+      await verifyPhoneCode(credential.phone, input.code);
+      const database = await requireDb();
+      await database.update(localCredentials).set({ phoneVerifiedAt: new Date() }).where(eq(localCredentials.id, credential.id));
+      await audit(ctx.user.id, "auth.phone_verified", ctx.user.id, ctx);
+      return { success: true } as const;
+    }),
+
+  setLoginPhone: protectedProcedure
+    .input(z.object({ phone: phoneInputSchema, currentPassword: passwordSchema, code: phoneCodeSchema.optional() }))
     .mutation(async ({ ctx, input }) => {
       if (!(await consumeRateLimit(`set-phone:${ctx.user.id}`))) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
       const credential = await findCredentialByUserId(ctx.user.id);
@@ -441,8 +601,14 @@ export const localAuthRouter = {
       if (!(await verifyPassword(input.currentPassword, credential.passwordHash))) throw fail("UNAUTHORIZED", "كلمة المرور الحالية غير صحيحة");
       const phone = requirePhone(input.phone);
       await assertIdentityFree({ phone }, ctx.user.id);
+      // مع SMS لا يُحفظ رقم دون إثبات امتلاكه، حتى لا يحجز أحد رقم غيره.
+      const smsEnabled = isSmsConfigured();
+      if (smsEnabled) {
+        if (!input.code) throw fail("BAD_REQUEST", "أدخل رمز التحقق الذي وصلك برسالة SMS");
+        await verifyPhoneCode(phone, input.code);
+      }
       const database = await requireDb();
-      await database.update(localCredentials).set({ phone }).where(eq(localCredentials.id, credential.id));
+      await database.update(localCredentials).set({ phone, phoneVerifiedAt: smsEnabled ? new Date() : null }).where(eq(localCredentials.id, credential.id));
       await database.update(users).set({ phone }).where(eq(users.id, ctx.user.id));
       await audit(ctx.user.id, credential.phone ? "auth.login_phone_changed" : "auth.login_phone_added", ctx.user.id, ctx);
       return { success: true, phone } as const;

@@ -1,5 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { BookOpen, KeyRound, LogIn, Mail, Phone, Star, UserPlus } from "lucide-react";
+import { BookOpen, KeyRound, LogIn, Mail, MessageSquare, Phone, Star, UserPlus } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -33,6 +33,30 @@ export default function LoginPage() {
   const [resetOpen, setResetOpen] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const requestReset = trpc.auth.requestPasswordReset.useMutation({ onSuccess: () => setResetSent(true), onError: (e) => toast.error(e.message) });
+  /** رموز SMS: تأكيد رقم التسجيل، واستعادة كلمة المرور بالهاتف. */
+  const [signupCodeSentTo, setSignupCodeSentTo] = useState<string | null>(null);
+  const [phoneCode, setPhoneCode] = useState("");
+  const [resetPhone, setResetPhone] = useState<string | null>(null);
+  const [resetCode, setResetCode] = useState("");
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetConfirm, setResetConfirm] = useState("");
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (cooldownUntil <= now) return;
+    const timer = window.setTimeout(() => setNow(Date.now()), 1000);
+    return () => window.clearTimeout(timer);
+  }, [cooldownUntil, now]);
+  const cooldown = Math.max(0, Math.ceil((cooldownUntil - now) / 1000));
+  const startCooldown = () => { const t = Date.now(); setNow(t); setCooldownUntil(t + 60_000); };
+  const requestSignupCode = trpc.auth.requestSignupPhoneCode.useMutation({
+    onSuccess: (result) => { setSignupCodeSentTo(result.phone); setPhoneCode(""); startCooldown(); toast.success("أرسلنا رمز التحقق برسالة SMS"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const requestPhoneReset = trpc.auth.requestPhonePasswordReset.useMutation({
+    onSuccess: (result) => { setResetPhone(result.phone); setResetCode(""); startCooldown(); },
+    onError: (e) => toast.error(e.message),
+  });
   const googleHref = `/api/auth/google${mode === "register" && inviteCode.trim() ? `?invite=${encodeURIComponent(inviteCode.trim())}` : ""}`;
   const canRegister = signupOpen || Boolean(providers?.inviteSignup);
   const [name, setName] = useState("");
@@ -46,6 +70,8 @@ export default function LoginPage() {
   const phoneEnabled = providers?.phone !== false;
   const countryCode = providers?.phoneCountryCode ?? "967";
   const identifierIsPhone = looksLikePhone(identifier);
+  const smsEnabled = Boolean(providers?.phoneVerification);
+  const resetAvailable = Boolean(providers?.passwordReset || smsEnabled);
   const onAuthSuccess = async () => { setPassword(""); try { sessionStorage.removeItem("tarteel-switch-account"); } catch {} await utils.auth.me.invalidate(); };
   const loginMutation = trpc.auth.login.useMutation({ onSuccess: onAuthSuccess, onError: (e) => toast.error(e.message) });
   const registerMutation = trpc.auth.register.useMutation({
@@ -57,7 +83,13 @@ export default function LoginPage() {
     },
     onError: (e) => toast.error(e.message),
   });
+  const resetWithPhone = trpc.auth.resetPasswordWithPhone.useMutation({
+    onSuccess: async () => { toast.success("تم تعيين كلمة المرور الجديدة"); setResetOpen(false); setResetPhone(null); setResetPassword(""); setResetConfirm(""); await onAuthSuccess(); },
+    onError: (e) => toast.error(e.message),
+  });
   const busy = loginMutation.isPending || registerMutation.isPending;
+  const phoneSignup = mode === "register" && phoneEnabled && signupMethod === "phone";
+  const needsSignupCode = phoneSignup && smsEnabled;
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (mode === "login") loginMutation.mutate({ identifier, password });
@@ -69,6 +101,7 @@ export default function LoginPage() {
         phone: usePhone ? phone : undefined,
         password,
         inviteCode: inviteCode.trim() || undefined,
+        phoneCode: usePhone && smsEnabled ? phoneCode.trim() : undefined,
       });
     }
   };
@@ -175,10 +208,27 @@ export default function LoginPage() {
                   {phoneEnabled && signupMethod === "phone" ? (
                     <label className="block text-sm">
                       <span className="mb-1 block font-medium text-foreground">رقم الهاتف</span>
-                      <input required type="tel" dir="ltr" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={`+${countryCode} …`} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
+                      <input required type="tel" dir="ltr" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => { setPhone(e.target.value); setSignupCodeSentTo(null); }} placeholder={`+${countryCode} …`} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
                       <span className="mt-1 block text-xs leading-5 text-muted-foreground">الرقم المحلي يُكمَّل برمز الدولة <bdi dir="ltr">+{countryCode}</bdi>؛ لرقم من دولة أخرى اكتبه كاملاً مع رمزها. ستدخل لاحقاً بهذا الرقم.</span>
                     </label>
-                  ) : (
+                  ) : null}
+                  {needsSignupCode ? (
+                    <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm">
+                      <button type="button" disabled={requestSignupCode.isPending || !phone.trim() || cooldown > 0} onClick={() => requestSignupCode.mutate({ phone, inviteCode: inviteCode.trim() || undefined })} className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary/40 py-2 font-semibold text-primary hover:bg-primary/10 disabled:opacity-60">
+                        <MessageSquare className="h-4 w-4" />
+                        {requestSignupCode.isPending ? "جارٍ الإرسال…" : cooldown > 0 ? `إعادة الإرسال بعد ${cooldown} ث` : signupCodeSentTo ? "أعد إرسال الرمز" : "أرسل رمز التحقق"}
+                      </button>
+                      {signupCodeSentTo ? (
+                        <label className="block">
+                          <span className="mb-1 block text-xs leading-5 text-muted-foreground">أدخل الرمز المرسل إلى <bdi dir="ltr">{signupCodeSentTo}</bdi></span>
+                          <input required type="text" dir="ltr" inputMode="numeric" autoComplete="one-time-code" maxLength={10} value={phoneCode} onChange={(e) => setPhoneCode(e.target.value)} placeholder="••••••" className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-center text-lg tracking-[0.4em] outline-none focus:border-primary" />
+                        </label>
+                      ) : (
+                        <p className="text-xs leading-5 text-muted-foreground">سنرسل رمزاً من 6 أرقام برسالة SMS لتأكيد أن الرقم لك.</p>
+                      )}
+                    </div>
+                  ) : null}
+                  {phoneEnabled && signupMethod === "phone" ? null : (
                     <label className="block text-sm">
                       <span className="mb-1 block font-medium text-foreground">البريد الإلكتروني</span>
                       <input required type="email" dir="ltr" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
@@ -191,26 +241,47 @@ export default function LoginPage() {
                 <input required type="password" dir="ltr" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
                 {mode === "register" && <span className="mt-1 block text-xs text-muted-foreground">8 أحرف على الأقل وتحتوي على حروف وأرقام.</span>}
               </label>
-              <button type="submit" disabled={busy} className="btn-gold w-full text-base py-3 flex items-center justify-center gap-2 disabled:opacity-60">
+              <button type="submit" disabled={busy || (needsSignupCode && (!signupCodeSentTo || !phoneCode.trim()))} className="btn-gold w-full text-base py-3 flex items-center justify-center gap-2 disabled:opacity-60">
                 {mode === "login" ? <LogIn className="w-5 h-5"/> : <UserPlus className="w-5 h-5"/>}
                 {busy ? "جارٍ التحقق…" : mode === "login" ? "الدخول إلى ترتيل" : "إنشاء الحساب"}
               </button>
-              {providers?.passwordReset ? (
-                mode === "login" && <button type="button" onClick={() => { setResetOpen((v) => !v); setResetSent(false); }} className="flex items-center gap-1.5 text-xs text-primary hover:underline"><KeyRound className="h-3.5 w-3.5 shrink-0"/>نسيت كلمة المرور؟</button>
+              {resetAvailable ? (
+                mode === "login" && <button type="button" onClick={() => { setResetOpen((v) => !v); setResetSent(false); setResetPhone(null); }} className="flex items-center gap-1.5 text-xs text-primary hover:underline"><KeyRound className="h-3.5 w-3.5 shrink-0"/>نسيت كلمة المرور؟</button>
               ) : (
                 <p className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground"><KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0"/>نسيت كلمة المرور؟ اطلب من إدارة المركز رابط تعيين كلمة مرور جديدة.</p>
               )}
             </form>
           )}
 
-          {resetOpen && mode === "login" && providers?.passwordReset && (
+          {resetOpen && mode === "login" && resetAvailable && (
             <div className="mt-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-right text-sm">
-              {resetSent ? (
+              {identifierIsPhone && smsEnabled ? (
+                resetPhone ? (
+                  <form onSubmit={(event) => { event.preventDefault(); if (resetPassword !== resetConfirm) { toast.error("كلمتا المرور غير متطابقتين"); return; } resetWithPhone.mutate({ phone: resetPhone, code: resetCode.trim(), newPassword: resetPassword }); }} className="space-y-2">
+                    <p className="text-xs leading-6 text-muted-foreground">إن كان الرقم <bdi dir="ltr">{resetPhone}</bdi> مؤكداً لحساب في ترتيل فستصله رسالة فيها رمز صالح 10 دقائق.</p>
+                    <input required type="text" dir="ltr" inputMode="numeric" autoComplete="one-time-code" maxLength={10} aria-label="رمز التحقق" value={resetCode} onChange={(e) => setResetCode(e.target.value)} placeholder="••••••" className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-center text-lg tracking-[0.4em] outline-none focus:border-primary" />
+                    <input required type="password" dir="ltr" autoComplete="new-password" minLength={8} aria-label="كلمة المرور الجديدة" placeholder="كلمة المرور الجديدة" value={resetPassword} onChange={(e) => setResetPassword(e.target.value)} className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-left outline-none focus:border-primary placeholder:text-right" />
+                    <input required type="password" dir="ltr" autoComplete="new-password" minLength={8} aria-label="تأكيد كلمة المرور" placeholder="تأكيد كلمة المرور" value={resetConfirm} onChange={(e) => setResetConfirm(e.target.value)} className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-left outline-none focus:border-primary placeholder:text-right" />
+                    <span className="block text-xs text-muted-foreground">8 أحرف على الأقل وتحتوي على حروف وأرقام.</span>
+                    <button type="submit" disabled={resetWithPhone.isPending || !resetCode.trim()} className="btn-gold w-full py-2.5 disabled:opacity-60">{resetWithPhone.isPending ? "جارٍ الحفظ…" : "تعيين كلمة المرور والدخول"}</button>
+                    <button type="button" disabled={requestPhoneReset.isPending || cooldown > 0} onClick={() => requestPhoneReset.mutate({ phone: resetPhone })} className="w-full text-xs text-primary hover:underline disabled:text-muted-foreground disabled:no-underline">{cooldown > 0 ? `إعادة الإرسال بعد ${cooldown} ث` : "أعد إرسال الرمز"}</button>
+                  </form>
+                ) : (
+                  <form onSubmit={(event) => { event.preventDefault(); requestPhoneReset.mutate({ phone: identifier.trim() }); }} className="space-y-2">
+                    <p className="text-xs leading-6 text-muted-foreground">سنرسل رمزاً برسالة SMS إلى الرقم المكتوب أعلاه. الاستعادة بالهاتف متاحة للأرقام المؤكدة فقط.</p>
+                    <button type="submit" disabled={requestPhoneReset.isPending || cooldown > 0} className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/40 py-2.5 font-semibold text-primary hover:bg-primary/10 disabled:opacity-60"><MessageSquare className="h-4 w-4" />{requestPhoneReset.isPending ? "جارٍ الإرسال…" : cooldown > 0 ? `إعادة الإرسال بعد ${cooldown} ث` : "أرسل رمز الاستعادة"}</button>
+                  </form>
+                )
+              ) : identifierIsPhone ? (
+                <p className="text-xs leading-6 text-muted-foreground">الاستعادة برقم الهاتف غير مفعّلة على هذا الخادم. اطلب من إدارة المركز رابط تعيين كلمة مرور جديدة.</p>
+              ) : !providers?.passwordReset ? (
+                <p className="text-xs leading-6 text-muted-foreground">{identifier.trim() ? "الاستعادة بالبريد غير مفعّلة؛ اكتب رقم هاتفك المؤكد في الحقل أعلاه لنرسل لك رمزاً." : "اكتب رقم هاتفك المؤكد في الحقل أعلاه لنرسل لك رمز الاستعادة برسالة SMS."}</p>
+              ) : resetSent ? (
                 <p className="leading-7 text-foreground">إن كان البريد مسجّلاً فستصلك رسالة فيها رابط صالح 30 دقيقة. افحص مجلد الرسائل غير المرغوب فيها أيضاً.</p>
               ) : (
                 <form onSubmit={(event) => { event.preventDefault(); requestReset.mutate({ email: identifier.trim() }); }} className="space-y-2">
-                  <p className="text-xs leading-6 text-muted-foreground">{identifierIsPhone ? "الاستعادة بالبريد فقط. إن كان حسابك برقم الهاتف فاطلب من إدارة المركز رابط تعيين كلمة مرور جديدة." : "أدخل بريد حسابك في الحقل أعلاه ثم اضغط الزر لنرسل لك رابط تعيين كلمة مرور جديدة."}</p>
-                  <button type="submit" disabled={requestReset.isPending || !identifier.trim() || identifierIsPhone} className="w-full rounded-xl border border-primary/40 py-2.5 font-semibold text-primary hover:bg-primary/10 disabled:opacity-60">{requestReset.isPending ? "جارٍ الإرسال…" : "أرسل رابط الاستعادة"}</button>
+                  <p className="text-xs leading-6 text-muted-foreground">{smsEnabled ? "أدخل بريد حسابك أو رقم هاتفك المؤكد في الحقل أعلاه ثم اضغط الزر." : "أدخل بريد حسابك في الحقل أعلاه ثم اضغط الزر لنرسل لك رابط تعيين كلمة مرور جديدة."}</p>
+                  <button type="submit" disabled={requestReset.isPending || !identifier.trim()} className="w-full rounded-xl border border-primary/40 py-2.5 font-semibold text-primary hover:bg-primary/10 disabled:opacity-60">{requestReset.isPending ? "جارٍ الإرسال…" : "أرسل رابط الاستعادة"}</button>
                 </form>
               )}
             </div>

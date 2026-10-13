@@ -471,6 +471,8 @@ export const localCredentials = mysqlTable("local_credentials", {
   email: varchar("email", { length: 320 }),
   /** رقم الهاتف بصيغة E.164 الموحّدة (‎+967771234567)؛ انظر shared/phone.ts. */
   phone: varchar("phone", { length: 20 }),
+  /** وقت تأكيد الرقم برمز SMS (Twilio Verify) عند التسجيل أو من الإعدادات أو باستعادة كلمة المرور. */
+  phoneVerifiedAt: timestamp("phoneVerifiedAt"),
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   /** وقت تأكيد البريد (برابط مرسل إليه أو بدخول Google ببريد مؤكد). */
   emailVerifiedAt: timestamp("emailVerifiedAt"),
