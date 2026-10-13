@@ -26,7 +26,6 @@ export default function Settings() {
   function sendTestNotification() {
     if (!user) return;
     createNotifMutation.mutate({
-      userId: user.id,
       title: "إشعار تجريبي",
       message: "هذا إشعار تجريبي من إعدادات المنصة",
       type: "info",

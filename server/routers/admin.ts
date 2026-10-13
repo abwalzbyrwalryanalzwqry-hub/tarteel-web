@@ -30,16 +30,27 @@ export const adminRouters = {
   notifications: router({
     list: protectedProcedure.query(async ({ ctx }) => getNotificationsByUser(ctx.user.id)),
     unreadCount: protectedProcedure.query(async ({ ctx }) => getUnreadNotificationsCount(ctx.user.id)),
-    markRead: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => markNotificationRead(input.id)),
+    // كل إشعار يخص صاحبه: لا يعلّم المستخدم إشعار غيره مقروءاً (المعرّفات متسلسلة ويمكن تخمينها).
+    markRead: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      if (!(await markNotificationRead(input.id, ctx.user.id))) throw new TRPCError({ code: "NOT_FOUND", message: "الإشعار غير موجود" });
+    }),
     markAllRead: protectedProcedure.mutation(async ({ ctx }) => markAllNotificationsRead(ctx.user.id)),
+    /**
+     * إشعار تجريبي من «الإعدادات» لصاحب الحساب فقط. إشعارات المستخدمين الآخرين تُنشأ داخل الخادم
+     * مع العمليات نفسها (استرداد كود، ربط ولي أمر…)، لا من الواجهة، حتى لا يرسل أحد إشعاراً مزيفاً لغيره.
+     */
     create: protectedProcedure
       .input(z.object({
-        userId: z.number(),
-        title: z.string(),
-        message: z.string(),
-        type: z.enum(["info", "warning", "success", "error", "attendance", "session", "memorization"]).default("info"),
+        /** للتوافق مع الواجهات القديمة: إن أُرسل يجب أن يكون معرّف المستخدم نفسه. */
+        userId: z.number().int().positive().optional(),
+        title: z.string().trim().min(1).max(255),
+        message: z.string().trim().min(1).max(2000),
+        type: z.enum(["info", "warning", "success", "error"]).default("info"),
       }))
-      .mutation(async ({ input }) => createNotification(input)),
+      .mutation(async ({ ctx, input }) => {
+        if (input.userId !== undefined && input.userId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "لا يمكن إرسال إشعار إلى مستخدم آخر" });
+        await createNotification({ userId: ctx.user.id, title: input.title, message: input.message, type: input.type });
+      }),
   }),
 
   // ===================== AUDIT LOG =====================
