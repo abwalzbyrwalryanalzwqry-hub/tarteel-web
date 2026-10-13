@@ -52,6 +52,20 @@ docker compose cp ./data/uploads/. app:/data/uploads/
 
 أضف شعارات المراكز بـ `--keys-file` (الاستعلام في رأس `scripts/import-assets.ts`).
 
+## خط الواجهة (ثمانية)
+
+الواجهة مصممة على خط «ثمانية للنصوص»، لكن ملفاته **ليست في المستودع**: [ترخيص ثمانية](https://font.thmanyah.com/licenses-en) يمنع رفعها أو استضافتها لإعادة التوزيع. دون الملفات تعمل الواجهة بخطوط النظام العربية (Noto Naskh Arabic أو Segoe UI أو Tahoma)، ومن ثبّت الخط على جهازه يراه تلقائياً.
+
+إن قررت إدارة المركز استخدام الخط على الخادم بعد مراجعة الترخيص (أو بإذن من ثمانية عبر ask@thmanyah.com)، ضع ملفات woff2 في `STORAGE_DIR` بهذه الأسماء:
+
+```
+thmanyahseriftext-Light_bb4bb1fe.woff2
+thmanyahseriftext-Regular_f5aef1ee.woff2
+thmanyahseriftext-Medium_be200abb.woff2
+thmanyahseriftext-Bold_6c86ea07.woff2
+thmanyahseriftext-Black_99238822.woff2
+```
+
 ## 3. قائمة الاختبار
 
 - [ ] `curl https://$APP_DOMAIN/api/health` ← `{"ok":true}`
@@ -61,6 +75,13 @@ docker compose cp ./data/uploads/. app:/data/uploads/
 - [ ] تقرير PDF بشعار المركز، ورفع شعار جديد يبقى بعد إعادة التشغيل
 - [ ] كود وصول ورابط دعوة معلم
 - [ ] تطبيق أندرويد: «الإعدادات ← عنوان الخادم» ← النطاق الجديد
+
+## الأداء وعامل الخدمة
+
+- كل صفحة تُحمَّل عند فتحها فقط، والمكتبات الكبيرة في ملفات مستقلة (`vendor-*`) تبقى في ذاكرة المتصفح عبر النشرات.
+- ملفات `/assets/` تُرسل مع `Cache-Control: immutable` لسنة؛ و`index.html` و`sw.js` مع `no-cache` حتى تصل كل نسخة جديدة فوراً.
+- عامل الخدمة (`client/public/sw.js`) يحفظ الواجهة لتفتح عند انقطاع الشبكة، ولا يحفظ أبداً `/api/` ولا `/storage/`. لإيقافه: `VITE_DISABLE_SW=true` ثم أعد البناء؛ الواجهة حينها تلغي تسجيله عند المستخدمين.
+- إحصاءات Umami اختيارية: اضبط `VITE_ANALYTICS_ENDPOINT` و`VITE_ANALYTICS_WEBSITE_ID` عند البناء.
 
 ## 4. بعد النقل
 
