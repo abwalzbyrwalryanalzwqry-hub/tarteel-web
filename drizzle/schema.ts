@@ -467,7 +467,10 @@ export type InsertAuditLog = typeof auditLog.$inferInsert;
 export const localCredentials = mysqlTable("local_credentials", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
-  email: varchar("email", { length: 320 }).notNull(),
+  /** معرّف الدخول: بريد أو رقم هاتف أو كلاهما؛ يلزم واحد منهما على الأقل (يتحقق منه الخادم). */
+  email: varchar("email", { length: 320 }),
+  /** رقم الهاتف بصيغة E.164 الموحّدة (‎+967771234567)؛ انظر shared/phone.ts. */
+  phone: varchar("phone", { length: 20 }),
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   /** وقت تأكيد البريد (برابط مرسل إليه أو بدخول Google ببريد مؤكد). */
   emailVerifiedAt: timestamp("emailVerifiedAt"),
@@ -476,7 +479,7 @@ export const localCredentials = mysqlTable("local_credentials", {
   passwordChangedAt: timestamp("passwordChangedAt").defaultNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => [uniqueIndex("local_credentials_email_unique").on(table.email), uniqueIndex("local_credentials_user_unique").on(table.userId)]);
+}, (table) => [uniqueIndex("local_credentials_email_unique").on(table.email), uniqueIndex("local_credentials_phone_unique").on(table.phone), uniqueIndex("local_credentials_user_unique").on(table.userId)]);
 
 export type LocalCredential = typeof localCredentials.$inferSelect;
 

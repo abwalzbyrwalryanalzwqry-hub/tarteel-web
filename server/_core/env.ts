@@ -20,6 +20,8 @@ export const ENV = {
    * مغلق افتراضياً: الخادم المنشور دون ضبط هذا المتغير لا يقبل حسابات من أي زائر.
    */
   allowSignup: bool(process.env.ALLOW_SIGNUP, false),
+  /** رمز الدولة للأرقام المكتوبة محلياً عند التسجيل والدخول برقم الهاتف (اليمن 967 افتراضياً). */
+  phoneDefaultCountryCode: str(process.env.PHONE_DEFAULT_COUNTRY_CODE, "967").replace(/\D/g, "") || "967",
   /** عدد الوكلاء العكسيين (Caddy/Nginx/Render) أمام الخادم؛ يحدد كيف يُقرأ IP العميل الحقيقي. */
   trustProxyHops: int(process.env.TRUST_PROXY_HOPS, 1),
   /** الحد اليومي لرسائل المساعد الذكي لكل مستخدم (0 = تعطيل المساعد). */

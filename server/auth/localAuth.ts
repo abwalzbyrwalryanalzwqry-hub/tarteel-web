@@ -1,5 +1,7 @@
 /**
- * الدخول المحلي لترتيل: بريد + كلمة مرور، وجلسة JWT في كوكي httpOnly.
+ * الدخول المحلي لترتيل: بريد أو رقم هاتف + كلمة مرور، وجلسة JWT في كوكي httpOnly.
+ * رقم الهاتف معرّف دخول فقط (لا رسائل SMS): يُحفظ بصيغة E.164 الموحّدة، واستعادة كلمة المرور
+ * لأصحاب الأرقام تكون برابط تعيين من إدارة المركز.
  * لا يعتمد على أي خدمة خارجية أو بريد أو نطاق؛ يعمل على أي استضافة Node + MySQL.
  */
 import { COOKIE_NAME } from "@shared/const";
@@ -18,6 +20,7 @@ import { isAccountUsable, sdk } from "../_core/sdk";
 import { protectedProcedure, publicProcedure } from "../_core/trpc";
 import type { TrpcContext } from "../_core/context";
 import * as db from "../db";
+import { looksLikePhone, normalizePhone } from "../../shared/phone";
 import { INVALID_INVITE_MESSAGE, classifyInviteCode, discardNewAccount, isInviteUsable, redeemSignupInvite } from "./inviteSignup";
 import {
   LOCK_DURATION_MS,
@@ -39,6 +42,42 @@ export const LOCAL_OPEN_ID_PREFIX = "local_";
 
 const emailSchema = z.string().trim().min(3).max(320).email("صيغة البريد غير صحيحة");
 const passwordSchema = z.string().min(1).max(PASSWORD_MAX_LENGTH);
+const phoneInputSchema = z.string().trim().min(6).max(32);
+/** حقل «البريد أو رقم الهاتف» في صفحة الدخول. */
+const identifierSchema = z.string().trim().min(3).max(320);
+
+export const INVALID_PHONE_MESSAGE = "رقم الهاتف غير صحيح. اكتبه مع رمز الدولة مثل ‎+967771234567 أو محلياً مثل 771234567";
+
+export type LoginIdentity = { email?: string | null; phone?: string | null };
+
+/** يوحّد رقم الهاتف برمز الدولة الافتراضي للخادم، أو يرمي خطأً عربياً واضحاً. */
+export function requirePhone(raw: string) {
+  const phone = normalizePhone(raw, ENV.phoneDefaultCountryCode);
+  if (!phone) throw fail("BAD_REQUEST", INVALID_PHONE_MESSAGE);
+  return phone;
+}
+
+/** يميّز بين بريد ورقم هاتف في حقل واحد. */
+export function parseIdentifier(raw: string): { email: string } | { phone: string } {
+  if (looksLikePhone(raw)) return { phone: requirePhone(raw) };
+  const parsed = emailSchema.safeParse(raw);
+  if (!parsed.success) throw fail("BAD_REQUEST", "أدخل بريداً إلكترونياً صحيحاً أو رقم هاتف");
+  return { email: normalizeEmail(parsed.data) };
+}
+
+/** يحوّل الحقول الاختيارية (identifier أو email أو phone) إلى هوية واحدة موحّدة، أو null إن كانت كلها فارغة. */
+function identityFromInput(input: { identifier?: string; email?: string; phone?: string }): LoginIdentity | null {
+  if (input.identifier?.trim()) return parseIdentifier(input.identifier);
+  const identity: LoginIdentity = {};
+  if (input.email?.trim()) identity.email = normalizeEmail(input.email);
+  if (input.phone?.trim()) identity.phone = requirePhone(input.phone);
+  return identity.email || identity.phone ? identity : null;
+}
+
+/** وصف معرّف الدخول للرسائل: «البريد x» أو «رقم الهاتف y». */
+export function describeIdentity(identity: LoginIdentity) {
+  return identity.email ? `البريد ${identity.email}` : identity.phone ? `رقم الهاتف ${identity.phone}` : "";
+}
 
 const fail = (code: TRPCError["code"], message: string) => new TRPCError({ code, message });
 
@@ -92,39 +131,76 @@ async function findCredentialByEmail(email: string) {
   return rows[0];
 }
 
+async function findCredentialByPhone(phone: string) {
+  const database = await requireDb();
+  const rows = await database.select().from(localCredentials).where(eq(localCredentials.phone, phone)).limit(1);
+  return rows[0];
+}
+
+function findCredentialByIdentity(identity: LoginIdentity) {
+  if (identity.email) return findCredentialByEmail(identity.email);
+  if (identity.phone) return findCredentialByPhone(identity.phone);
+  return Promise.resolve(undefined);
+}
+
 async function findCredentialByUserId(userId: number) {
   const database = await requireDb();
   const rows = await database.select().from(localCredentials).where(eq(localCredentials.userId, userId)).limit(1);
   return rows[0];
 }
 
-async function saveCredential(userId: number, email: string, password: string) {
+async function assertIdentityFree(identity: LoginIdentity, userId: number | null) {
+  if (identity.email) {
+    const owner = await findCredentialByEmail(identity.email);
+    if (owner && owner.userId !== userId) throw fail("CONFLICT", "هذا البريد مستخدم في حساب آخر");
+  }
+  if (identity.phone) {
+    const owner = await findCredentialByPhone(identity.phone);
+    if (owner && owner.userId !== userId) throw fail("CONFLICT", "رقم الهاتف هذا مستخدم في حساب آخر");
+  }
+}
+
+/** يحفظ كلمة المرور؛ المعرّف الجديد (بريد أو هاتف) يُضاف إلى المعرّف الموجود ولا يحذفه. */
+async function saveCredential(userId: number, identity: LoginIdentity, password: string) {
   const database = await requireDb();
-  const owner = await findCredentialByEmail(email);
-  if (owner && owner.userId !== userId) throw fail("CONFLICT", "هذا البريد مستخدم في حساب آخر");
+  await assertIdentityFree(identity, userId);
   const passwordHash = await hashPassword(password);
   const existing = await findCredentialByUserId(userId);
+  const email = identity.email ?? existing?.email ?? null;
+  const phone = identity.phone ?? existing?.phone ?? null;
+  if (!email && !phone) throw fail("BAD_REQUEST", "أدخل البريد أو رقم الهاتف الذي ستستخدمه للدخول");
   if (existing) {
-    await database.update(localCredentials).set({ email, passwordHash, failedAttempts: 0, lockedUntil: null, passwordChangedAt: new Date() }).where(eq(localCredentials.id, existing.id));
+    await database.update(localCredentials).set({ email, phone, passwordHash, failedAttempts: 0, lockedUntil: null, passwordChangedAt: new Date() }).where(eq(localCredentials.id, existing.id));
   } else {
-    await database.insert(localCredentials).values({ userId, email, passwordHash });
+    await database.insert(localCredentials).values({ userId, email, phone, passwordHash });
   }
   const user = (await database.select().from(users).where(eq(users.id, userId)).limit(1))[0];
-  if (user && !user.email) await database.update(users).set({ email }).where(eq(users.id, userId));
+  if (user && ((email && !user.email) || (phone && !user.phone))) {
+    await database.update(users).set({ email: user.email || email, phone: user.phone || phone }).where(eq(users.id, userId));
+  }
+  return { email, phone };
 }
 
 /** يُستخدم أيضاً من سكربت create-admin. */
-export async function createLocalUser(input: { name: string; email: string; password: string; role?: User["role"] }) {
+export async function createLocalUser(input: { name: string; email?: string | null; phone?: string | null; password: string; role?: User["role"] }) {
   const database = await requireDb();
-  const email = normalizeEmail(input.email);
-  if (await findCredentialByEmail(email)) throw fail("CONFLICT", "يوجد حساب مسجّل بهذا البريد");
+  const email = input.email ? normalizeEmail(input.email) : null;
+  const phone = input.phone ? requirePhone(input.phone) : null;
+  if (!email && !phone) throw fail("BAD_REQUEST", "أدخل البريد أو رقم الهاتف");
+  if (email && (await findCredentialByEmail(email))) throw fail("CONFLICT", "يوجد حساب مسجّل بهذا البريد");
+  if (phone && (await findCredentialByPhone(phone))) throw fail("CONFLICT", "يوجد حساب مسجّل برقم الهاتف هذا");
   const openId = `${LOCAL_OPEN_ID_PREFIX}${randomBytes(12).toString("hex")}`;
   // الدور الإداري يُمنح فقط صراحةً (سكربت create-admin)، لا بمطابقة بريد غير متحقق منه.
   const role = input.role;
   await db.upsertUser({ openId, name: input.name.trim(), email, loginMethod: "password", lastSignedIn: new Date(), ...(role ? { role } : {}) });
-  const user = await db.getUserByOpenId(openId);
+  let user = await db.getUserByOpenId(openId);
   if (!user) throw fail("INTERNAL_SERVER_ERROR", "تعذر إنشاء الحساب");
-  await database.insert(localCredentials).values({ userId: user.id, email, passwordHash: await hashPassword(input.password) });
+  if (phone) {
+    // upsertUser لا يكتب الهاتف؛ نحفظه في ملف المستخدم ليظهر للمركز.
+    await database.update(users).set({ phone }).where(eq(users.id, user.id));
+    user = { ...user, phone };
+  }
+  await database.insert(localCredentials).values({ userId: user.id, email, phone, passwordHash: await hashPassword(input.password) });
   return user;
 }
 
@@ -175,6 +251,9 @@ export const localAuthRouter = {
     /** «نسيت كلمة المرور» بالبريد: يلزم مزود بريد وPUBLIC_APP_URL. */
     passwordReset: isEmailFlowReady(),
     google: isGoogleConfigured(),
+    /** الدخول والتسجيل برقم الهاتف وكلمة المرور (بلا SMS). */
+    phone: true,
+    phoneCountryCode: ENV.phoneDefaultCountryCode,
   })),
 
   /** يرسل رابط استعادة إن وُجد حساب بهذا البريد. الرد واحد دائماً حتى لا يكشف أي البريدات مسجّلة. */
@@ -193,7 +272,7 @@ export const localAuthRouter = {
         if (user && isUserActive(user)) {
           const token = await issueEmailToken(user.id, "reset", RESET_TOKEN_TTL_MS);
           await sendEmail(actionEmail({
-            to: credential.email,
+            to: email,
             subject: "استعادة كلمة المرور في ترتيل",
             greeting: `مرحباً ${user.name ?? ""}،`.replace(" ،", "،"),
             body: "وصلنا طلب لتعيين كلمة مرور جديدة لحسابك. اضغط الزر لاختيارها؛ ستُغلق بعدها كل الجلسات المفتوحة على الأجهزة الأخرى.",
@@ -227,13 +306,13 @@ export const localAuthRouter = {
 
   emailStatus: protectedProcedure.query(async ({ ctx }) => {
     const credential = await findCredentialByUserId(ctx.user.id);
-    return { email: credential?.email ?? null, verified: Boolean(credential?.emailVerifiedAt), canSend: isEmailFlowReady() && Boolean(credential) };
+    return { email: credential?.email ?? null, verified: Boolean(credential?.emailVerifiedAt), canSend: isEmailFlowReady() && Boolean(credential?.email) };
   }),
 
   resendVerification: protectedProcedure.mutation(async ({ ctx }) => {
     if (!isEmailFlowReady()) throw fail("PRECONDITION_FAILED", "إرسال البريد غير مفعّل على هذا الخادم");
     const credential = await findCredentialByUserId(ctx.user.id);
-    if (!credential) throw fail("BAD_REQUEST", "لا يوجد بريد دخول لهذا الحساب");
+    if (!credential?.email) throw fail("BAD_REQUEST", "لا يوجد بريد دخول لهذا الحساب");
     if (credential.emailVerifiedAt) return { success: true, alreadyVerified: true } as const;
     if (!(await hitRateLimit(`verify-send:${ctx.user.id}`, { max: 3, windowMs: 60 * 60 * 1000 }))) throw fail("TOO_MANY_REQUESTS", "أُرسلت عدة رسائل؛ حاول بعد ساعة");
     const sent = await sendVerificationEmail(ctx.user, credential.email);
@@ -244,12 +323,15 @@ export const localAuthRouter = {
   register: publicProcedure
     .input(z.object({
       name: z.string().trim().min(2, "الاسم قصير جداً").max(120),
-      email: emailSchema,
+      /** بريد أو رقم هاتف أو كلاهما؛ يلزم واحد على الأقل. */
+      email: emailSchema.optional(),
+      phone: phoneInputSchema.optional(),
       password: passwordSchema,
       inviteCode: z.string().trim().max(128).optional(),
-    }))
+    }).refine((input) => Boolean(input.email || input.phone), { message: "أدخل البريد الإلكتروني أو رقم الهاتف", path: ["email"] }))
     .mutation(async ({ ctx, input }) => {
-      const email = normalizeEmail(input.email);
+      const email = input.email ? normalizeEmail(input.email) : null;
+      const phone = input.phone ? requirePhone(input.phone) : null;
       const invite = input.inviteCode ? classifyInviteCode(input.inviteCode) : null;
       if (input.inviteCode && !invite) throw fail("BAD_REQUEST", INVALID_INVITE_MESSAGE);
       if (!ENV.allowSignup && !invite) throw fail("FORBIDDEN", "إنشاء الحسابات مغلق إلا برمز دعوة؛ أدخل رمز الدعوة أو كود الدخول الذي وصلك من إدارة المركز");
@@ -257,13 +339,14 @@ export const localAuthRouter = {
       assertPolicy(input.password);
       // لا نربط تلقائياً بحساب قديم يحمل البريد نفسه (مثل حساب أُنشئ بنظام الدخول السابق) لأن البريد غير مُتحقق منه؛
       // صاحب الحساب القديم يعيّن كلمة مروره من الإعدادات أو برابط من المدير.
-      if (await findCredentialByEmail(email)) throw fail("CONFLICT", "يوجد حساب مسجّل بهذا البريد. سجّل الدخول بدلاً من ذلك");
+      if (email && (await findCredentialByEmail(email))) throw fail("CONFLICT", "يوجد حساب مسجّل بهذا البريد. سجّل الدخول بدلاً من ذلك");
+      if (phone && (await findCredentialByPhone(phone))) throw fail("CONFLICT", "يوجد حساب مسجّل برقم الهاتف هذا. سجّل الدخول بدلاً من ذلك");
       const database = await requireDb();
-      const legacy = await database.select({ id: users.id }).from(users).where(and(eq(users.email, email), isNull(users.deletedAt))).limit(1);
+      const legacy = email ? await database.select({ id: users.id }).from(users).where(and(eq(users.email, email), isNull(users.deletedAt))).limit(1) : [];
       if (legacy.length) throw fail("CONFLICT", "هذا البريد مرتبط بحساب موجود. سجّل الدخول بالطريقة السابقة وعيّن كلمة مرور من الإعدادات، أو اطلب من المدير رابط تعيين كلمة المرور.");
       if (invite && !(await isInviteUsable(invite))) throw fail("BAD_REQUEST", INVALID_INVITE_MESSAGE);
 
-      const user = await createLocalUser({ name: input.name, email, password: input.password });
+      const user = await createLocalUser({ name: input.name, email, phone, password: input.password });
       let granted: { role: string; centerId?: number } | null = null;
       if (invite) {
         try {
@@ -277,18 +360,25 @@ export const localAuthRouter = {
       const fresh = (await database.select().from(users).where(eq(users.id, user.id)).limit(1))[0] ?? user;
       await issueSession(ctx, fresh);
       // تأكيد البريد لا يمنع الدخول؛ يُرسل في الخلفية إن كان البريد مفعّلاً.
-      void sendVerificationEmail(fresh, email).catch((error) => console.warn("[Auth] verification email failed", String(error)));
-      await audit(user.id, invite ? "auth.register_invite" : "auth.register", user.id, ctx, granted ? { inviteKind: invite!.kind, role: granted.role, centerId: granted.centerId } : undefined);
+      if (email) void sendVerificationEmail(fresh, email).catch((error) => console.warn("[Auth] verification email failed", String(error)));
+      await audit(user.id, invite ? "auth.register_invite" : "auth.register", user.id, ctx, { method: phone && !email ? "phone" : "email", ...(granted ? { inviteKind: invite!.kind, role: granted.role, centerId: granted.centerId } : {}) });
       return { success: true, role: granted?.role ?? null } as const;
     }),
 
   login: publicProcedure
-    .input(z.object({ email: emailSchema, password: passwordSchema }))
+    .input(z.object({
+      /** «البريد أو رقم الهاتف» من حقل واحد؛ email وphone يبقيان للعملاء القدامى والسكربتات. */
+      identifier: identifierSchema.optional(),
+      email: emailSchema.optional(),
+      phone: phoneInputSchema.optional(),
+      password: passwordSchema,
+    }))
     .mutation(async ({ ctx, input }) => {
-      const email = normalizeEmail(input.email);
       if (!(await consumeRateLimit(`login:${clientKey(ctx)}`))) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول بعد ربع ساعة");
-      const credential = await findCredentialByEmail(email);
-      const invalid = fail("UNAUTHORIZED", "البريد أو كلمة المرور غير صحيحة");
+      const identity = identityFromInput(input);
+      if (!identity) throw fail("BAD_REQUEST", "أدخل البريد الإلكتروني أو رقم الهاتف");
+      const credential = await findCredentialByIdentity(identity);
+      const invalid = fail("UNAUTHORIZED", identity.email ? "البريد أو كلمة المرور غير صحيحة" : "رقم الهاتف أو كلمة المرور غير صحيحة");
       if (!credential) {
         await verifyPassword(input.password, await getDummyHash());
         throw invalid;
@@ -311,34 +401,51 @@ export const localAuthRouter = {
       if (!user || !isUserActive(user)) throw fail("FORBIDDEN", "حسابك غير نشط. تواصل مع إدارة المركز");
       await database.update(localCredentials).set({ failedAttempts: 0, lockedUntil: null }).where(eq(localCredentials.id, credential.id));
       await issueSession(ctx, user);
-      await audit(user.id, "auth.login", user.id, ctx);
+      await audit(user.id, "auth.login", user.id, ctx, { method: identity.email ? "email" : "phone" });
       return { success: true } as const;
     }),
 
   /** حالة كلمة المرور للمستخدم الحالي (لصفحة الإعدادات). */
   myCredential: protectedProcedure.query(async ({ ctx }) => {
     const credential = await findCredentialByUserId(ctx.user.id);
-    return { hasPassword: Boolean(credential), email: credential?.email ?? ctx.user.email ?? null };
+    return { hasPassword: Boolean(credential), email: credential?.email ?? ctx.user.email ?? null, phone: credential?.phone ?? null };
   }),
 
   /** تعيين/تغيير كلمة المرور من داخل الجلسة — وهو أيضاً مسار المستخدمين القدامى لتعيين أول كلمة مرور. */
   setPassword: protectedProcedure
-    .input(z.object({ email: emailSchema.optional(), currentPassword: passwordSchema.optional(), newPassword: passwordSchema }))
+    .input(z.object({ identifier: identifierSchema.optional(), email: emailSchema.optional(), phone: phoneInputSchema.optional(), currentPassword: passwordSchema.optional(), newPassword: passwordSchema }))
     .mutation(async ({ ctx, input }) => {
       assertPolicy(input.newPassword);
+      const requested = identityFromInput(input);
       const existing = await findCredentialByUserId(ctx.user.id);
       if (existing) {
         if (!input.currentPassword || !(await verifyPassword(input.currentPassword, existing.passwordHash))) {
           throw fail("UNAUTHORIZED", "كلمة المرور الحالية غير صحيحة");
         }
       }
-      const email = normalizeEmail(input.email ?? existing?.email ?? ctx.user.email ?? "");
-      if (!email) throw fail("BAD_REQUEST", "أدخل البريد الذي ستستخدمه للدخول");
-      await saveCredential(ctx.user.id, email, input.newPassword);
+      const fallbackEmail = !existing && ctx.user.email ? normalizeEmail(ctx.user.email) : null;
+      const saved = await saveCredential(ctx.user.id, requested ?? (fallbackEmail ? { email: fallbackEmail } : {}), input.newPassword);
       // تغيير كلمة المرور يُخرج كل الأجهزة الأخرى؛ الجهاز الحالي يبقى داخلاً بجلسة جديدة.
       await rotateSessions(ctx, ctx.user);
       await audit(ctx.user.id, existing ? "auth.password_changed" : "auth.password_set", ctx.user.id, ctx);
-      return { success: true, email } as const;
+      return { success: true, email: saved.email, phone: saved.phone } as const;
+    }),
+
+  /** يضيف رقم هاتف للدخول (أو يغيّره) لحساب له كلمة مرور، بعد التحقق من كلمة المرور الحالية. */
+  setLoginPhone: protectedProcedure
+    .input(z.object({ phone: phoneInputSchema, currentPassword: passwordSchema }))
+    .mutation(async ({ ctx, input }) => {
+      if (!(await consumeRateLimit(`set-phone:${ctx.user.id}`))) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
+      const credential = await findCredentialByUserId(ctx.user.id);
+      if (!credential) throw fail("BAD_REQUEST", "عيّن كلمة مرور أولاً، ويمكنك حينها الدخول برقم الهاتف مباشرة");
+      if (!(await verifyPassword(input.currentPassword, credential.passwordHash))) throw fail("UNAUTHORIZED", "كلمة المرور الحالية غير صحيحة");
+      const phone = requirePhone(input.phone);
+      await assertIdentityFree({ phone }, ctx.user.id);
+      const database = await requireDb();
+      await database.update(localCredentials).set({ phone }).where(eq(localCredentials.id, credential.id));
+      await database.update(users).set({ phone }).where(eq(users.id, ctx.user.id));
+      await audit(ctx.user.id, credential.phone ? "auth.login_phone_changed" : "auth.login_phone_added", ctx.user.id, ctx);
+      return { success: true, phone } as const;
     }),
 
   /** الخروج من كل الأجهزة: يبطل كل الجلسات بما فيها الحالية. */
@@ -363,7 +470,7 @@ export const localAuthRouter = {
     }),
 
   completeSetup: publicProcedure
-    .input(z.object({ token: z.string().trim().min(20).max(200), email: emailSchema.optional(), password: passwordSchema }))
+    .input(z.object({ token: z.string().trim().min(20).max(200), identifier: identifierSchema.optional(), email: emailSchema.optional(), phone: phoneInputSchema.optional(), password: passwordSchema }))
     .mutation(async ({ ctx, input }) => {
       if (!(await consumeRateLimit(`setup:${clientKey(ctx)}`))) throw fail("TOO_MANY_REQUESTS", "محاولات كثيرة، حاول لاحقاً");
       assertPolicy(input.password);
@@ -379,17 +486,20 @@ export const localAuthRouter = {
       const user = (await database.select().from(users).where(eq(users.id, row.userId)).limit(1))[0];
       if (!user || !isUserActive(user)) throw fail("FORBIDDEN", "الحساب غير نشط");
       const existing = await findCredentialByUserId(user.id);
-      const email = normalizeEmail(existing?.email ?? input.email ?? user.email ?? "");
-      if (!email) throw fail("BAD_REQUEST", "أدخل البريد الذي ستستخدمه للدخول");
+      // المعرّف الموجود يبقى؛ المعرّف المدخل يُستخدم فقط لحساب بلا كلمة مرور بعد.
+      const requested = existing ? null : identityFromInput(input);
+      const identity: LoginIdentity = requested ?? (existing ? {} : user.email ? { email: normalizeEmail(user.email) } : {});
+      if (!existing && !identity.email && !identity.phone) throw fail("BAD_REQUEST", "أدخل البريد أو رقم الهاتف الذي ستستخدمه للدخول");
+      await assertIdentityFree(identity, user.id);
       // نعلّم الرابط مستخدماً أولاً (حماية من الاستخدام المزدوج المتزامن).
       const marked = await database.update(passwordSetupTokens).set({ usedAt: new Date() }).where(and(eq(passwordSetupTokens.id, row.id), isNull(passwordSetupTokens.usedAt)));
       const affected = (marked as unknown as [{ affectedRows?: number }])[0]?.affectedRows;
       if (affected === 0) throw fail("BAD_REQUEST", "الرابط مستخدم من قبل");
-      await saveCredential(user.id, email, input.password);
+      const saved = await saveCredential(user.id, identity, input.password);
       // رابط الاستعادة وصل إلى هذا البريد، فهو مؤكد.
       if (row.purpose === "reset") await database.update(localCredentials).set({ emailVerifiedAt: new Date() }).where(eq(localCredentials.userId, user.id));
       await rotateSessions(ctx, user);
       await audit(user.id, row.purpose === "reset" ? "auth.password_reset_completed" : "auth.setup_completed", user.id, ctx);
-      return { success: true, email } as const;
+      return { success: true, email: saved.email, phone: saved.phone } as const;
     }),
 };

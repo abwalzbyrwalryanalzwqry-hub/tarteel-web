@@ -40,7 +40,7 @@ export const accessRouters = {
     members: protectedProcedure.input(z.object({ centerId: z.number() })).query(async ({ ctx, input }) => {
       await assertPermission(ctx.user, input.centerId, "users.view");
       const rows = await getCenterMembers(input.centerId);
-      return rows.map(({ membership, user }) => ({ membership, user: { id: user.id, name: user.name, email: user.email, role: user.role, isActive: user.isActive, accountStatus: user.accountStatus, lastSignedIn: user.lastSignedIn } }));
+      return rows.map(({ membership, user }) => ({ membership, user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role, isActive: user.isActive, accountStatus: user.accountStatus, lastSignedIn: user.lastSignedIn } }));
     }),
 
     memberDetail: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {

@@ -1,5 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { BookOpen, KeyRound, LogIn, Star, UserPlus } from "lucide-react";
+import { BookOpen, KeyRound, LogIn, Mail, Phone, Star, UserPlus } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc";
 import { clearPendingTeacherInvite, readPendingTeacherInvite } from "../../../shared/teacherInviteFlow";
 import { hasActiveAccessMembership } from "../../../shared/accessMembership";
 import { AccessHelpPanel } from "@/components/AccessHelpPanel";
+import { looksLikePhone } from "../../../shared/phone";
 
 const GOOGLE_ERRORS: Record<string, string> = {
   not_configured: "الدخول بـ Google غير مفعّل على هذا الخادم.",
@@ -35,8 +36,16 @@ export default function LoginPage() {
   const googleHref = `/api/auth/google${mode === "register" && inviteCode.trim() ? `?invite=${encodeURIComponent(inviteCode.trim())}` : ""}`;
   const canRegister = signupOpen || Boolean(providers?.inviteSignup);
   const [name, setName] = useState("");
+  /** الدخول: حقل واحد يقبل البريد أو رقم الهاتف. */
+  const [identifier, setIdentifier] = useState("");
+  /** التسجيل: بالبريد أو برقم الهاتف. */
+  const [signupMethod, setSignupMethod] = useState<"email" | "phone">("email");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const phoneEnabled = providers?.phone !== false;
+  const countryCode = providers?.phoneCountryCode ?? "967";
+  const identifierIsPhone = looksLikePhone(identifier);
   const onAuthSuccess = async () => { setPassword(""); try { sessionStorage.removeItem("tarteel-switch-account"); } catch {} await utils.auth.me.invalidate(); };
   const loginMutation = trpc.auth.login.useMutation({ onSuccess: onAuthSuccess, onError: (e) => toast.error(e.message) });
   const registerMutation = trpc.auth.register.useMutation({
@@ -51,8 +60,17 @@ export default function LoginPage() {
   const busy = loginMutation.isPending || registerMutation.isPending;
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (mode === "login") loginMutation.mutate({ email, password });
-    else registerMutation.mutate({ name, email, password, inviteCode: inviteCode.trim() || undefined });
+    if (mode === "login") loginMutation.mutate({ identifier, password });
+    else {
+      const usePhone = phoneEnabled && signupMethod === "phone";
+      registerMutation.mutate({
+        name,
+        email: usePhone ? undefined : email,
+        phone: usePhone ? phone : undefined,
+        password,
+        inviteCode: inviteCode.trim() || undefined,
+      });
+    }
   };
   const [switchAccount] = useState(() => {
     try { return sessionStorage.getItem("tarteel-switch-account") === "1"; } catch { return false; }
@@ -101,7 +119,7 @@ export default function LoginPage() {
           {switchAccount && (
             <div className="mb-5 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-right text-xs leading-6 text-muted-foreground">
               <p className="font-semibold text-foreground">تم تسجيل خروجك من ترتيل.</p>
-              <p className="mt-1">يمكنك الآن الدخول بحساب آخر ببريده وكلمة مروره.</p>
+              <p className="mt-1">يمكنك الآن الدخول بحساب آخر ببريده أو رقم هاتفه وكلمة مروره.</p>
             </div>
           )}
 
@@ -141,10 +159,33 @@ export default function LoginPage() {
                   <input required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 outline-none focus:border-primary" />
                 </label>
               )}
-              <label className="block text-sm">
-                <span className="mb-1 block font-medium text-foreground">البريد الإلكتروني</span>
-                <input required type="email" dir="ltr" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
-              </label>
+              {mode === "login" ? (
+                <label className="block text-sm">
+                  <span className="mb-1 block font-medium text-foreground">{phoneEnabled ? "البريد الإلكتروني أو رقم الهاتف" : "البريد الإلكتروني"}</span>
+                  <input required type="text" dir="ltr" inputMode={identifierIsPhone ? "tel" : "email"} autoComplete="username" autoCapitalize="none" spellCheck={false} value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
+                </label>
+              ) : (
+                <>
+                  {phoneEnabled && (
+                    <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted/40 p-1 text-xs" role="radiogroup" aria-label="طريقة التسجيل">
+                      <button type="button" role="radio" aria-checked={signupMethod === "email"} onClick={() => setSignupMethod("email")} className={`flex items-center justify-center gap-1.5 rounded-lg py-2 font-semibold transition-colors ${signupMethod === "email" ? "bg-background text-foreground shadow" : "text-muted-foreground"}`}><Mail className="h-3.5 w-3.5" />بالبريد</button>
+                      <button type="button" role="radio" aria-checked={signupMethod === "phone"} onClick={() => setSignupMethod("phone")} className={`flex items-center justify-center gap-1.5 rounded-lg py-2 font-semibold transition-colors ${signupMethod === "phone" ? "bg-background text-foreground shadow" : "text-muted-foreground"}`}><Phone className="h-3.5 w-3.5" />برقم الهاتف</button>
+                    </div>
+                  )}
+                  {phoneEnabled && signupMethod === "phone" ? (
+                    <label className="block text-sm">
+                      <span className="mb-1 block font-medium text-foreground">رقم الهاتف</span>
+                      <input required type="tel" dir="ltr" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={`+${countryCode} …`} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
+                      <span className="mt-1 block text-xs leading-5 text-muted-foreground">الرقم المحلي يُكمَّل برمز الدولة <bdi dir="ltr">+{countryCode}</bdi>؛ لرقم من دولة أخرى اكتبه كاملاً مع رمزها. ستدخل لاحقاً بهذا الرقم.</span>
+                    </label>
+                  ) : (
+                    <label className="block text-sm">
+                      <span className="mb-1 block font-medium text-foreground">البريد الإلكتروني</span>
+                      <input required type="email" dir="ltr" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
+                    </label>
+                  )}
+                </>
+              )}
               <label className="block text-sm">
                 <span className="mb-1 block font-medium text-foreground">كلمة المرور</span>
                 <input required type="password" dir="ltr" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
@@ -167,9 +208,9 @@ export default function LoginPage() {
               {resetSent ? (
                 <p className="leading-7 text-foreground">إن كان البريد مسجّلاً فستصلك رسالة فيها رابط صالح 30 دقيقة. افحص مجلد الرسائل غير المرغوب فيها أيضاً.</p>
               ) : (
-                <form onSubmit={(event) => { event.preventDefault(); requestReset.mutate({ email }); }} className="space-y-2">
-                  <p className="text-xs leading-6 text-muted-foreground">أدخل بريد حسابك في الحقل أعلاه ثم اضغط الزر لنرسل لك رابط تعيين كلمة مرور جديدة.</p>
-                  <button type="submit" disabled={requestReset.isPending || !email.trim()} className="w-full rounded-xl border border-primary/40 py-2.5 font-semibold text-primary hover:bg-primary/10 disabled:opacity-60">{requestReset.isPending ? "جارٍ الإرسال…" : "أرسل رابط الاستعادة"}</button>
+                <form onSubmit={(event) => { event.preventDefault(); requestReset.mutate({ email: identifier.trim() }); }} className="space-y-2">
+                  <p className="text-xs leading-6 text-muted-foreground">{identifierIsPhone ? "الاستعادة بالبريد فقط. إن كان حسابك برقم الهاتف فاطلب من إدارة المركز رابط تعيين كلمة مرور جديدة." : "أدخل بريد حسابك في الحقل أعلاه ثم اضغط الزر لنرسل لك رابط تعيين كلمة مرور جديدة."}</p>
+                  <button type="submit" disabled={requestReset.isPending || !identifier.trim() || identifierIsPhone} className="w-full rounded-xl border border-primary/40 py-2.5 font-semibold text-primary hover:bg-primary/10 disabled:opacity-60">{requestReset.isPending ? "جارٍ الإرسال…" : "أرسل رابط الاستعادة"}</button>
                 </form>
               )}
             </div>

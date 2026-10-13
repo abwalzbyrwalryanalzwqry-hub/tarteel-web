@@ -6,7 +6,7 @@ import { trpc } from "@/lib/trpc";
 /** صفحة رابط تعيين كلمة المرور لمرة واحدة (/set-password?token=...). */
 export default function SetPassword() {
   const token = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("token") ?? "" : "";
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const complete = trpc.auth.completeSetup.useMutation({
@@ -23,7 +23,7 @@ export default function SetPassword() {
       toast.error("كلمتا المرور غير متطابقتين");
       return;
     }
-    complete.mutate({ token, password, email: email.trim() || undefined });
+    complete.mutate({ token, password, identifier: identifier.trim() || undefined });
   };
 
   return (
@@ -36,8 +36,8 @@ export default function SetPassword() {
         ) : (
           <form onSubmit={submit} className="mt-6 space-y-3 text-right">
             <label className="block text-sm">
-              <span className="mb-1 block font-medium">البريد الإلكتروني للدخول</span>
-              <input type="email" dir="ltr" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="اتركه فارغاً لاستخدام بريد حسابك" className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
+              <span className="mb-1 block font-medium">البريد الإلكتروني أو رقم الهاتف للدخول</span>
+              <input type="text" dir="ltr" autoComplete="username" autoCapitalize="none" spellCheck={false} value={identifier} onChange={(e) => setIdentifier(e.target.value)} placeholder="اتركه فارغاً لاستخدام بريد حسابك" className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-left outline-none focus:border-primary" />
             </label>
             <label className="block text-sm">
               <span className="mb-1 block font-medium">كلمة المرور الجديدة</span>
