@@ -14,7 +14,7 @@ import { randomBytes, createHash } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import type { Express, Request, Response } from "express";
 import { SignJWT, jwtVerify, decodeJwt } from "jose";
-import { parse as parseCookieHeader } from "cookie";
+import { parseCookie as parseCookieHeader } from "cookie";
 import {
   localCredentials,
   oauthAccounts,
