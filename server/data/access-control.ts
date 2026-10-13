@@ -15,6 +15,7 @@ import {
   users,
 } from "../../drizzle/schema";
 import { getDb } from "./connection";
+import { logger } from "../_core/logger";
 
 // ===================== ACCESS CONTROL =====================
 export async function getUserCenterMemberships(userId: number) {
@@ -199,7 +200,7 @@ export async function redeemAccessCodeSecure(input: { codeHash: string; userId: 
     return await redeemAccessCodeInTransaction(db, input, now);
   } catch (error) {
     if (error instanceof AccessCodeRejection) {
-      await recordAccessCodeRejection(db, input, error.record, now).catch((recordError) => console.warn("[AccessCode] failed to record rejection", String(recordError)));
+      await recordAccessCodeRejection(db, input, error.record, now).catch((recordError) => logger.warn({ err: recordError }, "[AccessCode] failed to record rejection"));
     }
     throw error;
   }

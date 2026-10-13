@@ -37,6 +37,7 @@ import {
   normalizeEmail,
   verifyPassword,
 } from "./password";
+import { logger } from "../_core/logger";
 
 const SETUP_TOKEN_TTL_MS = 72 * 60 * 60 * 1000;
 const ADMIN_ROLES = new Set(["admin", "super_admin"]);
@@ -166,7 +167,7 @@ async function audit(userId: number | null, action: string, entityId: number | n
       userAgent: String(ctx.req.headers?.["user-agent"] ?? "").slice(0, 512) || null,
     });
   } catch (error) {
-    console.warn("[Auth] audit log failed", error);
+    logger.warn({ err: error }, "[Auth] audit log failed");
   }
 }
 
@@ -402,7 +403,7 @@ export const localAuthRouter = {
       } catch (error) {
         // حد المحاولات يظهر للمستخدم؛ أخطاء الرقم والخدمة لا تكشف وجود الحساب.
         if (error instanceof TRPCError && error.code === "TOO_MANY_REQUESTS") throw error;
-        console.warn("[Auth] phone reset code failed", String(error));
+        logger.warn({ err: error }, "[Auth] phone reset code failed");
       }
       return { success: true, phone } as const;
     }),
@@ -467,14 +468,14 @@ export const localAuthRouter = {
           granted = await redeemSignupInvite(invite, user.id, { ipAddress: clientKey(ctx), userAgent: String(ctx.req.headers?.["user-agent"] ?? "").slice(0, 512) || undefined });
         } catch (error) {
           // الرمز صار غير صالح بين الفحص والاسترداد: لا نترك حساباً بلا دعوة.
-          await discardNewAccount(user.id).catch((discardError) => console.warn("[Auth] discard failed", String(discardError)));
+          await discardNewAccount(user.id).catch((discardError) => logger.warn({ err: discardError }, "[Auth] discard failed"));
           throw fail("BAD_REQUEST", error instanceof Error ? error.message : INVALID_INVITE_MESSAGE);
         }
       }
       const fresh = (await database.select().from(users).where(eq(users.id, user.id)).limit(1))[0] ?? user;
       await issueSession(ctx, fresh);
       // تأكيد البريد لا يمنع الدخول؛ يُرسل في الخلفية إن كان البريد مفعّلاً.
-      if (email) void sendVerificationEmail(fresh, email).catch((error) => console.warn("[Auth] verification email failed", String(error)));
+      if (email) void sendVerificationEmail(fresh, email).catch((error) => logger.warn({ err: error }, "[Auth] verification email failed"));
       await audit(user.id, invite ? "auth.register_invite" : "auth.register", user.id, ctx, { method: phone && !email ? "phone" : "email", ...(granted ? { inviteKind: invite!.kind, role: granted.role, centerId: granted.centerId } : {}) });
       return { success: true, role: granted?.role ?? null } as const;
     }),

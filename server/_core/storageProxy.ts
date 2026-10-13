@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { getStorageDriver, resolveLocalPath, storageGetSignedUrl } from "../storage";
+import { logger } from "./logger";
 
 const IMMUTABLE = "public, max-age=31536000, immutable";
 
@@ -46,7 +47,7 @@ export function registerStorageProxy(app: Express) {
       res.set("Cache-Control", "no-store");
       res.redirect(307, url);
     } catch (err) {
-      console.error("[StorageProxy] failed:", err);
+      logger.error({ err }, "[StorageProxy] failed");
       res.status(502).send("Storage proxy error");
     }
   });

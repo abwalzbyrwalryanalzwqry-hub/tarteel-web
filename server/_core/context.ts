@@ -1,6 +1,7 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
 import { sdk } from "./sdk";
+import { logger } from "./logger";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
@@ -20,7 +21,7 @@ export async function createContext(
       const renew = auth.source === "cookie"
         ? sdk.issueSessionCookie(opts.req, opts.res, auth.user)
         : sdk.issueBearerRenewal(opts.res, auth.user);
-      await renew.catch((error) => console.warn("[Auth] session renew failed", String(error)));
+      await renew.catch((error) => logger.warn({ err: error }, "[Auth] session renew failed"));
     }
   } catch (error) {
     // Authentication is optional for public procedures.

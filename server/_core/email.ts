@@ -11,6 +11,8 @@
  * Brevo:  https://developers.brevo.com/reference/sendtransacemail
  */
 
+import { logger } from "./logger";
+
 export type EmailMessage = {
   to: string;
   subject: string;
@@ -58,7 +60,10 @@ export async function sendEmail(
 ): Promise<boolean> {
   const config = getEmailConfig();
   if (!config.provider) {
-    console.warn("[Email] not configured; message dropped:", message.subject);
+    logger.warn(
+      { subject: message.subject },
+      "[Email] not configured; message dropped"
+    );
     return false;
   }
   const request: {
@@ -101,17 +106,22 @@ export async function sendEmail(
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!response.ok) {
-      console.error(
-        "[Email] provider rejected message",
-        config.provider,
-        response.status,
-        (await response.text().catch(() => "")).slice(0, 300)
+      logger.error(
+        {
+          provider: config.provider,
+          status: response.status,
+          body: (await response.text().catch(() => "")).slice(0, 300),
+        },
+        "[Email] provider rejected message"
       );
       return false;
     }
     return true;
   } catch (error) {
-    console.error("[Email] send failed", config.provider, String(error));
+    logger.error(
+      { err: error, provider: config.provider },
+      "[Email] send failed"
+    );
     return false;
   }
 }
