@@ -20,7 +20,7 @@ export async function setupVite(app: Express, server: Server) {
   });
 
   app.use(vite.middlewares);
-  app.use("*", async (req, res, next) => {
+  app.use(async (req, res, next) => {
     const url = req.originalUrl;
 
     try {
@@ -60,7 +60,8 @@ export function serveStatic(app: Express) {
   app.use(express.static(distPath, { setHeaders: setStaticCacheHeaders }));
 
   // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
+  // Express 5 لا يقبل "*" مساراً؛ app.use بلا مسار يطابق كل الطلبات.
+  app.use((_req, res) => {
     res.setHeader("Cache-Control", "no-cache");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
