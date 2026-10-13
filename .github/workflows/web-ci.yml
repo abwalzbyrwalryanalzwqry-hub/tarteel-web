@@ -53,6 +53,9 @@ jobs:
       TEST_DATABASE_URL: mysql://tarteel:tarteel@127.0.0.1:3306/tarteel_test
     steps:
       - uses: actions/checkout@v7
+        with:
+          # يلزم تاريخ الفرع لمقارنة الملفات الجديدة بالفرع الأساسي في فحص التنسيق.
+          fetch-depth: 0
 
       # النسخة تُقرأ من packageManager في package.json.
       - uses: pnpm/action-setup@v6
@@ -71,6 +74,18 @@ jobs:
 
       - name: فحص الأنواع
         run: pnpm check
+
+      - name: فحص الشيفرة (ESLint)
+        run: pnpm lint
+
+      # معظم الملفات القديمة غير منسقة؛ إعادة تنسيقها دفعة واحدة تتعارض مع كل فرع مفتوح.
+      # لذلك نشترط Prettier على الملفات الجديدة فقط، وتُنسَّق القديمة تدريجياً.
+      - name: تنسيق الملفات الجديدة (Prettier)
+        if: github.event_name == 'pull_request'
+        run: |
+          mapfile -t files < <(git diff --name-only --diff-filter=A "origin/${{ github.base_ref }}...HEAD" -- '*.ts' '*.tsx' '*.js' '*.mjs' '*.css')
+          if [ ${#files[@]} -eq 0 ]; then echo "لا ملفات جديدة"; exit 0; fi
+          pnpm exec prettier --check --ignore-unknown "${files[@]}"
 
       - name: تطبيق الترحيلات على قاعدة الاختبار
         env:

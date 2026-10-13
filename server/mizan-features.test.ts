@@ -2,13 +2,14 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { QURAN_SURAHS } from "../shared/types";
+import { readRouterSource } from "./testing/routerSource";
 
 const root = process.cwd();
 
 describe("منظومة الميزان", () => {
   it("يحفظ قوالب الفترات التاريخية ويجعل الفترات الفعلية من سجلات الجلسات", () => {
     const schema = readFileSync(path.join(root, "drizzle/schema.ts"), "utf8");
-    const router = readFileSync(path.join(root, "server/routers.ts"), "utf8");
+    const router = readRouterSource();
     expect(schema).toContain('mysqlTable("circle_periods"');
     expect(router).toContain("circlePeriods: router");
     expect(router).toContain("monthlyRecord");
@@ -17,7 +18,7 @@ describe("منظومة الميزان", () => {
   });
 
   it("يحتفظ بحدود آيات السور ويطبق نهايات السور في سجلات الإنجاز", () => {
-    const router = readFileSync(path.join(root, "server/routers.ts"), "utf8");
+    const router = readRouterSource();
     const schema = readFileSync(path.join(root, "drizzle/schema.ts"), "utf8");
     expect(QURAN_SURAHS).toHaveLength(114);
     expect(QURAN_SURAHS.find((surah) => surah.number === 1)?.ayahs).toBe(7);

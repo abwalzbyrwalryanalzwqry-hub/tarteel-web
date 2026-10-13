@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { readDataLayerSource } from "./testing/dataLayerSource";
+import { readRouterSource } from "./testing/routerSource";
 
 const root = path.resolve(import.meta.dirname, "..");
 const read = (relative: string) => readFileSync(path.join(root, relative), "utf8");
@@ -21,7 +22,7 @@ describe("مسار المدير الجديد والمركز المستقل", () 
     const login = read("client/src/pages/LoginPage.tsx");
     const layout = read("client/src/components/TarteelLayout.tsx");
     const onboarding = read("client/src/pages/CenterOnboarding.tsx");
-    const router = read("server/routers.ts");
+    const router = readRouterSource();
     const app = read("client/src/App.tsx");
     expect(login).toContain('"/start"');
     expect(layout).toContain('navigate("/start")');

@@ -2,12 +2,13 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { readDataLayerSource } from "./testing/dataLayerSource";
+import { readRouterSource } from "./testing/routerSource";
 
 const root = process.cwd();
 
 describe("انتهاء كود الدخول وإشعار المدير", () => {
   it("يبقي تاريخ انتهاء الكود اختيارياً ويرفض التاريخ الماضي عند الإنشاء وإعادة الإصدار", () => {
-    const router = readFileSync(path.join(root, "server/routers.ts"), "utf8");
+    const router = readRouterSource();
     const page = readFileSync(path.join(root, "client/src/pages/AccessManagement.tsx"), "utf8");
     expect(router).toContain("expiresAt: z.date().nullable().optional()");
     expect(router).toContain("تاريخ الانتهاء يجب أن يكون في المستقبل");

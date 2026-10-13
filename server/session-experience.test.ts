@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { QURAN_SURAHS } from "../shared/types";
 import { readDataLayerSource } from "./testing/dataLayerSource";
+import { readRouterSource } from "./testing/routerSource";
 
 const root = process.cwd();
 const source = (file: string) => readFileSync(path.join(root, file), "utf8");
@@ -10,7 +11,7 @@ const source = (file: string) => readFileSync(path.join(root, file), "utf8");
 describe("تزامن البيانات وتجربة جلسة المعلم", () => {
   it("يعزل إحصاءات لوحة التحكم وجلساتها بحلقات الحساب عند غياب صلاحية المركز", () => {
     const database = readDataLayerSource();
-    const router = source("server/routers.ts");
+    const router = readRouterSource();
     expect(database).toContain("getDashboardStatsForCircles");
     expect(database).toContain("getRecentSessionsForCircles");
     expect(router).toContain("getAccessibleDashboardCircleIds");
@@ -62,7 +63,7 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
 
   it("يحفظ أزرار الحضور كعناصر مستقلة قابلة للتفاعل مع حراسة تعديل خادمية", () => {
     const detail = source("client/src/pages/SessionDetail.tsx");
-    const router = source("server/routers.ts");
+    const router = readRouterSource();
     expect(detail).toContain('role="button"');
     expect(detail).toContain("attendanceOverrides");
     expect(detail).toContain("aria-pressed={status === s}");
@@ -71,7 +72,7 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
 
   it("يسجل الحضور الجماعي للطلاب غير المسجلين فقط ويحافظ على الاستثناءات الفردية", () => {
     const detail = source("client/src/pages/SessionDetail.tsx");
-    const router = source("server/routers.ts");
+    const router = readRouterSource();
     const database = readDataLayerSource();
     expect(detail).toContain("تسجيل الجميع حضوراً");
     expect(detail).toContain("ستبقى حالات الغياب والاستئذان المسجلة يدوياً كما هي");
@@ -99,7 +100,7 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     const dates = source("shared/dates.ts");
     const schema = source("drizzle/schema.ts");
     const database = readDataLayerSource();
-    const router = source("server/routers.ts");
+    const router = readRouterSource();
     const composer = source("client/src/components/NewSessionComposer.tsx");
     const detail = source("client/src/pages/SessionDetail.tsx");
     expect(dates).toContain("getRiyadhDayKey");
@@ -118,7 +119,7 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
   it("يحفظ الفترة كمسودة تلقائية ثم يعرضها للتقارير بعد الاعتماد النهائي فقط", () => {
     const schema = source("drizzle/schema.ts");
     const database = readDataLayerSource();
-    const router = source("server/routers.ts");
+    const router = readRouterSource();
     const composer = source("client/src/components/NewSessionComposer.tsx");
     const header = source("client/src/components/SessionHeaderControls.tsx");
     const detail = source("client/src/pages/SessionDetail.tsx");
@@ -141,7 +142,7 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
 
   it("يعيد المعلم إلى المسودة ويقبل نطاق السور الصاعد أو النازل مع زر اعتماد واضح", () => {
     const mizan = source("shared/mizan.ts");
-    const router = source("server/routers.ts");
+    const router = readRouterSource();
     const periods = source("client/src/pages/Sessions.tsx");
     const detail = source("client/src/pages/SessionDetail.tsx");
     expect(mizan).toContain("endSurah === input.surahNumber");
@@ -152,7 +153,7 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
   });
 
   it("يفتح سجل طلاب الفترة الجديدة فور إنشائها من القائمة أو من الحلقة", () => {
-    const router = source("server/routers.ts");
+    const router = readRouterSource();
     const periods = source("client/src/pages/Sessions.tsx");
     const circle = source("client/src/pages/CircleDetail.tsx");
     expect(router).toContain("function getInsertedSessionId");
@@ -174,7 +175,7 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
   });
 
   it("يستعيد المسودة بحسب الحلقة والتاريخ إذا غاب معرّف الإنشاء من الاستجابة الحية", () => {
-    const router = source("server/routers.ts");
+    const router = readRouterSource();
     const periods = source("client/src/pages/Sessions.tsx");
     const circle = source("client/src/pages/CircleDetail.tsx");
     expect(router).toContain("byDay: protectedProcedure");
@@ -196,7 +197,7 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
   it("يفتح الفترة بالنقر ويعرض إدارة آمنة بالضغط المطوّل مع نقل مؤكد إلى السلة", () => {
     const periods = source("client/src/pages/Sessions.tsx");
     const trash = source("client/src/pages/Trash.tsx");
-    const router = source("server/routers.ts");
+    const router = readRouterSource();
     const database = readDataLayerSource();
     expect(periods).toContain("onPointerDown={() => startHold(period)}");
     expect(periods).toContain("تأكيد النقل إلى السلة");

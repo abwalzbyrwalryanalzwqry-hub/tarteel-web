@@ -5,12 +5,10 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { QURAN_SURAHS } from "../../../shared/types";
 import { AIGuidanceCard } from "@/components/AIGuidanceCard";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Link } from "wouter";
 
 export default function Students() {
-  const { user } = useAuth();
   const { can, role } = usePermissions();
   const isTeachingRole = role === "teacher" || role === "assistant_teacher";
   const isReaderRole = role === "student" || role === "guardian";
