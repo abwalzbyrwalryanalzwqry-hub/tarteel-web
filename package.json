@@ -5,13 +5,15 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx watch server/_core/index.ts",
-    "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && pnpm build:scripts",
+    "build:scripts": "esbuild scripts/migrate.ts scripts/create-admin.ts scripts/backup-upload.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "lint": "eslint .",
     "test": "vitest run",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "db:migrate": "tsx scripts/migrate.ts",
     "auth:create-admin": "tsx scripts/create-admin.ts create-admin",
     "auth:setup-link": "tsx scripts/create-admin.ts setup-link",
     "assets:import": "tsx scripts/import-assets.ts"

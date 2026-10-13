@@ -134,6 +134,13 @@
       "when": 1791851655408,
       "tag": "0018_usage_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1791853402154,
+      "tag": "0019_email_and_oauth",
+      "breakpoints": true
     }
   ]
 }
