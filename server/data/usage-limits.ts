@@ -9,6 +9,7 @@ import { lt, sql } from "drizzle-orm";
 import { aiDailyUsage, rateLimitBuckets } from "../../drizzle/schema";
 import { getDb } from "./connection";
 import { logger } from "../_core/logger";
+import { isSqliteDialect } from "./dialect";
 
 type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
@@ -64,7 +65,8 @@ async function dbHit(db: Db, key: string, windowMs: number, now: number) {
 export async function hitRateLimit(key: string, options: { max: number; windowMs: number; now?: number }): Promise<boolean> {
   const now = options.now ?? Date.now();
   const k = bucketKey(key);
-  const db = await getDb();
+  // نسخة الجهاز المحلية (SQLite): مستخدم واحد في كل لحظة، والعدّاد في الذاكرة يكفي.
+  const db = isSqliteDialect() ? null : await getDb();
   if (db) {
     try {
       return (await dbHit(db, k, options.windowMs, now)) <= options.max;
@@ -82,7 +84,7 @@ export const usageDay = (now: Date) => now.toISOString().slice(0, 10);
 export async function consumeDailyQuota(userId: number, limit: number, now = new Date()): Promise<boolean> {
   if (limit <= 0) return false;
   const day = usageDay(now);
-  const db = await getDb();
+  const db = isSqliteDialect() ? null : await getDb();
   if (db) {
     try {
       const result = await db.insert(aiDailyUsage).values({ userId, day, count: 1 }).onDuplicateKeyUpdate({ set: { count: sql`LAST_INSERT_ID(${aiDailyUsage.count} + 1)` } });

@@ -16,6 +16,7 @@ import {
 } from "../../drizzle/schema";
 import { getDb } from "./connection";
 import { logger } from "../_core/logger";
+import { isSqliteDialect } from "./dialect";
 
 // ===================== ACCESS CONTROL =====================
 export async function getUserCenterMemberships(userId: number) {
@@ -184,6 +185,17 @@ async function recordAccessCodeRejection(
   if (!record.accessCodeId) return;
   // MySQL يطبق التعيينات بالترتيب، فالشرطان التاليان يقرآن failedAttempts بعد زيادتها (تحديث ذري بلا سباق).
   const lockUntil = new Date(now.getTime() + 15 * 60_000);
+  if (isSqliteDialect()) {
+    // SQLite يحسب كل التعيينات من القيم القديمة، فنقارن بالعدد بعد الزيادة صراحةً.
+    const next = sql`(${accessCodes.failedAttempts} + 1)`;
+    await db.update(accessCodes).set({
+      failedAttempts: sql`${accessCodes.failedAttempts} + 1`,
+      lockedUntil: sql`CASE WHEN ${next} >= ${ACCESS_CODE_LOCK_AFTER} THEN ${lockUntil} ELSE ${accessCodes.lockedUntil} END`,
+      status: record.disable ? "disabled" : sql`CASE WHEN ${next} >= ${ACCESS_CODE_DISABLE_AFTER} THEN 'disabled' ELSE ${accessCodes.status} END`,
+      updatedAt: now,
+    }).where(eq(accessCodes.id, record.accessCodeId));
+    return;
+  }
   await db.update(accessCodes).set({
     failedAttempts: sql`${accessCodes.failedAttempts} + 1`,
     lockedUntil: sql`IF(${accessCodes.failedAttempts} >= ${ACCESS_CODE_LOCK_AFTER}, ${lockUntil}, ${accessCodes.lockedUntil})`,
