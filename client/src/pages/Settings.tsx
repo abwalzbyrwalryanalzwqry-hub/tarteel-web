@@ -1,10 +1,12 @@
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Bell, Building2, Code2, Moon, Settings as SettingsIcon, Sun, Type, Users } from "lucide-react";
+import { Bell, Building2, ChevronLeft, Code2, Moon, Settings as SettingsIcon, ShieldCheck, Sun, Type, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 import { PasswordSettingsCard } from "@/components/PasswordSettingsCard";
+import { DeleteAccountCard } from "@/components/DeleteAccountCard";
+import { LEGAL_LINKS } from "@/components/LegalPage";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -142,6 +144,20 @@ export default function Settings() {
             <span className="btn-gold inline-flex min-h-10 items-center px-4 text-sm">عرض بيانات المطور</span>
           </Link>
         </div>
+
+        {/* Privacy & account deletion */}
+        <div className="glass-card rounded-2xl p-5">
+          <h2 className="font-display font-bold text-foreground text-lg mb-4 flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-primary"/>الخصوصية والشروط</h2>
+          <div className="space-y-2">
+            {LEGAL_LINKS.map((link) => (
+              <a key={link.href} href={link.href} className="flex min-h-11 items-center justify-between rounded-xl bg-muted/20 p-3 text-sm font-medium text-foreground hover:bg-muted/40">
+                {link.label}
+                <ChevronLeft className="h-4 w-4 text-muted-foreground" aria-hidden="true"/>
+              </a>
+            ))}
+          </div>
+        </div>
+        <DeleteAccountCard />
       </div>
 
       {/* Users List (Admin only) */}

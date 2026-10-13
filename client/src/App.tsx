@@ -43,6 +43,9 @@ const AccessManagement = lazy(() => import("./pages/AccessManagement"));
 const RedeemAccessCode = lazy(() => import("./pages/RedeemAccessCode"));
 const CenterOnboarding = lazy(() => import("./pages/CenterOnboarding"));
 const GuideDashboard = lazy(() => import("./pages/GuideDashboard"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfUse = lazy(() => import("./pages/TermsOfUse"));
+const DeleteAccountInfo = lazy(() => import("./pages/DeleteAccountInfo"));
 
 /** صفحة داخل الإطار، معرّفة مرة واحدة حتى لا يُعاد تركيب الإطار مع كل إعادة رسم للموجّه. */
 function inLayout<P extends object>(
@@ -111,6 +114,9 @@ function Router() {
         <Route path="/login" component={LoginPage} />
         <Route path="/set-password" component={SetPassword} />
         <Route path="/verify-email" component={VerifyEmail} />
+        <Route path="/privacy" component={PrivacyPolicy} />
+        <Route path="/terms" component={TermsOfUse} />
+        <Route path="/delete-account" component={DeleteAccountInfo} />
         <Route path="/dashboard" component={DashboardRoute} />
         <Route path="/centers" component={CentersRoute} />
         <Route path="/branches" component={BranchesRoute} />

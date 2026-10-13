@@ -8,6 +8,7 @@ import { aiRouter } from "./routers/ai";
 import { reportingRouter } from "./routers/reporting";
 
 import { localAuthRouter } from "./auth/localAuth";
+import { accountDeletionRouter } from "./auth/accountDeletion";
 import { quranRouters } from "./routers/quran";
 import { centersRouters } from "./routers/centers";
 import { circlesRouters } from "./routers/circles";
@@ -25,6 +26,7 @@ export const appRouter = router({
 
   auth: router({
     ...localAuthRouter,
+    ...accountDeletionRouter,
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);

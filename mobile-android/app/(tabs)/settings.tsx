@@ -79,6 +79,22 @@ export default function SettingsScreen() {
             <Ionicons name="document-text-outline" size={18} color={colors.primary} /><Text style={styles.linkText}>ترخيص نص Tanzil</Text>
           </Pressable>
         </View>
+
+        {current ? (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}><Ionicons name="shield-checkmark-outline" size={20} color={colors.primary} /><Text style={styles.cardTitle}>الخصوصية والحساب</Text></View>
+            <Text style={styles.help}>تحذف حسابك من «الإعدادات ← حذف الحساب» داخل المنصة بعد الدخول.</Text>
+            {[
+              { path: "/privacy", label: "سياسة الخصوصية", icon: "lock-closed-outline" as const },
+              { path: "/terms", label: "شروط الاستخدام", icon: "document-text-outline" as const },
+              { path: "/delete-account", label: "حذف الحساب", icon: "trash-outline" as const },
+            ].map((link) => (
+              <Pressable key={link.path} onPress={() => void Linking.openURL(`${current}${link.path}`)} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
+                <Ionicons name={link.icon} size={18} color={colors.primary} /><Text style={styles.linkText}>{link.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
