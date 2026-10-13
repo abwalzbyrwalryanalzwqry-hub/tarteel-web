@@ -116,15 +116,15 @@ describe("H2: الجلسات", () => {
 describe("H5: حد المساعد الذكي", () => {
   afterEach(() => resetAiQuotaForTests());
 
-  it("يسمح بالحد اليومي ثم يمنع، ويعيد الفتح في اليوم التالي، والحد مستقل لكل مستخدم", () => {
+  it("يسمح بالحد اليومي ثم يمنع، ويعيد الفتح في اليوم التالي، والحد مستقل لكل مستخدم", async () => {
     const day1 = new Date("2026-10-13T10:00:00Z");
-    for (let i = 0; i < 3; i++) expect(consumeAiQuota(1, 3, day1)).toBe(true);
-    expect(consumeAiQuota(1, 3, day1)).toBe(false);
-    expect(consumeAiQuota(2, 3, day1)).toBe(true);
-    expect(consumeAiQuota(1, 3, new Date("2026-10-14T00:00:01Z"))).toBe(true);
+    for (let i = 0; i < 3; i++) expect(await consumeAiQuota(1, 3, day1)).toBe(true);
+    expect(await consumeAiQuota(1, 3, day1)).toBe(false);
+    expect(await consumeAiQuota(2, 3, day1)).toBe(true);
+    expect(await consumeAiQuota(1, 3, new Date("2026-10-14T00:00:01Z"))).toBe(true);
   });
 
-  it("الحد 0 يعطّل المساعد", () => {
-    expect(consumeAiQuota(1, 0)).toBe(false);
+  it("الحد 0 يعطّل المساعد", async () => {
+    expect(await consumeAiQuota(1, 0)).toBe(false);
   });
 });
