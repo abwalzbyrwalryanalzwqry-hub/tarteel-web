@@ -3,7 +3,7 @@ import type { ExpoConfig } from "expo/config";
 const config: ExpoConfig = {
   name: "ترتيل",
   slug: "tarteel-android",
-  version: "0.2.0",
+  version: "0.2.1",
   orientation: "default",
   scheme: "tarteel",
   userInterfaceStyle: "automatic",
@@ -15,7 +15,15 @@ const config: ExpoConfig = {
       foregroundImage: "./assets/icon-foreground.png",
       backgroundColor: "#E89B00"
     },
-    permissions: ["android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE", "android.permission.POST_NOTIFICATIONS"]
+    permissions: ["android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE", "android.permission.POST_NOTIFICATIONS"],
+    // تمنع إعادة إضافتها عند expo prebuild (انظر AndroidManifest.xml).
+    blockedPermissions: [
+      "android.permission.READ_EXTERNAL_STORAGE",
+      "android.permission.WRITE_EXTERNAL_STORAGE",
+      "android.permission.SYSTEM_ALERT_WINDOW",
+      "android.permission.USE_BIOMETRIC",
+      "android.permission.USE_FINGERPRINT"
+    ]
   },
   splash: {
     image: "./assets/splash.png",
