@@ -33,9 +33,8 @@ const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
 const AIAssistant = lazy(() => import("./pages/AIAssistant"));
 const SplashScreen = lazy(() => import("./pages/SplashScreen"));
 const DeveloperInfo = lazy(() => import("./pages/DeveloperInfo"));
-const QuranCenter = lazy(() => import("./pages/QuranCenter"));
-const MushafPickerPage = lazy(() => import("./pages/MushafPickerPage"));
-const QuranReaderPage = lazy(() => import("./pages/QuranReaderPage"));
+/** قسم المصحف (منقول من زِن): شاشاته كلها تحت /quran بإطارها الخاص وملء الشاشة. */
+const MushafApp = lazy(() => import("./mushaf/app/MushafApp"));
 const ParentMessages = lazy(() => import("./pages/ParentMessages"));
 const TeacherInvites = lazy(() => import("./pages/TeacherInvites"));
 const RedeemTeacherInvite = lazy(() => import("./pages/RedeemTeacherInvite"));
@@ -78,7 +77,6 @@ const TeachersRoute = inLayout(Teachers);
 const StudentsRoute = inLayout(Students);
 const SessionsRoute = inLayout(Sessions);
 const AIAssistantRoute = inLayout(AIAssistant);
-const QuranCenterRoute = inLayout(QuranCenter);
 const ParentMessagesRoute = inLayout(ParentMessages);
 const TeacherInvitesRoute = inLayout(TeacherInvites);
 const AccessManagementRoute = inLayout(AccessManagement);
@@ -136,9 +134,7 @@ function Router() {
           )}
         />
         <Route path="/assistant">{__TARTEEL_DEVICE__ ? <Redirect to="/dashboard" /> : <AIAssistantRoute />}</Route>
-        <Route path="/quran/picker" component={MushafPickerPage} />
-        <Route path="/quran/read" component={QuranReaderPage} />
-        <Route path="/quran" component={QuranCenterRoute} />
+        <Route path="/quran/*?" component={MushafApp} />
         <Route path="/parent-messages" component={ParentMessagesRoute} />
         <Route path="/teacher-invites" component={TeacherInvitesRoute} />
         <Route path="/access-management" component={AccessManagementRoute} />

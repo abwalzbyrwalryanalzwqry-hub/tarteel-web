@@ -16,7 +16,6 @@ export default function RootLayout() {
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="surah/[id]" options={{ animation: "slide_from_left" }} />
       </Stack>
     </SafeAreaProvider>
   );

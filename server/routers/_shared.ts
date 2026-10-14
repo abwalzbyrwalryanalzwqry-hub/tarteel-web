@@ -15,6 +15,9 @@ import {
   getSessionById,
   getSessionByCircleDay,
   getStudentById,
+  getStudentByUserId,
+  getStudents,
+  getStudentsByGuardianUserId,
   getStudentMizanProfile,
   getTeacherByUserId,
   getUserCenterMemberships,
@@ -153,4 +156,33 @@ export async function getAccessibleDashboardCircleIds(user: AccessSubject) {
   const circles = await getCircles();
   const allowed = await filterAccessibleCircles(user, circles);
   return allowed.map((circle) => circle.id);
+}
+
+/** الطلاب الذين يحق للمستخدم قراءة سجلاتهم (منطق students.list نفسه، ويستعمله سجل الصفحة في المصحف). */
+export async function listReadableStudents(user: AccessSubject, input: { centerId?: number; circleId?: number; search?: string }) {
+  if (user.role === "student") {
+    const student = await getStudentByUserId(user.id);
+    if (!student) return [];
+    await assertStudentReadAccess(user, student);
+    return [toReaderStudent(student)];
+  }
+  if (user.role === "guardian") {
+    const linked = await getStudentsByGuardianUserId(user.id);
+    const permitted = await Promise.all(linked.map(async (student) => { try { await assertStudentReadAccess(user, student); return student; } catch { return null; } }));
+    return permitted.filter((student): student is NonNullable<typeof student> => Boolean(student)).map(toReaderStudent);
+  }
+  const scope = await getTeacherCircleScope(user);
+  if (!scope) {
+    if (input.circleId) { await assertCirclePermission(user, input.circleId, "students.view"); return getStudents(undefined, input.circleId, input.search); }
+    const centerIds = input.centerId ? [input.centerId] : await getAccessibleCenterIds(user, "students.view");
+    if (input.centerId) await assertPermission(user, input.centerId, "students.view");
+    const candidates = (await Promise.all(centerIds.map((centerId) => getStudents(centerId, undefined, input.search)))).flat();
+    const authorized = await Promise.all(candidates.map(async (student) => { try { await assertStudentPermission(user, student.id, "students.view", student.circleId); return student; } catch { return null; } }));
+    return authorized.filter((student): student is NonNullable<typeof student> => Boolean(student));
+  }
+  if (input.circleId) {
+    if (!scope.includes(input.circleId)) throw new TRPCError({ code: "FORBIDDEN" });
+    return getStudents(undefined, input.circleId, input.search);
+  }
+  return (await Promise.all(scope.map((circleId) => getStudents(undefined, circleId, input.search)))).flat();
 }

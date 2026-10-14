@@ -10,7 +10,7 @@
 | [multi-account-acceptance-runbook.md](multi-account-acceptance-runbook.md) | اختبار الصلاحيات بحسابات متعددة |
 | [mizan-architecture.md](mizan-architecture.md) | تصميم منظومة الميزان (التقييم) |
 | [typography-system.md](typography-system.md) | نظام الخطوط والتراتبية الطباعية |
-| [tanzil-source-verification-ar.md](tanzil-source-verification-ar.md) | مصدر النص العثماني وترخيصه |
+| [mushaf-sources-ar.md](mushaf-sources-ar.md) | مصادر قسم المصحف وتراخيصها |
 | [android-offline-first-design-ar.md](android-offline-first-design-ar.md) | تصميم تطبيق أندرويد بلا اتصال |
 
 ## الأرشيف

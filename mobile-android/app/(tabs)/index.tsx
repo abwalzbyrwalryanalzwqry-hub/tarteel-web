@@ -4,14 +4,13 @@ import { Pressable } from "../../src/ui/Pressable";
 import { useFocusEffect, useLocalSearchParams, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView, type WebViewMessageEvent, type WebViewNavigation } from "react-native-webview";
-import * as FileSystem from "expo-file-system/legacy";
-import * as Sharing from "expo-sharing";
 import Constants from "expo-constants";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { getSavedServerUrl } from "../../src/config/server";
 import { LOCAL_WEB_URL, isLocalWebUrl } from "../../src/config/localWeb";
 import { readLocalDatabaseFile, saveLocalDatabaseFile } from "../../src/data/localDatabaseFile";
 import { BRIDGE_SCRIPT, type BridgeMessage } from "../../src/web/bridge";
+import { handleCommonBridgeMessage, setKeepAwakeFocus } from "../../src/web/nativeActions";
 import { useNetworkStatus } from "../../src/network/useNetworkStatus";
 import { colors } from "../../src/ui/theme";
 
@@ -19,10 +18,7 @@ const EXTERNAL_SCHEMES = /^(mailto:|tel:|sms:|whatsapp:|intent:|market:|geo:)/i;
 const EXTERNAL_HOSTS = /(^|\.)(wa\.me|whatsapp\.com|play\.google\.com|maps\.google\.com)$/i;
 const USER_AGENT_SUFFIX = `TarteelAndroid/${Constants.expoConfig?.version ?? "0"}`;
 
-function safeFileName(name: string) {
-  const cleaned = name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").trim();
-  return cleaned || `tarteel-${Date.now()}`;
-}
+const KEEP_AWAKE_TAG = "tarteel-platform";
 
 export default function PlatformScreen() {
   const webRef = useRef<WebView>(null);
@@ -58,6 +54,12 @@ export default function PlatformScreen() {
     return () => { active = false; };
   }, []));
 
+  // إبقاء الشاشة مضاءة (إن طلبته الصفحة) يسري والتبويب ظاهر فقط.
+  useFocusEffect(useCallback(() => {
+    setKeepAwakeFocus(KEEP_AWAKE_TAG, true);
+    return () => setKeepAwakeFocus(KEEP_AWAKE_TAG, false);
+  }, []));
+
   // زر الرجوع في أندرويد يتنقل داخل المنصة أولاً.
   useFocusEffect(useCallback(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -85,21 +87,7 @@ export default function PlatformScreen() {
       webRef.current?.injectJavaScript(`window.__tarteelNativeDb && window.__tarteelNativeDb(${payload}); true;`);
       return;
     }
-    if (message.type === "open") {
-      void Linking.openURL(message.url).catch(() => undefined);
-      return;
-    }
-    if (message.type === "download") {
-      try {
-        const uri = `${FileSystem.cacheDirectory}${safeFileName(message.filename)}`;
-        await FileSystem.writeAsStringAsync(uri, message.data, { encoding: FileSystem.EncodingType.Base64 });
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(uri, { mimeType: message.mime, dialogTitle: "حفظ أو مشاركة الملف" });
-        }
-      } catch (error) {
-        console.warn("[Tarteel] download failed", error);
-      }
-    }
+    await handleCommonBridgeMessage(message, KEEP_AWAKE_TAG);
   }, []);
 
   const onShouldStartLoad = useCallback((request: WebViewNavigation) => {
@@ -151,7 +139,11 @@ export default function PlatformScreen() {
           onMessage={onMessage}
           onShouldStartLoadWithRequest={onShouldStartLoad}
           onNavigationStateChange={(state) => setCanGoBack(state.canGoBack)}
-          onLoadStart={() => setLoading(true)}
+          // إعادة تحميل الصفحة تُسقط طلب إبقاء الشاشة مضاءة؛ تطلبه الصفحة من جديد إن احتاجته.
+          onLoadStart={() => {
+            setLoading(true);
+            void handleCommonBridgeMessage({ type: "keep-awake", on: false }, KEEP_AWAKE_TAG);
+          }}
           onLoadEnd={() => setLoading(false)}
           onError={() => { setLoading(false); setFailed(true); }}
           onHttpError={(event) => { if (event.nativeEvent.statusCode >= 500 && !event.nativeEvent.url.includes("/api/")) setFailed(true); }}

@@ -2,7 +2,7 @@
  * حذف المستخدم حسابه بنفسه (مطلب Google Play لكل تطبيق يتيح إنشاء الحسابات، وحق للمستخدم).
  *
  * ما يُحذف نهائياً: بيانات الدخول (كلمة المرور، البريد، الهاتف، ربط Google)، وروابط التعيين والاستعادة،
- * وعلامات المصحف وتفضيلات الآيات، والإشعارات، وعدّاد المساعد، وكل عضويات المراكز وصلاحياتها ونطاقاتها،
+ * وحالة القراءة في المصحف (العلامات والختمة والسجل) وبطاقات المراجعة، والإشعارات، وعدّاد المساعد، وكل عضويات المراكز وصلاحياتها ونطاقاتها،
  * وروابط ولي الأمر بالطلاب. ويُمحى عنوان IP ووكيل المتصفح من سجل التدقيق ومحاولات الأكواد.
  *
  * ما يبقى: صف المستخدم مجهول الهوية («حساب محذوف») حتى لا تنكسر المراجع في السجلات القديمة، وسجلات
@@ -27,8 +27,8 @@ import {
   parentStudentLinks,
   passwordSetupTokens,
   permissionGrants,
-  quranBookmarks,
-  quranVersePreferences,
+  quranReadingStates,
+  quranReviewCards,
   students,
   teachers,
   userScopes,
@@ -143,10 +143,12 @@ export async function eraseAccount(userId: number, now = new Date()) {
       .where(eq(passwordSetupTokens.userId, userId));
 
     // البيانات الشخصية داخل التطبيق
-    await tx.delete(quranBookmarks).where(eq(quranBookmarks.userId, userId));
     await tx
-      .delete(quranVersePreferences)
-      .where(eq(quranVersePreferences.userId, userId));
+      .delete(quranReadingStates)
+      .where(eq(quranReadingStates.userId, userId));
+    await tx
+      .delete(quranReviewCards)
+      .where(eq(quranReviewCards.userId, userId));
     await tx.delete(notifications).where(eq(notifications.userId, userId));
     await tx.delete(aiDailyUsage).where(eq(aiDailyUsage.userId, userId));
 
@@ -226,9 +228,8 @@ async function countPersonalData(userId: number) {
   const database = await requireDb();
   const count = async (
     table:
-      typeof quranBookmarks | typeof notifications | typeof centerMemberships,
+      typeof notifications | typeof centerMemberships,
     column:
-      | typeof quranBookmarks.userId
       | typeof notifications.userId
       | typeof centerMemberships.userId
   ) =>
@@ -240,8 +241,23 @@ async function countPersonalData(userId: number) {
           .where(eq(column, userId))
       )[0]?.n ?? 0
     );
+  // علامات المصحف محفوظة قائمةً واحدة (JSON) في حالة القراءة.
+  const readingState = (
+    await database
+      .select({ bookmarks: quranReadingStates.bookmarks })
+      .from(quranReadingStates)
+      .where(eq(quranReadingStates.userId, userId))
+      .limit(1)
+  )[0];
+  let bookmarks = 0;
+  try {
+    const parsed: unknown = JSON.parse(readingState?.bookmarks ?? "[]");
+    bookmarks = Array.isArray(parsed) ? parsed.length : 0;
+  } catch {
+    bookmarks = 0;
+  }
   return {
-    bookmarks: await count(quranBookmarks, quranBookmarks.userId),
+    bookmarks,
     notifications: await count(notifications, notifications.userId),
     centers: await count(centerMemberships, centerMemberships.userId),
   };

@@ -1,55 +1,62 @@
-/** موجّهات tRPC: المصحف والعلامات وميزان الحفظ. تُدمج في appRouter (server/routers.ts) بالمفاتيح نفسها. */
+/** موجّهات tRPC: حالة القراءة في المصحف والمراجعة المتباعدة وسجل الصفحة وميزان الحفظ. تُدمج في appRouter (server/routers.ts) بالمفاتيح نفسها. */
 import { z } from "zod";
 
 import { TRPCError } from "@trpc/server";
 
 import { QURAN_SURAHS } from "../../shared/types";
-import { getQuranBookmarkReferenceKey } from "../../shared/quranBookmarks";
-import { normalizeQuranVersePreference } from "../../shared/quranVersePreferences";
 
 import { protectedProcedure, router } from "../_core/trpc";
 
 import {
   getCircleMonthlyRecord,
-  deleteQuranBookmarkForUser,
-  deleteQuranVersePreferenceForUser,
-  getQuranBookmarksForUser,
-  getQuranVersePreferencesForUser,
-  saveQuranBookmark,
-  saveQuranVersePreference,
+  applyQuranReview,
+  getDueQuranReviews,
+  getQuranRecordsInRange,
+  InvalidReadingStateError,
+  syncQuranReadingState,
   getStudentById,
 } from "../db";
-import { assertStudentReadAccess, assertTeacherCircleAccess, getStudentProfileForReader } from "./_shared";
+import { assertStudentReadAccess, assertTeacherCircleAccess, getStudentProfileForReader, listReadableStudents } from "./_shared";
+
+const isoTime = z.string().max(40).nullish();
+const readingStateInput = z.object({
+  bookmarks: z.array(z.unknown()).max(5000).optional(),
+  bookmarksAt: isoTime,
+  khatmah: z.record(z.string(), z.unknown()).optional(),
+  khatmahAt: isoTime,
+  history: z.record(z.string(), z.unknown()).optional(),
+  historyAt: isoTime,
+});
 
 export const quranRouters = {
 
-  quranBookmarks: router({
-    list: protectedProcedure.query(({ ctx }) => getQuranBookmarksForUser(ctx.user.id)),
-    save: protectedProcedure.input(z.object({ referenceType: z.enum(["page", "ayah"]), pageNumber: z.number().int().min(1).max(604), surahNumber: z.number().int().min(1).max(114).optional(), ayahNumber: z.number().int().positive().optional(), label: z.string().trim().max(160).optional() })).mutation(async ({ ctx, input }) => {
-      const surah = input.surahNumber ? QURAN_SURAHS.find((item) => item.number === input.surahNumber) : undefined;
-      if (input.referenceType === "ayah" && (!surah || !input.ayahNumber || input.ayahNumber > surah.ayahs)) throw new TRPCError({ code: "BAD_REQUEST", message: "مرجع الآية غير صحيح." });
-      const referenceKey = getQuranBookmarkReferenceKey(input);
-      return saveQuranBookmark({ userId: ctx.user.id, referenceType: input.referenceType, referenceKey, pageNumber: input.pageNumber, surahNumber: input.referenceType === "ayah" ? input.surahNumber : null, ayahNumber: input.referenceType === "ayah" ? input.ayahNumber : null, label: input.label || null });
-    }),
-    remove: protectedProcedure.input(z.object({ referenceType: z.enum(["page", "ayah"]), pageNumber: z.number().int().min(1).max(604), surahNumber: z.number().int().min(1).max(114).optional(), ayahNumber: z.number().int().positive().optional() })).mutation(async ({ ctx, input }) => {
-      if (input.referenceType === "ayah" && (!input.surahNumber || !input.ayahNumber)) throw new TRPCError({ code: "BAD_REQUEST", message: "مرجع الآية غير صحيح." });
-      const referenceKey = getQuranBookmarkReferenceKey(input);
-      await deleteQuranBookmarkForUser(ctx.user.id, referenceKey);
-      return { success: true } as const;
+  // حالة القراءة في قسم المصحف (العلامات والختمة والسجل): «الأحدث يغلب» لكل حقل.
+  quranReadingState: router({
+    sync: protectedProcedure.input(readingStateInput).mutation(async ({ ctx, input }) => {
+      try {
+        return await syncQuranReadingState(ctx.user.id, input);
+      } catch (error) {
+        if (error instanceof InvalidReadingStateError) throw new TRPCError({ code: "BAD_REQUEST", message: "INVALID_STATE" });
+        throw error;
+      }
     }),
   }),
 
-  quranVersePreferences: router({
-    list: protectedProcedure.query(({ ctx }) => getQuranVersePreferencesForUser(ctx.user.id)),
-    save: protectedProcedure.input(z.object({ pageNumber: z.number().int().min(1).max(604), surahNumber: z.number().int().min(1).max(114), ayahNumber: z.number().int().positive(), isFavorite: z.boolean(), note: z.string().trim().max(2400).nullable() })).mutation(async ({ ctx, input }) => {
+  // المراجعة المتباعدة لما أتقنه صاحب الحساب في وضع الحفظ (لنفسه فقط).
+  quranReview: router({
+    markMastered: protectedProcedure.input(z.object({ surahNumber: z.number().int().min(1).max(114), fromAyah: z.number().int().min(1), toAyah: z.number().int().min(1) })).mutation(({ ctx, input }) => {
       const surah = QURAN_SURAHS.find((item) => item.number === input.surahNumber);
-      if (!surah || input.ayahNumber > surah.ayahs) throw new TRPCError({ code: "BAD_REQUEST", message: "مرجع الآية غير صحيح." });
-      const preference = normalizeQuranVersePreference(input);
-      if (!preference.shouldPersist) {
-        await deleteQuranVersePreferenceForUser(ctx.user.id, preference.verseKey);
-        return null;
-      }
-      return saveQuranVersePreference({ userId: ctx.user.id, verseKey: preference.verseKey, pageNumber: preference.pageNumber, surahNumber: preference.surahNumber, ayahNumber: preference.ayahNumber, isFavorite: preference.isFavorite, note: preference.note });
+      if (!surah || input.toAyah < input.fromAyah || input.toAyah > surah.ayahs) throw new TRPCError({ code: "BAD_REQUEST", message: "مقطع غير صحيح." });
+      return applyQuranReview({ userId: ctx.user.id, ...input, score: 95 });
+    }),
+    due: protectedProcedure.query(({ ctx }) => getDueQuranReviews(ctx.user.id)),
+  }),
+
+  // سجل الصفحة: تسجيلات الحفظ والمراجعة في الفترات التي تشمل صفحة المصحف، لمن يحق له قراءتها.
+  quranRecords: router({
+    byRange: protectedProcedure.input(z.object({ fromSurah: z.number().int().min(1).max(114), fromAyah: z.number().int().min(1), toSurah: z.number().int().min(1).max(114), toAyah: z.number().int().min(1) })).query(async ({ ctx, input }) => {
+      const readable = await listReadableStudents(ctx.user, {});
+      return getQuranRecordsInRange(readable.map((student) => student.id), input);
     }),
   }),
 

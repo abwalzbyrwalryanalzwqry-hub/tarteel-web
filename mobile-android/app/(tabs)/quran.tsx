@@ -1,120 +1,137 @@
-import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, View } from "react-native";
-import { Pressable } from "../../src/ui/Pressable";
-import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, BackHandler, Linking, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WebView, type WebViewMessageEvent, type WebViewNavigation } from "react-native-webview";
 import * as SecureStore from "expo-secure-store";
+import Constants from "expo-constants";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { searchLocalQuran } from "../../src/quran/localQuran";
-import { SURAH_NAMES, surahName, toArabicDigits } from "../../src/quran/surahs";
-import { useLocalQuran } from "../../src/quran/useLocalQuran";
+import { Pressable } from "../../src/ui/Pressable";
+import { isLocalWebUrl } from "../../src/config/localWeb";
+import { BRIDGE_SCRIPT, type BridgeMessage } from "../../src/web/bridge";
+import { handleCommonBridgeMessage, setKeepAwakeFocus } from "../../src/web/nativeActions";
+import { LEGACY_LAST_READ_KEY, mushafStartUrl, parseLegacyLastRead } from "../../src/web/mushaf";
 import { colors } from "../../src/ui/theme";
-import { LAST_READ_KEY } from "../../src/quran/lastRead";
 
+const KEEP_AWAKE_TAG = "tarteel-mushaf";
+const USER_AGENT_SUFFIX = `TarteelAndroid/${Constants.expoConfig?.version ?? "0"}`;
+const EXTERNAL_SCHEMES = /^(mailto:|tel:|sms:|whatsapp:|intent:|market:|geo:)/i;
 
-export default function QuranScreen() {
-  const { verses, loading, error } = useLocalQuran();
-  const [query, setQuery] = useState("");
-  const [lastRead, setLastRead] = useState<{ surah: number; ayah: number } | null>(null);
+/**
+ * تبويب المصحف: قسم المصحف في ترتيل (المنقول من زِن) من نسخة الجهاز المضمّنة في التطبيق، بوضع
+ * «المصحف المستقل» — يعمل دون اتصال ودون حساب، ولا يفتح قاعدة بيانات المنصة (انظر
+ * client/src/mushaf/lib/standalone.ts). المصحف المرتبط بالحساب (سجل الحفظ والمراجعة) في تبويب المنصة.
+ */
+export default function MushafScreen() {
+  const webRef = useRef<WebView>(null);
+  const [startUrl, setStartUrl] = useState<string | null>(null);
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [webKey, setWebKey] = useState(0);
+
+  // آخر موضع من قارئ المصحف السابق (الأصلي) يُفتح مرة واحدة ثم يُنسى؛ المصحف الجديد يحفظ موضعه بنفسه.
+  useEffect(() => {
+    let active = true;
+    void SecureStore.getItemAsync(LEGACY_LAST_READ_KEY)
+      .catch(() => null)
+      .then((raw) => {
+        if (!active) return;
+        const legacy = parseLegacyLastRead(raw);
+        setStartUrl(mushafStartUrl(legacy));
+        if (raw !== null) void SecureStore.deleteItemAsync(LEGACY_LAST_READ_KEY).catch(() => undefined);
+      });
+    return () => { active = false; };
+  }, []);
 
   useFocusEffect(useCallback(() => {
-    void SecureStore.getItemAsync(LAST_READ_KEY).then((raw) => { try { setLastRead(raw ? JSON.parse(raw) : null); } catch { setLastRead(null); } });
+    setKeepAwakeFocus(KEEP_AWAKE_TAG, true);
+    return () => setKeepAwakeFocus(KEEP_AWAKE_TAG, false);
   }, []));
 
-  const counts = useMemo(() => {
-    const map = new Array<number>(115).fill(0);
-    for (const verse of verses) map[verse.surah] += 1;
-    return map;
-  }, [verses]);
+  // زر الرجوع في أندرويد يتنقل داخل المصحف أولاً.
+  useFocusEffect(useCallback(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (canGoBack && webRef.current) { webRef.current.goBack(); return true; }
+      return false;
+    });
+    return () => sub.remove();
+  }, [canGoBack]));
 
-  const results = useMemo(() => (query.trim().length >= 2 ? searchLocalQuran(verses, query, 100) : []), [query, verses]);
-  const searching = query.trim().length >= 2;
+  const onMessage = useCallback((event: WebViewMessageEvent) => {
+    let message: BridgeMessage;
+    try { message = JSON.parse(event.nativeEvent.data); } catch { return; }
+    // لا قاعدة بيانات في هذا التبويب: طلبات db-load/db-save (لا ترسلها الصفحة هنا) تُتجاهل.
+    void handleCommonBridgeMessage(message, KEEP_AWAKE_TAG);
+  }, []);
+
+  // روابط المصادر والتراخيص وغيرها تُفتح في المتصفح، ويبقى التبويب على المصحف.
+  const onShouldStartLoad = useCallback((request: WebViewNavigation) => {
+    const url = request.url;
+    if (EXTERNAL_SCHEMES.test(url)) { void Linking.openURL(url).catch(() => undefined); return false; }
+    if (/^https?:/i.test(url) && !isLocalWebUrl(url)) { void Linking.openURL(url).catch(() => undefined); return false; }
+    return true;
+  }, []);
+
+  const retry = () => { setFailed(false); setWebKey((k) => k + 1); };
+
+  if (startUrl === null) {
+    return <View style={styles.center}><ActivityIndicator color={colors.primary} size="large" /></View>;
+  }
 
   return (
     <SafeAreaView style={styles.root} edges={["top", "left", "right"]}>
-      <View style={styles.header}>
-        <Text style={styles.title}>المصحف</Text>
-        <Text style={styles.subtitle}>رواية حفص · نص Tanzil · يعمل دون اتصال</Text>
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={18} color={colors.subtle} />
-          <TextInput
-            accessibilityLabel="البحث في المصحف"
-            value={query}
-            onChangeText={setQuery}
-            placeholder="ابحث في الآيات (حرفان على الأقل)"
-            placeholderTextColor={colors.subtle}
-            style={styles.searchInput}
-            returnKeyType="search"
-          />
-          {query ? <Pressable accessibilityLabel="مسح البحث" onPress={() => setQuery("")} hitSlop={10}><Ionicons name="close-circle" size={18} color={colors.subtle} /></Pressable> : null}
-        </View>
-        {lastRead && !searching ? (
-          <Pressable style={({ pressed }) => [styles.resume, pressed && styles.pressed]} onPress={() => router.push({ pathname: "/surah/[id]", params: { id: String(lastRead.surah), ayah: String(lastRead.ayah) } })}>
-            <Ionicons name="bookmark" size={18} color={colors.gold} />
-            <Text style={styles.resumeText}>متابعة القراءة: سورة {surahName(lastRead.surah)} · آية {toArabicDigits(lastRead.ayah)}</Text>
+      {failed ? (
+        <View style={styles.center}>
+          <Ionicons name="alert-circle-outline" size={56} color={colors.primary} />
+          <Text style={styles.title}>تعذر فتح المصحف</Text>
+          <Text style={styles.body}>المصحف مضمّن في التطبيق ويعمل دون اتصال؛ أعد المحاولة.</Text>
+          <Pressable accessibilityRole="button" onPress={retry} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
+            <Text style={styles.primaryButtonText}>إعادة المحاولة</Text>
           </Pressable>
-        ) : null}
-      </View>
-
-      {loading ? <ActivityIndicator style={{ marginTop: 32 }} color={colors.primary} size="large" /> : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      {!loading && !error && (searching ? (
-        <FlatList
-          data={results}
-          keyExtractor={(item) => `${item.surah}:${item.ayah}`}
-          contentContainerStyle={styles.list}
-          keyboardShouldPersistTaps="handled"
-          ListHeaderComponent={<Text style={styles.count}>{toArabicDigits(results.length)} نتيجة{results.length === 100 ? " (أول ١٠٠)" : ""}</Text>}
-          renderItem={({ item }) => (
-            <Pressable style={({ pressed }) => [styles.card, pressed && styles.pressed]} onPress={() => router.push({ pathname: "/surah/[id]", params: { id: String(item.surah), ayah: String(item.ayah) } })}>
-              <Text style={styles.verse}>{item.text}</Text>
-              <Text style={styles.meta}>سورة {surahName(item.surah)} · آية {toArabicDigits(item.ayah)}</Text>
-            </Pressable>
-          )}
-          ListEmptyComponent={<Text style={styles.empty}>لا توجد نتائج</Text>}
-        />
+        </View>
       ) : (
-        <FlatList
-          data={SURAH_NAMES.map((name, index) => ({ name, number: index + 1 }))}
-          keyExtractor={(item) => String(item.number)}
-          contentContainerStyle={styles.list}
-          initialNumToRender={20}
-          renderItem={({ item }) => (
-            <Pressable style={({ pressed }) => [styles.surahRow, pressed && styles.pressed]} onPress={() => router.push({ pathname: "/surah/[id]", params: { id: String(item.number) } })}>
-              <View style={styles.badge}><Text style={styles.badgeText}>{toArabicDigits(item.number)}</Text></View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.surahName}>سورة {item.name}</Text>
-                <Text style={styles.meta}>{toArabicDigits(counts[item.number])} آية</Text>
-              </View>
-              <Ionicons name="chevron-back" size={18} color={colors.subtle} />
-            </Pressable>
-          )}
+        <WebView
+          key={webKey}
+          ref={webRef}
+          source={{ uri: startUrl }}
+          style={styles.web}
+          originWhitelist={["https://*", "about:*", "blob:*", "data:*"]}
+          injectedJavaScriptBeforeContentLoaded={BRIDGE_SCRIPT}
+          onMessage={onMessage}
+          // إعادة تحميل الصفحة تُسقط طلب إبقاء الشاشة مضاءة؛ تطلبه الصفحة من جديد إن احتاجته.
+          onLoadStart={() => void handleCommonBridgeMessage({ type: "keep-awake", on: false }, KEEP_AWAKE_TAG)}
+          onShouldStartLoadWithRequest={onShouldStartLoad}
+          onNavigationStateChange={(state) => setCanGoBack(state.canGoBack)}
+          onError={() => setFailed(true)}
+          onRenderProcessGone={() => retry()}
+          applicationNameForUserAgent={USER_AGENT_SUFFIX}
+          javaScriptEnabled
+          domStorageEnabled
+          cacheEnabled
+          allowFileAccess={false}
+          mixedContentMode="never"
+          setSupportMultipleWindows={false}
+          mediaPlaybackRequiresUserAction={false}
+          allowsInlineMediaPlayback
+          textZoom={100}
+          overScrollMode="never"
+          bounces={false}
+          startInLoadingState
+          renderLoading={() => <View style={styles.loadingOverlay}><ActivityIndicator color={colors.primary} size="large" /></View>}
         />
-      ))}
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, gap: 8 },
-  title: { fontSize: 26, fontWeight: "700", color: colors.primary },
-  subtitle: { fontSize: 13, color: colors.muted },
-  searchBox: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.surface, paddingHorizontal: 12 },
-  searchInput: { flex: 1, paddingVertical: 12, fontSize: 15, color: colors.primary, writingDirection: "rtl" },
-  resume: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 14, backgroundColor: colors.soft, borderWidth: 1, borderColor: colors.border, padding: 12 },
-  resumeText: { flex: 1, color: colors.primary, fontWeight: "600" },
-  list: { paddingHorizontal: 16, paddingBottom: 32, gap: 8 },
-  surahRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.border, paddingVertical: 12, paddingHorizontal: 14 },
-  badge: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.soft, alignItems: "center", justifyContent: "center" },
-  badgeText: { color: colors.primary, fontWeight: "700" },
-  surahName: { fontSize: 17, fontWeight: "700", color: colors.primary },
-  card: { backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.border, padding: 14, gap: 6 },
-  verse: { fontSize: 20, lineHeight: 38, color: "#233D2D", writingDirection: "rtl" },
-  meta: { fontSize: 12, color: colors.subtle },
-  count: { fontSize: 13, color: colors.muted, marginBottom: 4 },
-  empty: { textAlign: "center", color: colors.muted, marginTop: 24 },
-  error: { textAlign: "center", color: colors.danger, marginTop: 24 },
-  pressed: { opacity: 0.8 },
+  web: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28, gap: 14, backgroundColor: colors.background },
+  title: { fontSize: 20, fontWeight: "700", color: colors.primary, textAlign: "center" },
+  body: { fontSize: 15, lineHeight: 24, color: colors.muted, textAlign: "center" },
+  primaryButton: { marginTop: 8, minWidth: 220, borderRadius: 16, backgroundColor: colors.gold, paddingVertical: 14, paddingHorizontal: 22, alignItems: "center" },
+  primaryButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
+  pressed: { opacity: 0.85 },
+  loadingOverlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
 });

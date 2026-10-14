@@ -807,54 +807,43 @@ export const notifications = sqliteTable("notifications", {
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
 
-// ===================== QURAN BOOKMARKS =====================
-// علامات مرجعية شخصية؛ لا تحمل نصاً قرآنياً وتبقى معزولة بحسب صاحب الحساب.
-export const quranBookmarks = sqliteTable(
-  "quran_bookmarks",
+// ===================== QURAN READING STATE =====================
+// حالة القراءة في قسم المصحف (العلامات والختمة وسجل القراءة) لكل حساب: نسخة من ذاكرة الجهاز تُدمج
+// «الأحدث يغلب» لكل حقل على حدة (quranReadingState.sync). القيم JSON كما يحفظها الجهاز، والأوقات ISO.
+export const quranReadingStates = sqliteTable("quran_reading_states", {
+  userId: integer("userId").primaryKey(),
+  bookmarks: text("bookmarks"),
+  bookmarksAt: text("bookmarksAt"),
+  khatmah: text("khatmah"),
+  khatmahAt: text("khatmahAt"),
+  history: text("history"),
+  historyAt: text("historyAt"),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
+    .$defaultFn(() => new Date())
+    .$onUpdate(() => new Date())
+    .notNull(),
+});
+
+export type QuranReadingState = typeof quranReadingStates.$inferSelect;
+
+// ===================== QURAN REVIEW CARDS =====================
+// المراجعة المتباعدة (SM-2) للمقاطع التي أتقنها صاحب الحساب في وضع الحفظ. السهولة بالمئات (250 = 2.5)،
+// وموعد المراجعة يوم بتوقيت المنصة (YYYY-MM-DD).
+export const quranReviewCards = sqliteTable(
+  "quran_review_cards",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     userId: integer("userId").notNull(),
-    referenceType: text("referenceType", { enum: ["page", "ayah"] }).notNull(),
-    referenceKey: text("referenceKey").notNull(),
-    pageNumber: integer("pageNumber").notNull(),
-    surahNumber: integer("surahNumber"),
-    ayahNumber: integer("ayahNumber"),
-    label: text("label"),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" })
-      .$defaultFn(() => new Date())
-      .notNull(),
-    updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
-      .$defaultFn(() => new Date())
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  table => [
-    uniqueIndex("quran_bookmarks_user_reference_unique").on(
-      table.userId,
-      table.referenceKey
-    ),
-    index("quran_bookmarks_user_created_idx").on(table.userId, table.createdAt),
-  ]
-);
-
-export type QuranBookmark = typeof quranBookmarks.$inferSelect;
-export type InsertQuranBookmark = typeof quranBookmarks.$inferInsert;
-
-// ===================== QURAN VERSE PREFERENCES =====================
-// مفضلة وملاحظات شخصية؛ المرجع العددي فقط يحافظ على النص القرآني من مصدره الموثق.
-export const quranVersePreferences = sqliteTable(
-  "quran_verse_preferences",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: integer("userId").notNull(),
-    verseKey: text("verseKey").notNull(),
-    pageNumber: integer("pageNumber").notNull(),
     surahNumber: integer("surahNumber").notNull(),
-    ayahNumber: integer("ayahNumber").notNull(),
-    isFavorite: integer("isFavorite", { mode: "boolean" })
-      .default(false)
-      .notNull(),
-    note: text("note"),
+    fromAyah: integer("fromAyah").notNull(),
+    toAyah: integer("toAyah").notNull(),
+    easeHundredths: integer("easeHundredths").default(250).notNull(),
+    intervalDays: integer("intervalDays").default(0).notNull(),
+    repetitions: integer("repetitions").default(0).notNull(),
+    lapses: integer("lapses").default(0).notNull(),
+    lastScore: integer("lastScore"),
+    lastReviewedAt: integer("lastReviewedAt", { mode: "timestamp_ms" }),
+    dueDate: text("dueDate").notNull(),
     createdAt: integer("createdAt", { mode: "timestamp_ms" })
       .$defaultFn(() => new Date())
       .notNull(),
@@ -864,21 +853,17 @@ export const quranVersePreferences = sqliteTable(
       .notNull(),
   },
   table => [
-    uniqueIndex("quran_verse_preferences_user_verse_unique").on(
+    uniqueIndex("quran_review_cards_user_range_unique").on(
       table.userId,
-      table.verseKey
+      table.surahNumber,
+      table.fromAyah,
+      table.toAyah
     ),
-    index("quran_verse_preferences_user_favorite_idx").on(
-      table.userId,
-      table.isFavorite,
-      table.updatedAt
-    ),
+    index("quran_review_cards_user_due_idx").on(table.userId, table.dueDate),
   ]
 );
 
-export type QuranVersePreference = typeof quranVersePreferences.$inferSelect;
-export type InsertQuranVersePreference =
-  typeof quranVersePreferences.$inferInsert;
+export type QuranReviewCard = typeof quranReviewCards.$inferSelect;
 
 // ===================== AUDIT LOG =====================
 export const auditLog = sqliteTable("audit_log", {

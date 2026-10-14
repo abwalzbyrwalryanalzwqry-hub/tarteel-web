@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 const root = process.cwd();
 const css = readFileSync(path.join(root, "client/src/index.css"), "utf8");
 const html = readFileSync(path.join(root, "client/index.html"), "utf8");
-const quranCenter = readFileSync(path.join(root, "client/src/pages/QuranCenter.tsx"), "utf8");
+const mushafCss = readFileSync(path.join(root, "client/src/mushaf/mushaf.css"), "utf8");
+const quranFonts = readFileSync(path.join(root, "client/public/fonts/quran-fonts.css"), "utf8");
 
 describe("نظام خطوط ترتيل المركزي", () => {
   it("يربط ملفات ثمانية شريف الرسمية بجميع الأوزان المتاحة من التخزين المعتمد", () => {
@@ -18,18 +19,19 @@ describe("نظام خطوط ترتيل المركزي", () => {
     }
   });
 
-  it("يعرّف رموزاً مركزية للعرض والعناوين والنصوص والأكواد والقرآن", () => {
+  it("يعرّف رموزاً مركزية للعرض والعناوين والنصوص والأكواد", () => {
     for (const token of ["display-lg", "display-md", "display-sm", "h1", "h2", "h3", "h4", "body-lg", "body", "body-sm", "caption", "label", "button"]) {
       expect(css).toContain(`--tarteel-type-${token}`);
     }
-    expect(css).toContain(".quran-text");
-    expect(css).toContain("--tarteel-line-quran");
     expect(css).toContain(".tarteel-code, code, kbd, samp");
   });
 
-  it("يلغي تحميل الخطوط الخارجية السابقة ويطبق نمط القرآن في مركز القرآن", () => {
+  it("يلغي تحميل الخطوط الخارجية ويستضيف خطوط المصحف ذاتياً بهوية ترتيل", () => {
     expect(html).not.toMatch(/fonts\.googleapis|fonts\.gstatic|Tajawal|Amiri/);
-    expect(quranCenter).toContain("quran-text");
-    expect(quranCenter).toContain("quran-text--large");
+    expect(quranFonts).not.toMatch(/fonts\.googleapis|fonts\.gstatic/);
+    expect(quranFonts).toContain("/fonts/amiri-quran-400-arabic.woff2");
+    expect(mushafCss).toContain('font-family: "KFGQPC Hafs"');
+    expect(mushafCss).toContain("--font-quran:");
+    expect(mushafCss).toContain('"Tarteel Serif Text"');
   });
 });

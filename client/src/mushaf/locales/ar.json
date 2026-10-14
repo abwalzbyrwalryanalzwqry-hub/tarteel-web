@@ -1,0 +1,53 @@
+{
+  "common": {
+    "back": "رجوع",
+    "close": "إغلاق"
+  },
+  "mushafReader": {
+    "sleep": {
+      "label": "مؤقّت الإيقاف",
+      "minutes": "{n} د",
+      "surahEnd": "نهاية السورة",
+      "cancel": "إلغاء المؤقّت",
+      "untilSurahEnd": "يتوقف بنهاية السورة",
+      "inMinutes": "يتوقف بعد {n} د",
+      "perAyah": "كل آية ×{n}"
+    }
+  },
+  "nav": {
+    "aria": "التنقّل في المصحف"
+  },
+  "recitationsList": {
+    "play": "تشغيل سورة {name}",
+    "ayahs": "{n} آية",
+    "downloaded": " · محمّلة",
+    "removeDownload": "حذف التحميل",
+    "cancelDownload": "إلغاء التحميل",
+    "download": "تحميل سورة {name}",
+    "progress": "{done} / {total} آية"
+  },
+  "review": {
+    "queued": "حُفظت على الجهاز، وتُضاف إلى المراجعة عند عودة الاتصال."
+  },
+  "surahPicker": {
+    "ayahs": "{n} آية",
+    "ayahUnit": "آية",
+    "title": "اختر السورة",
+    "subtitle": "114 سورة · القرآن الكريم",
+    "search": "ابحث باسم السورة أو رقمها",
+    "none": "لا توجد نتائج مطابقة"
+  },
+  "units": {
+    "days": {
+      "zero": "لا أيام",
+      "one": "يوم واحد",
+      "two": "يومان",
+      "few": "{n} أيام",
+      "many": "{n} يوماً",
+      "other": "{n} يوم"
+    }
+  },
+  "dailyRecord": {
+    "title": "السجل اليومي للحلقة"
+  }
+}

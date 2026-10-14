@@ -2,15 +2,19 @@
  * عامل خدمة ترتيل: يسرّع الفتح ويعرض الواجهة عند انقطاع الشبكة.
  *
  * - /assets/* (ملفات بأسماء مُجزّأة لا تتغير): من الذاكرة أولاً ثم الشبكة.
+ * - بيانات المصحف (/data/quran/*) وخطوطه (/fonts/*): ثابتة لا تتغير، فتُحفظ عند أول طلب وتُقرأ من الذاكرة
+ *   بعدها، فيُفتح ما قُرئ من المصحف وتفاسيره دون اتصال.
  * - صفحات التنقل: الشبكة أولاً حتى تصل أحدث نسخة بعد كل نشر، وعند الانقطاع آخر نسخة محفوظة.
  * - لا نلمس /api/ ولا /storage/ (بيانات المستخدمين ورفوعاتهم الخاصة) ولا أي طلب غير GET
  *   أو من نطاق آخر؛ تمر إلى الشبكة كما هي.
  *
  * لإيقافه في نشر ما: اضبط VITE_DISABLE_SW=true وأعد البناء؛ الواجهة حينها تلغي تسجيله.
  */
-const VERSION = "v1";
+const VERSION = "v2";
 const ASSETS = `tarteel-assets-${VERSION}`;
 const SHELL = `tarteel-shell-${VERSION}`;
+// بيانات المصحف بإصدار مستقل: لا تُحذف مع كل تحديث للواجهة.
+const QURAN = "tarteel-quran-v1";
 const SHELL_KEY = "/__app-shell";
 const MAX_ASSETS = 150;
 
@@ -18,7 +22,7 @@ self.addEventListener("install", () => self.skipWaiting());
 
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
-    const keep = new Set([ASSETS, SHELL]);
+    const keep = new Set([ASSETS, SHELL, QURAN]);
     for (const key of await caches.keys()) if (key.startsWith("tarteel-") && !keep.has(key)) await caches.delete(key);
     await self.clients.claim();
   })());
@@ -30,12 +34,12 @@ async function trimAssets() {
   for (const request of keys.slice(0, Math.max(0, keys.length - MAX_ASSETS))) await cache.delete(request);
 }
 
-async function assetFirst(request) {
-  const cache = await caches.open(ASSETS);
+async function assetFirst(request, name = ASSETS) {
+  const cache = await caches.open(name);
   const cached = await cache.match(request);
   if (cached) return cached;
   const response = await fetch(request);
-  if (response.ok) { await cache.put(request, response.clone()); trimAssets(); }
+  if (response.ok) { await cache.put(request, response.clone()); if (name === ASSETS) trimAssets(); }
   return response;
 }
 
@@ -61,4 +65,5 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/storage/")) return;
   if (request.mode === "navigate") { event.respondWith(navigation(request)); return; }
   if (url.pathname.startsWith("/assets/")) event.respondWith(assetFirst(request));
+  else if (url.pathname.startsWith("/data/quran/") || url.pathname.startsWith("/fonts/")) event.respondWith(assetFirst(request, QURAN));
 });
