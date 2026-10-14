@@ -4,7 +4,7 @@
  *
  * النسخة المحلية تشغّل منطق الخادم نفسه داخل التطبيق على SQLite. أسماء الجداول والأعمدة
  * والفهارس تبقى كما هي، وتتغير الأنواع فقط:
- *   int/tinyint → integer، varchar/text/mysqlEnum → text، boolean → integer(boolean)،
+ *   int/tinyint → integer، varchar/text/mediumtext/mysqlEnum → text، boolean → integer(boolean)،
  *   timestamp → integer(timestamp_ms)، decimal → numeric (نص كما في MySQL).
  *
  * الاستخدام: tsx scripts/gen-sqlite-schema.ts [--check]
@@ -50,6 +50,7 @@ export function convertSchema(source: string): string {
     /\btimestamp\(("[^"]+")\)/g,
     'integer($1, { mode: "timestamp_ms" })'
   );
+  out = out.replace(/\bmediumtext\(("[^"]+")\)/g, "text($1)");
   out = out.replace(/\bdecimal\(("[^"]+")(?:,\s*\{[^}]*\})?\)/g, "numeric($1)");
   out = out.replace(
     /\b(?:int|tinyint)\(("[^"]+")(?:,\s*\{[^}]*\})?\)/g,

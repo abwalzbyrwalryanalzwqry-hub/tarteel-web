@@ -13,7 +13,8 @@ import {
   notifications,
   organizations,
   parentStudentLinks,
-  quranBookmarks,
+  quranReadingStates,
+  quranReviewCards,
   students,
   users,
 } from "../../drizzle/schema";
@@ -108,11 +109,17 @@ describeWithDb("حذف الحساب (MySQL)", () => {
       role: "guardian",
       status: "active",
     });
-    await d.insert(quranBookmarks).values({
+    await d.insert(quranReadingStates).values({
       userId: user.id,
-      referenceType: "page",
-      referenceKey: "page:1",
-      pageNumber: 1,
+      bookmarks: JSON.stringify([{ id: "1:1", surah: 1, ayah: 1 }]),
+      bookmarksAt: new Date().toISOString(),
+    });
+    await d.insert(quranReviewCards).values({
+      userId: user.id,
+      surahNumber: 1,
+      fromAyah: 1,
+      toAyah: 7,
+      dueDate: "2026-01-01",
     });
     await d
       .insert(notifications)
@@ -165,7 +172,8 @@ describeWithDb("حذف الحساب (MySQL)", () => {
 
     for (const [table, column] of [
       [localCredentials, localCredentials.userId],
-      [quranBookmarks, quranBookmarks.userId],
+      [quranReadingStates, quranReadingStates.userId],
+      [quranReviewCards, quranReviewCards.userId],
       [notifications, notifications.userId],
       [centerMemberships, centerMemberships.userId],
       [parentStudentLinks, parentStudentLinks.guardianUserId],

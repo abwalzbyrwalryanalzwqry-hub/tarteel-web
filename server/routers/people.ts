@@ -33,7 +33,7 @@ import {
   updateTeacher,
 } from "../db";
 import { autoLinkGuardianByPhone, normalizeGuardianPhone } from "../data/guardian-links";
-import { assertStudentManageAccess, assertStudentReadAccess, getAccessibleCenterIds, getTeacherCircleScope, toReaderStudent } from "./_shared";
+import { assertStudentManageAccess, assertStudentReadAccess, getAccessibleCenterIds, getTeacherCircleScope, listReadableStudents, toReaderStudent } from "./_shared";
 
 export const peopleRouters = {
 
@@ -132,33 +132,7 @@ export const peopleRouters = {
   students: router({
     list: protectedProcedure
       .input(z.object({ centerId: z.number().optional(), circleId: z.number().optional(), search: z.string().optional() }))
-      .query(async ({ ctx, input }) => {
-        if (ctx.user.role === "student") {
-          const student = await getStudentByUserId(ctx.user.id);
-          if (!student) return [];
-          await assertStudentReadAccess(ctx.user, student);
-          return [toReaderStudent(student)];
-        }
-        if (ctx.user.role === "guardian") {
-          const linked = await getStudentsByGuardianUserId(ctx.user.id);
-          const permitted = await Promise.all(linked.map(async (student) => { try { await assertStudentReadAccess(ctx.user, student); return student; } catch { return null; } }));
-          return permitted.filter((student): student is NonNullable<typeof student> => Boolean(student)).map(toReaderStudent);
-        }
-        const scope = await getTeacherCircleScope(ctx.user);
-        if (!scope) {
-          if (input.circleId) { await assertCirclePermission(ctx.user, input.circleId, "students.view"); return getStudents(undefined, input.circleId, input.search); }
-          const centerIds = input.centerId ? [input.centerId] : await getAccessibleCenterIds(ctx.user, "students.view");
-          if (input.centerId) await assertPermission(ctx.user, input.centerId, "students.view");
-          const candidates = (await Promise.all(centerIds.map((centerId) => getStudents(centerId, undefined, input.search)))).flat();
-          const authorized = await Promise.all(candidates.map(async (student) => { try { await assertStudentPermission(ctx.user, student.id, "students.view", student.circleId); return student; } catch { return null; } }));
-          return authorized.filter((student): student is NonNullable<typeof student> => Boolean(student));
-        }
-        if (input.circleId) {
-          if (!scope.includes(input.circleId)) throw new TRPCError({ code: "FORBIDDEN" });
-          return getStudents(undefined, input.circleId, input.search);
-        }
-        return (await Promise.all(scope.map((circleId) => getStudents(undefined, circleId, input.search)))).flat();
-      }),
+      .query(({ ctx, input }) => listReadableStudents(ctx.user, input)),
     byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
       const student = await getStudentById(input.id);
       const authorizedStudent = await assertStudentReadAccess(ctx.user, student);

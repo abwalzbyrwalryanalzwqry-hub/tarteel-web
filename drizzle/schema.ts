@@ -3,6 +3,7 @@ import {
   mysqlEnum,
   mysqlTable,
   text,
+  mediumtext,
   timestamp,
   varchar,
   boolean,
@@ -408,41 +409,43 @@ export const notifications = mysqlTable("notifications", {
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
 
-// ===================== QURAN BOOKMARKS =====================
-// علامات مرجعية شخصية؛ لا تحمل نصاً قرآنياً وتبقى معزولة بحسب صاحب الحساب.
-export const quranBookmarks = mysqlTable("quran_bookmarks", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  referenceType: mysqlEnum("referenceType", ["page", "ayah"]).notNull(),
-  referenceKey: varchar("referenceKey", { length: 32 }).notNull(),
-  pageNumber: int("pageNumber").notNull(),
-  surahNumber: int("surahNumber"),
-  ayahNumber: int("ayahNumber"),
-  label: varchar("label", { length: 160 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+// ===================== QURAN READING STATE =====================
+// حالة القراءة في قسم المصحف (العلامات والختمة وسجل القراءة) لكل حساب: نسخة من ذاكرة الجهاز تُدمج
+// «الأحدث يغلب» لكل حقل على حدة (quranReadingState.sync). القيم JSON كما يحفظها الجهاز، والأوقات ISO.
+export const quranReadingStates = mysqlTable("quran_reading_states", {
+  userId: int("userId").primaryKey(),
+  bookmarks: mediumtext("bookmarks"),
+  bookmarksAt: varchar("bookmarksAt", { length: 32 }),
+  khatmah: text("khatmah"),
+  khatmahAt: varchar("khatmahAt", { length: 32 }),
+  history: mediumtext("history"),
+  historyAt: varchar("historyAt", { length: 32 }),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => [uniqueIndex("quran_bookmarks_user_reference_unique").on(table.userId, table.referenceKey), index("quran_bookmarks_user_created_idx").on(table.userId, table.createdAt)]);
+});
 
-export type QuranBookmark = typeof quranBookmarks.$inferSelect;
-export type InsertQuranBookmark = typeof quranBookmarks.$inferInsert;
+export type QuranReadingState = typeof quranReadingStates.$inferSelect;
 
-// ===================== QURAN VERSE PREFERENCES =====================
-// مفضلة وملاحظات شخصية؛ المرجع العددي فقط يحافظ على النص القرآني من مصدره الموثق.
-export const quranVersePreferences = mysqlTable("quran_verse_preferences", {
+// ===================== QURAN REVIEW CARDS =====================
+// المراجعة المتباعدة (SM-2) للمقاطع التي أتقنها صاحب الحساب في وضع الحفظ. السهولة بالمئات (250 = 2.5)،
+// وموعد المراجعة يوم بتوقيت المنصة (YYYY-MM-DD).
+export const quranReviewCards = mysqlTable("quran_review_cards", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
-  verseKey: varchar("verseKey", { length: 32 }).notNull(),
-  pageNumber: int("pageNumber").notNull(),
   surahNumber: int("surahNumber").notNull(),
-  ayahNumber: int("ayahNumber").notNull(),
-  isFavorite: boolean("isFavorite").default(false).notNull(),
-  note: text("note"),
+  fromAyah: int("fromAyah").notNull(),
+  toAyah: int("toAyah").notNull(),
+  easeHundredths: int("easeHundredths").default(250).notNull(),
+  intervalDays: int("intervalDays").default(0).notNull(),
+  repetitions: int("repetitions").default(0).notNull(),
+  lapses: int("lapses").default(0).notNull(),
+  lastScore: int("lastScore"),
+  lastReviewedAt: timestamp("lastReviewedAt"),
+  dueDate: varchar("dueDate", { length: 10 }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => [uniqueIndex("quran_verse_preferences_user_verse_unique").on(table.userId, table.verseKey), index("quran_verse_preferences_user_favorite_idx").on(table.userId, table.isFavorite, table.updatedAt)]);
+}, (table) => [uniqueIndex("quran_review_cards_user_range_unique").on(table.userId, table.surahNumber, table.fromAyah, table.toAyah), index("quran_review_cards_user_due_idx").on(table.userId, table.dueDate)]);
 
-export type QuranVersePreference = typeof quranVersePreferences.$inferSelect;
-export type InsertQuranVersePreference = typeof quranVersePreferences.$inferInsert;
+export type QuranReviewCard = typeof quranReviewCards.$inferSelect;
 
 // ===================== AUDIT LOG =====================
 export const auditLog = mysqlTable("audit_log", {

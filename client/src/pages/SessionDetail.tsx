@@ -17,7 +17,7 @@ import { AIGuidanceCard } from "@/components/AIGuidanceCard";
 import { AyahPicker } from "@/components/AyahPicker";
 import { SessionHeaderControls } from "@/components/SessionHeaderControls";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { clearMushafSelectionContext, createMushafSelectionToken, readMushafSelectionContext, saveMushafSelectionContext, type MushafSelectionContext } from "@/lib/mushafSelection";
+import { clearMushafSelectionContext, createMushafSelectionToken, readMushafSelectionContext, saveMushafSelectionContext, type MushafSelectionContext } from "@/mushaf/lib/mushaf-selection";
 import { formatHijriDate } from "../../../shared/dates";
 import { getAttendanceSummary, MIZAN_RATING_LABELS, scoreToStars } from "../../../shared/mizan";
 import {
@@ -38,7 +38,12 @@ function readMushafReturn(sessionId?: number) {
   const toAyah = Number(params.get("toAyah"));
   const targetSurah = QURAN_SURAHS.find((surah) => surah.number === toSurah);
   if (!context || context.sessionId !== sessionId || !targetSurah || !Number.isInteger(toAyah) || toAyah < 1 || toAyah > targetSurah.ayahs) return null;
-  return { context, toSurah, toAyah };
+  // منتقي المصحف قد يقدّم البداية إن لُمست آية قبلها؛ تُعتمد إن كانت صحيحة، وإلا تبقى بداية النموذج.
+  const fromSurah = Number(params.get("fromSurah"));
+  const fromAyah = Number(params.get("fromAyah"));
+  const startSurah = QURAN_SURAHS.find((surah) => surah.number === fromSurah);
+  const start = startSurah && Number.isInteger(fromAyah) && fromAyah >= 1 && fromAyah <= startSurah.ayahs ? { fromSurah, fromAyah } : null;
+  return { context: start ? { ...context, ...start } : context, toSurah, toAyah };
 }
 
 const tabs = [
@@ -365,7 +370,7 @@ export default function SessionDetail({ sessionId }: Props) {
                       <BookOpen className="w-4 h-4 text-primary flex-shrink-0"/>
                       <span className="font-medium text-foreground">{student?.name}</span>
                       <span className="text-sm text-muted-foreground">{getSurahName(m.surahNumber)} {m.toSurahNumber && m.toSurahNumber !== m.surahNumber ? `إلى ${getSurahName(m.toSurahNumber)}` : ""} ({m.fromAyah}-{m.toAyah})</span>
-                      <Link href={`/quran?surah=${m.surahNumber}&ayah=${m.fromAyah}`}><span className="text-xs text-primary hover:underline cursor-pointer">فتح المرجع</span></Link>
+                      <Link href={`/quran/read?surah=${m.surahNumber}&ayah=${m.fromAyah}`}><span className="text-xs text-primary hover:underline cursor-pointer">فتح المرجع</span></Link>
                       {m.grade && <span className={`mr-auto text-xs px-2 py-0.5 rounded-full ${m.grade==="excellent"?"bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400":m.grade==="very_good"?"bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400":"bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"}`}>{GRADE_LABELS[m.grade]}</span>}
                     </div>
                   );
@@ -409,7 +414,7 @@ export default function SessionDetail({ sessionId }: Props) {
                       <ClipboardList className="w-4 h-4 text-purple-600 flex-shrink-0"/>
                       <span className="font-medium text-foreground">{student?.name}</span>
                       <span className="text-sm text-muted-foreground">{getSurahName(r.surahNumber)} {r.toSurahNumber && r.toSurahNumber !== r.surahNumber ? `إلى ${getSurahName(r.toSurahNumber)}` : ""} ({r.fromAyah}-{r.toAyah})</span>
-                      <Link href={`/quran?surah=${r.surahNumber}&ayah=${r.fromAyah}`}><span className="text-xs text-primary hover:underline cursor-pointer">فتح المرجع</span></Link>
+                      <Link href={`/quran/read?surah=${r.surahNumber}&ayah=${r.fromAyah}`}><span className="text-xs text-primary hover:underline cursor-pointer">فتح المرجع</span></Link>
                       {r.grade && <span className={`mr-auto text-xs px-2 py-0.5 rounded-full ${r.grade==="excellent"?"bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400":"bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"}`}>{GRADE_LABELS[r.grade]}</span>}
                     </div>
                   );
@@ -492,7 +497,8 @@ function QuranEntryForm({ student, sessionId, progress, onSubmit, isLoading, kin
   const [toAyah, setToAyah] = useState(() => initialAyah);
   const formRef = useRef<HTMLFormElement>(null);
   useEffect(() => {
-    if (!remembered) return;
+    // العائد من المصحف يحمل المقطع المختار؛ لا يُستبدل بآخر تسجيل حين يصل لاحقاً.
+    if (!remembered || returnContext) return;
     const resumedSurah = remembered.toSurahNumber ?? remembered.surahNumber;
     const resumedAyah = remembered.toAyah;
     setFromSurah(resumedSurah);
@@ -503,6 +509,8 @@ function QuranEntryForm({ student, sessionId, progress, onSubmit, isLoading, kin
   useEffect(() => {
     if (!returnContext) return;
     setExpanded(true);
+    setFromSurah(returnContext.context.fromSurah);
+    setFromAyah(returnContext.context.fromAyah);
     setToSurah(returnContext.toSurah);
     setToAyah(returnContext.toAyah);
   }, [returnContext]);
