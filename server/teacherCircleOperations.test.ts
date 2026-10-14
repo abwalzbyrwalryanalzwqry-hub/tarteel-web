@@ -21,12 +21,12 @@ describe("إدارة المعلم لحلقته", () => {
     expect(router).toContain("assertStudentManageAccess(ctx.user, input.circleId, \"students.create\"");
   });
 
-  it("يثبت معلم الجلسة وموسمها على الحلقة المرتبطة بحسابه", () => {
+  it("يثبت معلم الجلسة على الحلقة المرتبطة بحسابه، ويجعل معلم الحلقة افتراضياً للإدارة", () => {
     const router = readRouterSource();
     expect(router).toContain("resolveSessionCreateInput");
     expect(router).toContain("circle.teacherId !== teacher.id && circle.assistantTeacherId !== teacher.id");
     expect(router).toContain("لا يمكنك تعيين معلم آخر لجلسة حلقتك");
-    expect(router).toContain("الموسم المحدد لا يطابق موسم الحلقة");
+    expect(router).toContain("input.teacherId ?? circle.teacherId");
     expect(router).toContain("sessions: router");
   });
 

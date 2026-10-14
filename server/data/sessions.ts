@@ -5,13 +5,12 @@ import {
 import { getDb } from "./connection";
 
 // ===================== SESSIONS =====================
-export async function getSessions(circleId?: number, seasonId?: number, includeDrafts = false) {
+export async function getSessions(circleId?: number, includeDrafts = false) {
   const db = await getDb();
   if (!db) return [];
   const conditions = [isNull(sessions.deletedAt)];
   if (!includeDrafts) conditions.push(ne(sessions.status, "draft"));
   if (circleId) conditions.push(eq(sessions.circleId, circleId));
-  if (seasonId) conditions.push(eq(sessions.seasonId, seasonId));
   return db.select().from(sessions).where(and(...conditions)).orderBy(desc(sessions.scheduledAt));
 }
 

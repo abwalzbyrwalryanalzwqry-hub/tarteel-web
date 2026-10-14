@@ -9,7 +9,7 @@ import { toast } from "sonner";
 
 export default function ParentMessages() {
   const { data: students } = trpc.students.list.useQuery({});
-  const { data: circles } = trpc.circles.list.useQuery({ branchId: undefined, seasonId: undefined });
+  const { data: circles } = trpc.circles.list.useQuery();
   const [studentId, setStudentId] = useState<number | undefined>();
   const [templateKey, setTemplateKey] = useState<ParentMessageTemplateKey>("achievement");
   const [period, setPeriod] = useState("هذا الشهر");

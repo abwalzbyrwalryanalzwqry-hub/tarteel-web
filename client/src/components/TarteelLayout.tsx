@@ -12,7 +12,6 @@ import {
   Bell,
   BookOpen,
   BookOpenText,
-  BookText,
   Building2,
   ChevronLeft,
   ClipboardList,
@@ -36,8 +35,6 @@ import { Link, useLocation } from "wouter";
 const navItems = [
   { path: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard, permission: "dashboard:view" as const },
   { path: "/centers", label: "المراكز", icon: Building2, permission: "centers:manage" as const },
-  { path: "/branches", label: "الفروع", icon: Building2, permission: "branches:manage" as const },
-  { path: "/seasons", label: "المواسم الدراسية", icon: BookText, permission: "seasons:manage" as const },
   { path: "/circles", label: "الحلقات", icon: BookOpen, permission: "circles:view" as const },
   { path: "/teachers", label: "المعلمون", icon: GraduationCap, permission: "teachers:manage" as const },
   { path: "/teacher-invites", label: "دعوات المعلمين", icon: KeyRound, permission: "teachers:manage" as const },

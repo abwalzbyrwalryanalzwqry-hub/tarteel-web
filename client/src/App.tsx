@@ -13,7 +13,6 @@ import { PageLoader } from "./components/PageLoader";
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Centers = lazy(() => import("./pages/Centers"));
-const Branches = lazy(() => import("./pages/Branches"));
 const Teachers = lazy(() => import("./pages/Teachers"));
 const Students = lazy(() => import("./pages/Students"));
 const StudentProfile = lazy(() => import("./pages/StudentProfile"));
@@ -26,7 +25,6 @@ const Notifications = lazy(() => import("./pages/Notifications"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Trash = lazy(() => import("./pages/Trash"));
 const AuditLog = lazy(() => import("./pages/AuditLog"));
-const AcademicSeasons = lazy(() => import("./pages/AcademicSeasons"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const SetPassword = lazy(() => import("./pages/SetPassword"));
 const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
@@ -70,8 +68,6 @@ const idParam = (params: Record<string, string | undefined>) =>
 
 const DashboardRoute = inLayout(Dashboard);
 const CentersRoute = inLayout(Centers);
-const BranchesRoute = inLayout(Branches);
-const AcademicSeasonsRoute = inLayout(AcademicSeasons);
 const CirclesRoute = inLayout(Circles);
 const TeachersRoute = inLayout(Teachers);
 const StudentsRoute = inLayout(Students);
@@ -117,8 +113,6 @@ function Router() {
         <Route path="/delete-account" component={DeleteAccountInfo} />
         <Route path="/dashboard" component={DashboardRoute} />
         <Route path="/centers" component={CentersRoute} />
-        <Route path="/branches" component={BranchesRoute} />
-        <Route path="/seasons" component={AcademicSeasonsRoute} />
         <Route path="/circles" component={CirclesRoute} />
         <Route path="/circles/:id" component={CircleDetailRoute} />
         <Route path="/teachers" component={TeachersRoute} />

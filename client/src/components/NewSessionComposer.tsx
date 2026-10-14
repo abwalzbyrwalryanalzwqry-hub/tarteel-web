@@ -8,16 +8,14 @@ import { formatDualCalendarDate, getHijriDateParts, hijriToGregorian } from "../
 export type NewSessionValues = {
   circleId: number;
   teacherId?: number;
-  seasonId?: number;
   title?: string;
   type: "regular" | "exam" | "review" | "special";
   scheduledAt: Date;
   notes?: string;
 };
 
-type CircleOption = { id: number; name: string; seasonId?: number | null };
+type CircleOption = { id: number; name: string; teacherId?: number | null };
 type TeacherOption = { id: number; name: string };
-type SeasonOption = { id: number; name: string };
 
 const periodNameOptions = [
   { id: "daily", type: "regular" as const, label: "يومية", description: "متابعة يومية للحلقة" },
@@ -38,7 +36,6 @@ export function NewSessionComposer({
   onOpenChange,
   circles,
   teachers,
-  seasons,
   isTeachingRole,
   isLoading,
   conflictMessage,
@@ -49,7 +46,6 @@ export function NewSessionComposer({
   onOpenChange: (open: boolean) => void;
   circles?: CircleOption[];
   teachers?: TeacherOption[];
-  seasons?: SeasonOption[];
   isTeachingRole: boolean;
   isLoading: boolean;
   conflictMessage?: string | null;
@@ -58,7 +54,6 @@ export function NewSessionComposer({
 }) {
   const [circleId, setCircleId] = useState<number | undefined>();
   const [teacherId, setTeacherId] = useState<number | undefined>();
-  const [seasonId, setSeasonId] = useState<number | undefined>();
   const [title, setTitle] = useState("يومية");
   const [kind, setKind] = useState<NewSessionValues["type"]>("regular");
   const [nameOption, setNameOption] = useState("daily");
@@ -71,14 +66,13 @@ export function NewSessionComposer({
     if (!open || circleId || !circles?.length) return;
     const firstCircle = circles[0];
     setCircleId(firstCircle.id);
-    if (isTeachingRole && firstCircle.seasonId) setSeasonId(firstCircle.seasonId);
+    if (!isTeachingRole && firstCircle.teacherId) setTeacherId(firstCircle.teacherId);
   }, [circleId, circles, isTeachingRole, open]);
 
   useEffect(() => {
     if (open) return;
     setCircleId(undefined);
     setTeacherId(undefined);
-    setSeasonId(undefined);
     setTitle("يومية");
     setKind("regular");
     setNameOption("daily");
@@ -105,7 +99,7 @@ export function NewSessionComposer({
     const nextCircle = circles?.find((circle) => circle.id === nextCircleId);
     setCircleId(nextCircleId || undefined);
     onClearConflict?.();
-    if (isTeachingRole) setSeasonId(nextCircle?.seasonId ?? undefined);
+    if (!isTeachingRole) setTeacherId(nextCircle?.teacherId ?? undefined);
   };
 
   const submit = () => {
@@ -113,8 +107,8 @@ export function NewSessionComposer({
       toast.error("اختر الحلقة أولاً");
       return;
     }
-    if (!isTeachingRole && (!teacherId || !seasonId)) {
-      toast.error("اختر المعلم والموسم الدراسي");
+    if (!isTeachingRole && !teacherId && !selectedCircle?.teacherId) {
+      toast.error("اختر معلم الفترة");
       return;
     }
     if (!title.trim()) {
@@ -124,7 +118,6 @@ export function NewSessionComposer({
     onSubmit({
       circleId,
       teacherId,
-      seasonId: isTeachingRole ? selectedCircle?.seasonId ?? seasonId : seasonId,
       title: title.trim() || undefined,
       type: kind,
       scheduledAt,
@@ -145,10 +138,9 @@ export function NewSessionComposer({
         <div className="space-y-5 p-5 sm:p-7">
           <section className="rounded-2xl border border-border bg-background/70 p-4">
             <div className="mb-3 flex items-center gap-2"><Layers3 className="h-4 w-4 text-primary" /><h3 className="font-display font-bold">نطاق الجلسة</h3></div>
-            <div className={`grid gap-3 ${isTeachingRole ? "" : "sm:grid-cols-3"}`}>
+            <div className={`grid gap-3 ${isTeachingRole ? "" : "sm:grid-cols-2"}`}>
               <label className="block"><span className="mb-1.5 block text-sm font-semibold">الحلقة <span className="text-destructive">*</span></span><select value={circleId ?? ""} onChange={(event) => chooseCircle(event.target.value)} className="tarteel-input"><option value="">اختر الحلقة</option>{circles?.map((circle) => <option key={circle.id} value={circle.id}>{circle.name}</option>)}</select></label>
               {!isTeachingRole && <label className="block"><span className="mb-1.5 block text-sm font-semibold">المعلم <span className="text-destructive">*</span></span><select value={teacherId ?? ""} onChange={(event) => setTeacherId(Number(event.target.value) || undefined)} className="tarteel-input"><option value="">اختر المعلم</option>{teachers?.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}</select></label>}
-              {!isTeachingRole && <label className="block"><span className="mb-1.5 block text-sm font-semibold">الموسم الدراسي <span className="text-destructive">*</span></span><select value={seasonId ?? ""} onChange={(event) => setSeasonId(Number(event.target.value) || undefined)} className="tarteel-input"><option value="">اختر الموسم</option>{seasons?.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label>}
             </div>
           </section>
 

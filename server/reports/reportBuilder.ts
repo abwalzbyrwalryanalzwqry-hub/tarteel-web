@@ -1,6 +1,6 @@
 import { and, eq, gte, inArray, isNull, lte, ne } from "drizzle-orm";
 import { getDb, getReportingGoals, getReportingPreferences, keepLatestAttendanceRows } from "../db";
-import { attendance, branches, centers, circles, evaluation, memorization, revision, sessions, students, teachers } from "../../drizzle/schema";
+import { attendance, centers, circles, evaluation, memorization, revision, sessions, students, teachers } from "../../drizzle/schema";
 import { GRADE_LABELS, QURAN_SURAHS } from "../../shared/types";
 import { scoreToStars, MIZAN_RATING_LABELS } from "../../shared/mizan";
 
@@ -60,8 +60,7 @@ export async function buildUnifiedReport(input: ReportBuilderInput): Promise<Uni
   if (!db) throw new Error("Database not available");
   const [circle] = await db.select().from(circles).where(eq(circles.id, input.circleId)).limit(1);
   if (!circle) throw new Error("الحلقة غير موجودة");
-  const [branch] = await db.select().from(branches).where(eq(branches.id, circle.branchId)).limit(1);
-  const [center] = branch ? await db.select().from(centers).where(eq(centers.id, branch.centerId)).limit(1) : [];
+  const [center] = await db.select().from(centers).where(eq(centers.id, circle.centerId)).limit(1);
   const start = asDateBoundary(input.startDate);
   const end = asDateBoundary(input.endDate, true);
   const sessionConditions = [eq(sessions.circleId, input.circleId), ne(sessions.status, "draft")];
@@ -177,7 +176,7 @@ export async function buildCenterManagementReport(input: { centerId: number; per
   const [center] = await db.select().from(centers).where(and(eq(centers.id, input.centerId), isNull(centers.deletedAt))).limit(1);
   if (!center) throw new Error("المركز غير موجود");
   const { start, end } = periodRange(input.period, input.startDate, input.endDate);
-  const allCenterCircles = await db.select({ id: circles.id, name: circles.name, teacherId: circles.teacherId, assistantTeacherId: circles.assistantTeacherId, teacherName: teachers.name, teacherPhone: teachers.phone, teacherEmail: teachers.email }).from(circles).innerJoin(branches, eq(circles.branchId, branches.id)).leftJoin(teachers, eq(circles.teacherId, teachers.id)).where(and(eq(branches.centerId, input.centerId), isNull(branches.deletedAt), isNull(circles.deletedAt), eq(circles.isActive, true)));
+  const allCenterCircles = await db.select({ id: circles.id, name: circles.name, teacherId: circles.teacherId, assistantTeacherId: circles.assistantTeacherId, teacherName: teachers.name, teacherPhone: teachers.phone, teacherEmail: teachers.email }).from(circles).leftJoin(teachers, eq(circles.teacherId, teachers.id)).where(and(eq(circles.centerId, input.centerId), isNull(circles.deletedAt), eq(circles.isActive, true)));
   const centerCircles = input.teacherId ? allCenterCircles.filter((circle) => circle.teacherId === input.teacherId || circle.assistantTeacherId === input.teacherId) : allCenterCircles;
   const circleIds = centerCircles.map((circle) => circle.id);
   const allStudents = circleIds.length ? await db.select({ id: students.id, circleId: students.circleId, birthDate: students.birthDate }).from(students).where(and(eq(students.centerId, input.centerId), eq(students.isActive, true), isNull(students.deletedAt), inArray(students.circleId, circleIds))) : [];

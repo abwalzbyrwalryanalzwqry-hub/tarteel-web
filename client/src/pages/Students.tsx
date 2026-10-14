@@ -20,7 +20,7 @@ export default function Students() {
 
   const { data: students, isLoading, refetch } = trpc.students.list.useQuery({ search: search || undefined });
   const { data: centers } = trpc.centers.list.useQuery({ orgId: undefined }, { enabled: !isReaderRole });
-  const { data: circles } = trpc.circles.list.useQuery({ branchId: undefined, seasonId: undefined }, { enabled: !isReaderRole });
+  const { data: circles } = trpc.circles.list.useQuery(undefined, { enabled: !isReaderRole });
   const { data: users } = trpc.users.list.useQuery(undefined, { enabled: !isTeachingRole && !isReaderRole });
   const syncSharedData = () => void Promise.all([
     utils.dashboard.stats.invalidate(),

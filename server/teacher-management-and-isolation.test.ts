@@ -11,7 +11,7 @@ describe("إدارة المعلم وعزل البيانات", () => {
     const router = readRouterSource();
     const db = readDataLayerSource(root);
     expect(router).toContain("transferTeacherToCircle");
-    expect(router).toContain("branch.centerId !== teacher.centerId");
+    expect(router).toContain("circle.centerId !== teacher.centerId");
     expect(db).toContain("المقعد المحدد في الحَلَقة مرتبط بمعلم آخر");
     expect(db).toContain("getTeacherLastActivity");
     expect(db).toContain("circles.assistantTeacherId");

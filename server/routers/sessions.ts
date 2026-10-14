@@ -34,19 +34,19 @@ export const sessionsRouters = {
   // ===================== SESSIONS =====================
   sessions: router({
     list: protectedProcedure
-      .input(z.object({ circleId: z.number().optional(), seasonId: z.number().optional(), includeDrafts: z.boolean().optional().default(false) }))
+      .input(z.object({ circleId: z.number().optional(), includeDrafts: z.boolean().optional().default(false) }).optional().default({ includeDrafts: false }))
       .query(async ({ ctx, input }) => {
         const scope = await getTeacherCircleScope(ctx.user);
         if (!scope) {
-          if (input.circleId) { await assertCirclePermission(ctx.user, input.circleId, "attendance.view"); return getSessions(input.circleId, input.seasonId, input.includeDrafts); }
+          if (input.circleId) { await assertCirclePermission(ctx.user, input.circleId, "attendance.view"); return getSessions(input.circleId, input.includeDrafts); }
           const circles = await filterAccessibleCircles(ctx.user, await getCircles());
-          return (await Promise.all(circles.map((circle) => getSessions(circle.id, input.seasonId, input.includeDrafts)))).flat();
+          return (await Promise.all(circles.map((circle) => getSessions(circle.id, input.includeDrafts)))).flat();
         }
         if (input.circleId) {
           if (!scope.includes(input.circleId)) throw new TRPCError({ code: "FORBIDDEN" });
-          return getSessions(input.circleId, input.seasonId, input.includeDrafts);
+          return getSessions(input.circleId, input.includeDrafts);
         }
-        return (await Promise.all(scope.map((circleId) => getSessions(circleId, input.seasonId, input.includeDrafts)))).flat();
+        return (await Promise.all(scope.map((circleId) => getSessions(circleId, input.includeDrafts)))).flat();
       }),
     byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => getAuthorizedSession(ctx.user, input.id)),
     byDay: protectedProcedure.input(z.object({ circleId: z.number(), scheduledAt: z.date() })).query(async ({ ctx, input }) => {
@@ -62,7 +62,6 @@ export const sessionsRouters = {
       .input(z.object({
         circleId: z.number(),
         teacherId: z.number().optional(),
-        seasonId: z.number().optional(),
         title: z.string().optional(),
         type: z.enum(["regular", "exam", "review", "special"]).default("regular"),
         scheduledAt: z.date(),

@@ -392,60 +392,10 @@ export const parentStudentLinks = sqliteTable(
   ]
 );
 
-// ===================== BRANCHES =====================
-export const branches = sqliteTable("branches", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  centerId: integer("centerId").notNull(),
-  name: text("name").notNull(),
-  description: text("description"),
-  phone: text("phone"),
-  address: text("address"),
-  supervisorId: integer("supervisorId"),
-  isActive: integer("isActive", { mode: "boolean" }).default(true).notNull(),
-  deletedAt: integer("deletedAt", { mode: "timestamp_ms" }),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" })
-    .$defaultFn(() => new Date())
-    .notNull(),
-  updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
-    .$defaultFn(() => new Date())
-    .$onUpdate(() => new Date())
-    .notNull(),
-});
-
-export type Branch = typeof branches.$inferSelect;
-export type InsertBranch = typeof branches.$inferInsert;
-
-// ===================== ACADEMIC SEASONS =====================
-export const academicSeasons = sqliteTable("academic_seasons", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  centerId: integer("centerId").notNull(),
-  name: text("name").notNull(),
-  type: text("type", {
-    enum: ["academic_year", "semester", "summer", "ramadan", "custom"],
-  })
-    .default("academic_year")
-    .notNull(),
-  startDate: integer("startDate", { mode: "timestamp_ms" }).notNull(),
-  endDate: integer("endDate", { mode: "timestamp_ms" }).notNull(),
-  isActive: integer("isActive", { mode: "boolean" }).default(true).notNull(),
-  deletedAt: integer("deletedAt", { mode: "timestamp_ms" }),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" })
-    .$defaultFn(() => new Date())
-    .notNull(),
-  updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
-    .$defaultFn(() => new Date())
-    .$onUpdate(() => new Date())
-    .notNull(),
-});
-
-export type AcademicSeason = typeof academicSeasons.$inferSelect;
-export type InsertAcademicSeason = typeof academicSeasons.$inferInsert;
-
 // ===================== CIRCLES (HALAQAT) =====================
 export const circles = sqliteTable("circles", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  branchId: integer("branchId").notNull(),
-  seasonId: integer("seasonId").notNull(),
+  centerId: integer("centerId").notNull(),
   name: text("name").notNull(),
   description: text("description"),
   teacherId: integer("teacherId"),
@@ -579,7 +529,6 @@ export const sessions = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     circleId: integer("circleId").notNull(),
     teacherId: integer("teacherId").notNull(),
-    seasonId: integer("seasonId").notNull(),
     title: text("title"),
     type: text("type", { enum: ["regular", "exam", "review", "special"] })
       .default("regular")

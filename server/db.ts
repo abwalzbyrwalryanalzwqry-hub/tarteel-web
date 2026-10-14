@@ -10,8 +10,6 @@ export * from "./data/centers";
 export * from "./data/quran-reading-state";
 export * from "./data/quran-review";
 export * from "./data/quran-records";
-export * from "./data/branches";
-export * from "./data/academic-seasons";
 export * from "./data/circles";
 export * from "./data/circle-periods";
 export * from "./data/teachers";

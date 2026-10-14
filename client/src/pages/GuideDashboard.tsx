@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 
 export default function GuideDashboard() {
   const { data: memberships } = trpc.access.mine.useQuery();
-  const { data: circles, isLoading: circlesLoading } = trpc.circles.list.useQuery({ branchId: undefined, seasonId: undefined });
+  const { data: circles, isLoading: circlesLoading } = trpc.circles.list.useQuery();
   const { data: students } = trpc.students.list.useQuery({ centerId: undefined, circleId: undefined, search: undefined });
   const activeScopes = memberships?.filter((membership) => membership.role === "guide" && membership.status === "active") ?? [];
 

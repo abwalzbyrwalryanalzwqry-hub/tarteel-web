@@ -12,7 +12,7 @@ export default function Teachers() {
 
   const { data: teachers, isLoading, refetch } = trpc.teachers.list.useQuery({ centerId: undefined });
   const { data: centers } = trpc.centers.list.useQuery({ orgId: undefined });
-  const { data: circles } = trpc.circles.list.useQuery({ branchId: undefined, seasonId: undefined });
+  const { data: circles } = trpc.circles.list.useQuery();
   const { data: teacherActivity } = trpc.teachers.activity.useQuery();
 
   const createMutation = trpc.teachers.create.useMutation({

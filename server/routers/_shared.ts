@@ -92,7 +92,7 @@ export async function assertStudentManageAccess(user: AccessSubject, circleId: n
   return assertPermission(user, centerId, permission);
 }
 
-export async function resolveSessionCreateInput(user: AccessSubject, input: { circleId: number; teacherId?: number; seasonId?: number; title?: string; type: "regular" | "exam" | "review" | "special"; scheduledAt: Date; notes?: string }) {
+export async function resolveSessionCreateInput(user: AccessSubject, input: { circleId: number; teacherId?: number; title?: string; type: "regular" | "exam" | "review" | "special"; scheduledAt: Date; notes?: string }) {
   const circle = await getCircleById(input.circleId);
   if (!circle) throw new TRPCError({ code: "NOT_FOUND", message: "الحلقة غير موجودة" });
   await assertCirclePermission(user, circle.id, "attendance.create");
@@ -100,11 +100,12 @@ export async function resolveSessionCreateInput(user: AccessSubject, input: { ci
     const teacher = await getTeacherByUserId(user.id);
     if (!teacher || (circle.teacherId !== teacher.id && circle.assistantTeacherId !== teacher.id)) throw new TRPCError({ code: "FORBIDDEN", message: "لا يمكنك إنشاء جلسة إلا في حلقتك المرتبطة بحسابك" });
     if (input.teacherId != null && input.teacherId !== teacher.id) throw new TRPCError({ code: "FORBIDDEN", message: "لا يمكنك تعيين معلم آخر لجلسة حلقتك" });
-    if (input.seasonId != null && input.seasonId !== circle.seasonId) throw new TRPCError({ code: "BAD_REQUEST", message: "الموسم المحدد لا يطابق موسم الحلقة" });
-    return { ...input, teacherId: teacher.id, seasonId: circle.seasonId };
+    return { ...input, teacherId: teacher.id };
   }
-  if (!input.teacherId || !input.seasonId) throw new TRPCError({ code: "BAD_REQUEST", message: "يلزم اختيار المعلم والموسم الدراسي" });
-  return input as Required<Pick<typeof input, "teacherId" | "seasonId">> & typeof input;
+  // الإدارة: معلم الحلقة افتراضياً، فلا يلزم اختياره في كل فترة.
+  const teacherId = input.teacherId ?? circle.teacherId ?? circle.assistantTeacherId ?? undefined;
+  if (!teacherId) throw new TRPCError({ code: "BAD_REQUEST", message: "عيّن معلماً للحلقة أو اختر معلم الفترة" });
+  return { ...input, teacherId };
 }
 
 /** يستخرج معرّف الإدراج من صيغ موصل MySQL/TiDB المتوافقة. */
@@ -115,7 +116,7 @@ export function getInsertedSessionId(result: unknown) {
 }
 
 /** كل فترة تخص تاريخاً يحدده المعلم: يمنع السجل الثاني في الحلقة والتاريخ نفسيهما. */
-export async function createDailyPeriod(user: AccessSubject, input: { circleId: number; teacherId?: number; seasonId?: number; title?: string; type: "regular" | "exam" | "review" | "special"; scheduledAt: Date; notes?: string }) {
+export async function createDailyPeriod(user: AccessSubject, input: { circleId: number; teacherId?: number; title?: string; type: "regular" | "exam" | "review" | "special"; scheduledAt: Date; notes?: string }) {
   const resolved = await resolveSessionCreateInput(user, input);
   const dayKey = getRiyadhDayKey(resolved.scheduledAt);
   const existing = await getSessionByCircleDay(resolved.circleId, dayKey);

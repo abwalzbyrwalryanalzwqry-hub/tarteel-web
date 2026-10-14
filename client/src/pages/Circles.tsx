@@ -11,9 +11,8 @@ export default function Circles() {
   const [search, setSearch] = useState("");
   const [editItem, setEditItem] = useState<any>(null);
 
-  const { data: circles, isLoading, refetch } = trpc.circles.list.useQuery({ branchId: undefined, seasonId: undefined });
-  const { data: branches } = trpc.branches.list.useQuery({ centerId: undefined });
-  const { data: seasons } = trpc.seasons.list.useQuery({ centerId: undefined });
+  const { data: circles, isLoading, refetch } = trpc.circles.list.useQuery();
+  const { data: centers } = trpc.centers.list.useQuery({});
   const { data: teachers } = trpc.teachers.list.useQuery({ centerId: undefined });
 
   const createMutation = trpc.circles.create.useMutation({
@@ -35,8 +34,7 @@ export default function Circles() {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     createMutation.mutate({
-      branchId: Number(fd.get("branchId")),
-      seasonId: Number(fd.get("seasonId")),
+      centerId: fd.get("centerId") ? Number(fd.get("centerId")) : centers?.length === 1 ? centers[0].id : undefined,
       name: fd.get("name") as string,
       teacherId: fd.get("teacherId") ? Number(fd.get("teacherId")) : undefined,
       maxStudents: Number(fd.get("maxStudents")) || 20,
@@ -102,12 +100,9 @@ export default function Circles() {
         </div>
       )}
       {showForm&&<EntityForm title="إنشاء حلقة جديدة" onClose={()=>setShowForm(false)} onSubmit={handleCreate} isLoading={createMutation.isPending}>
-        <div><label className="block text-sm font-medium text-foreground mb-1.5">الفرع <span className="text-destructive">*</span></label>
-          <select name="branchId" required className="tarteel-input"><option value="">اختر الفرع</option>{branches?.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select>
-        </div>
-        <div><label className="block text-sm font-medium text-foreground mb-1.5">الموسم الدراسي <span className="text-destructive">*</span></label>
-          <select name="seasonId" required className="tarteel-input"><option value="">اختر الموسم</option>{seasons?.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>
-        </div>
+        {(centers?.length ?? 0) > 1 && <div><label className="block text-sm font-medium text-foreground mb-1.5">المركز <span className="text-destructive">*</span></label>
+          <select name="centerId" required className="tarteel-input"><option value="">اختر المركز</option>{centers?.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
+        </div>}
         <FormInput label="اسم الحلقة" name="name" required placeholder="حلقة الفجر"/>
         <div><label className="block text-sm font-medium text-foreground mb-1.5">المعلم</label>
           <select name="teacherId" className="tarteel-input"><option value="">اختر المعلم</option>{teachers?.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>

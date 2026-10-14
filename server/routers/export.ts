@@ -13,7 +13,6 @@ import {
   students,
   circles,
   centers,
-  branches,
 } from '../../drizzle/schema';
 
 export const exportRouter = router({
@@ -57,23 +56,12 @@ export const exportRouter = router({
       const circle = circleData[0];
       if (!circle) throw new Error('Circle not found');
 
-      // جلب بيانات الفرع
-      const branchData = circle.branchId
-        ? await db
-            .select()
-            .from(branches)
-            .where(eq(branches.id, circle.branchId))
-            .limit(1)
-        : [];
-
-      const branch = branchData[0];
-
       // جلب بيانات المركز
-      const centerData = branch?.centerId
+      const centerData = circle.centerId
         ? await db
             .select()
             .from(centers)
-            .where(eq(centers.id, branch.centerId))
+            .where(eq(centers.id, circle.centerId))
             .limit(1)
         : [];
 
@@ -182,23 +170,12 @@ export const exportRouter = router({
       const circle = circleData[0];
       if (!circle) throw new Error('Circle not found');
 
-      // جلب بيانات الفرع
-      const branchData = circle.branchId
-        ? await db
-            .select()
-            .from(branches)
-            .where(eq(branches.id, circle.branchId))
-            .limit(1)
-        : [];
-
-      const branch = branchData[0];
-
       // جلب بيانات المركز
-      const centerData = branch?.centerId
+      const centerData = circle.centerId
         ? await db
             .select()
             .from(centers)
-            .where(eq(centers.id, branch.centerId))
+            .where(eq(centers.id, circle.centerId))
             .limit(1)
         : [];
 
@@ -311,23 +288,12 @@ export const exportRouter = router({
       const circle = circleData[0];
       if (!circle) throw new Error('Circle not found');
 
-      // جلب بيانات الفرع
-      const branchData = circle.branchId
-        ? await db
-            .select()
-            .from(branches)
-            .where(eq(branches.id, circle.branchId))
-            .limit(1)
-        : [];
-
-      const branch = branchData[0];
-
       // جلب بيانات المركز
-      const centerData = branch?.centerId
+      const centerData = circle.centerId
         ? await db
             .select()
             .from(centers)
-            .where(eq(centers.id, branch.centerId))
+            .where(eq(centers.id, circle.centerId))
             .limit(1)
         : [];
 

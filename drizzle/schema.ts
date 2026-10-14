@@ -155,46 +155,10 @@ export const parentStudentLinks = mysqlTable("parent_student_links", {
   id: int("id").autoincrement().primaryKey(), guardianUserId: int("guardianUserId").notNull(), studentId: int("studentId").notNull(), centerId: int("centerId").notNull(), linkedBy: int("linkedBy"), createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [uniqueIndex("parent_student_links_guardian_student_unique").on(table.guardianUserId, table.studentId), index("parent_student_links_guardian_center_idx").on(table.guardianUserId, table.centerId)]);
 
-// ===================== BRANCHES =====================
-export const branches = mysqlTable("branches", {
-  id: int("id").autoincrement().primaryKey(),
-  centerId: int("centerId").notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description"),
-  phone: varchar("phone", { length: 32 }),
-  address: text("address"),
-  supervisorId: int("supervisorId"),
-  isActive: boolean("isActive").default(true).notNull(),
-  deletedAt: timestamp("deletedAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
-
-export type Branch = typeof branches.$inferSelect;
-export type InsertBranch = typeof branches.$inferInsert;
-
-// ===================== ACADEMIC SEASONS =====================
-export const academicSeasons = mysqlTable("academic_seasons", {
-  id: int("id").autoincrement().primaryKey(),
-  centerId: int("centerId").notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
-  type: mysqlEnum("type", ["academic_year", "semester", "summer", "ramadan", "custom"]).default("academic_year").notNull(),
-  startDate: timestamp("startDate").notNull(),
-  endDate: timestamp("endDate").notNull(),
-  isActive: boolean("isActive").default(true).notNull(),
-  deletedAt: timestamp("deletedAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
-
-export type AcademicSeason = typeof academicSeasons.$inferSelect;
-export type InsertAcademicSeason = typeof academicSeasons.$inferInsert;
-
 // ===================== CIRCLES (HALAQAT) =====================
 export const circles = mysqlTable("circles", {
   id: int("id").autoincrement().primaryKey(),
-  branchId: int("branchId").notNull(),
-  seasonId: int("seasonId").notNull(),
+  centerId: int("centerId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   teacherId: int("teacherId"),
@@ -300,7 +264,6 @@ export const sessions = mysqlTable("sessions", {
   id: int("id").autoincrement().primaryKey(),
   circleId: int("circleId").notNull(),
   teacherId: int("teacherId").notNull(),
-  seasonId: int("seasonId").notNull(),
   title: varchar("title", { length: 255 }),
   type: mysqlEnum("type", ["regular", "exam", "review", "special"]).default("regular").notNull(),
   status: mysqlEnum("status", ["draft", "scheduled", "open", "closed", "cancelled"]).default("draft").notNull(),

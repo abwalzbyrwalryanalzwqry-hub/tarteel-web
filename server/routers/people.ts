@@ -12,7 +12,6 @@ import {
   createTeacher,
   createTeacherInvite,
   redeemTeacherInvite,
-  getBranchById,
   getCenterIdForCircle,
   getCircleById,
   getMemorizationByStudent,
@@ -79,8 +78,7 @@ export const peopleRouters = {
       const [teacher, circle] = await Promise.all([getTeacherById(input.teacherId), getCircleById(input.circleId)]);
       if (!teacher || !circle) throw new TRPCError({ code: "NOT_FOUND", message: "المعلم أو الحَلَقة غير موجودة" });
       await assertPermission(ctx.user, teacher.centerId, "teachers.edit"); await assertCirclePermission(ctx.user, circle.id, "circles.assign_teacher");
-      const branch = await getBranchById(circle.branchId);
-      if (!branch || branch.centerId !== teacher.centerId) throw new TRPCError({ code: "BAD_REQUEST", message: "لا يمكن نقل المعلم إلى حَلَقة خارج مركزه" });
+      if (circle.centerId !== teacher.centerId) throw new TRPCError({ code: "BAD_REQUEST", message: "لا يمكن نقل المعلم إلى حَلَقة خارج مركزه" });
       try {
         await transferTeacherToCircle(input.teacherId, input.circleId, input.role);
         return { success: true } as const;

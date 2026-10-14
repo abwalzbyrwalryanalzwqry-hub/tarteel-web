@@ -14,8 +14,6 @@ export type TarteelRole =
 export type TarteelPermission =
   | "dashboard:view"
   | "centers:manage"
-  | "branches:manage"
-  | "seasons:manage"
   | "circles:view"
   | "circles:manage"
   | "teachers:manage"
@@ -48,7 +46,7 @@ export const GRANULAR_PERMISSIONS = [
 export type GranularPermission = (typeof GRANULAR_PERMISSIONS)[number];
 
 const ALL_PERMISSIONS: TarteelPermission[] = [
-  "dashboard:view", "centers:manage", "branches:manage", "seasons:manage", "circles:view", "circles:manage",
+  "dashboard:view", "centers:manage", "circles:view", "circles:manage",
   "teachers:manage", "students:view", "students:manage", "sessions:view", "sessions:manage", "reports:view",
   "settings:view", "settings:manage", "notifications:view", "audit:view", "trash:manage", "ai:use", "quran:view", "messages:manage",
 ];
@@ -89,8 +87,6 @@ export const ROLE_LABELS: Record<TarteelRole, string> = {
 export const NAVIGATION_PERMISSION_RULES = {
   "/dashboard": "dashboard:view",
   "/centers": "centers:manage",
-  "/branches": "branches:manage",
-  "/seasons": "seasons:manage",
   "/circles": "circles:view",
   "/teachers": "teachers:manage",
   "/teacher-invites": "teachers:manage",

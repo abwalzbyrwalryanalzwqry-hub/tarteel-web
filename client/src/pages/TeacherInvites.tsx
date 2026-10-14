@@ -14,7 +14,7 @@ function inviteState(invite: { isRevoked: boolean; usedAt: Date | null; expiresA
 export default function TeacherInvites() {
   const utils = trpc.useUtils();
   const { data: centers } = trpc.centers.list.useQuery({ orgId: undefined });
-  const { data: circles } = trpc.circles.list.useQuery({ branchId: undefined, seasonId: undefined });
+  const { data: circles } = trpc.circles.list.useQuery();
   const { data: invites, isLoading } = trpc.teacherInvites.list.useQuery({ centerId: undefined });
   const [centerId, setCenterId] = useState<number | undefined>();
   const [circleId, setCircleId] = useState<number | undefined>();

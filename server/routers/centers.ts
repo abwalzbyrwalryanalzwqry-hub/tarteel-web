@@ -1,4 +1,4 @@
-/** موجّهات tRPC: لوحة التحكم والمنظمات والمراكز والفروع والمواسم. تُدمج في appRouter (server/routers.ts) بالمفاتيح نفسها. */
+/** موجّهات tRPC: لوحة التحكم والمنظمات والمراكز. تُدمج في appRouter (server/routers.ts) بالمفاتيح نفسها. */
 import { z } from "zod";
 
 import { TRPCError } from "@trpc/server";
@@ -8,15 +8,9 @@ import { assertPermission } from "../accessControl";
 import { protectedProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import {
-  createAcademicSeason,
-  createBranch,
   createCenter,
   provisionIndependentCenter,
   createOrganization,
-  getAcademicSeasons,
-  getAcademicSeasonById,
-  getBranchById,
-  getBranches,
   getCenterById,
   getCenterManagerOverview,
   getDashboardStatsForCircles,
@@ -25,10 +19,7 @@ import {
   getRecentSessionsForCircles,
   getRecentSessionsForCenters,
   getUserCenterMemberships,
-  softDeleteBranch,
   softDeleteCenter,
-  updateAcademicSeason,
-  updateBranch,
   updateCenter,
 } from "../db";
 import { getAccessibleCenterIds, getAccessibleDashboardCircleIds } from "./_shared";
@@ -159,69 +150,5 @@ export const centersRouters = {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
       }
     }),
-  }),
-
-  // ===================== BRANCHES =====================
-  branches: router({
-    list: protectedProcedure.input(z.object({ centerId: z.number().optional() })).query(async ({ ctx, input }) => {
-      if (input.centerId) { await assertPermission(ctx.user, input.centerId, "center.view"); return getBranches(input.centerId); }
-      const centerIds = await getAccessibleCenterIds(ctx.user, "center.view");
-      return (await Promise.all(centerIds.map((centerId) => getBranches(centerId)))).flat();
-    }),
-    byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => { const branch = await getBranchById(input.id); if (!branch) return branch; await assertPermission(ctx.user, branch.centerId, "center.view"); return branch; }),
-    create: protectedProcedure
-      .input(z.object({
-        centerId: z.number(),
-        name: z.string().min(2),
-        description: z.string().optional(),
-        phone: z.string().optional(),
-        address: z.string().optional(),
-        supervisorId: z.number().optional(),
-      }))
-      .mutation(async ({ ctx, input }) => { await assertPermission(ctx.user, input.centerId, "center.edit"); return createBranch(input); }),
-    update: protectedProcedure
-      .input(z.object({
-        id: z.number(),
-        name: z.string().optional(),
-        description: z.string().optional(),
-        phone: z.string().optional(),
-        address: z.string().optional(),
-        isActive: z.boolean().optional(),
-      }))
-      .mutation(async ({ ctx, input }) => {
-        const { id, ...data } = input;
-        const branch = await getBranchById(id); if (!branch) throw new TRPCError({ code: "NOT_FOUND" }); await assertPermission(ctx.user, branch.centerId, "center.edit");
-        await updateBranch(id, data);
-      }),
-    delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => { const branch = await getBranchById(input.id); if (!branch) throw new TRPCError({ code: "NOT_FOUND" }); await assertPermission(ctx.user, branch.centerId, "center.edit"); return softDeleteBranch(input.id); }),
-  }),
-
-  // ===================== ACADEMIC SEASONS =====================
-  seasons: router({
-    list: protectedProcedure.input(z.object({ centerId: z.number().optional() })).query(async ({ ctx, input }) => {
-      if (input.centerId) { await assertPermission(ctx.user, input.centerId, "center.view"); return getAcademicSeasons(input.centerId); }
-      const centerIds = await getAccessibleCenterIds(ctx.user, "center.view");
-      return (await Promise.all(centerIds.map((centerId) => getAcademicSeasons(centerId)))).flat();
-    }),
-    create: protectedProcedure
-      .input(z.object({
-        centerId: z.number(),
-        name: z.string().min(2),
-        type: z.enum(["academic_year", "semester", "summer", "ramadan", "custom"]),
-        startDate: z.date(),
-        endDate: z.date(),
-      }))
-      .mutation(async ({ ctx, input }) => { await assertPermission(ctx.user, input.centerId, "center.edit"); return createAcademicSeason(input); }),
-    update: protectedProcedure
-      .input(z.object({
-        id: z.number(),
-        name: z.string().optional(),
-        isActive: z.boolean().optional(),
-      }))
-      .mutation(async ({ ctx, input }) => {
-        const { id, ...data } = input;
-        const season = await getAcademicSeasonById(id); if (!season) throw new TRPCError({ code: "NOT_FOUND" }); await assertPermission(ctx.user, season.centerId, "center.edit");
-        await updateAcademicSeason(id, data);
-      }),
   }),
 };

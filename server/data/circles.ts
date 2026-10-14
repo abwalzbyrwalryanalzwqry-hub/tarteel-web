@@ -5,12 +5,11 @@ import {
 import { getDb } from "./connection";
 
 // ===================== CIRCLES =====================
-export async function getCircles(branchId?: number, seasonId?: number) {
+export async function getCircles(centerId?: number) {
   const db = await getDb();
   if (!db) return [];
   const conditions = [isNull(circles.deletedAt)];
-  if (branchId) conditions.push(eq(circles.branchId, branchId));
-  if (seasonId) conditions.push(eq(circles.seasonId, seasonId));
+  if (centerId) conditions.push(eq(circles.centerId, centerId));
   return db.select().from(circles).where(and(...conditions)).orderBy(desc(circles.createdAt));
 }
 

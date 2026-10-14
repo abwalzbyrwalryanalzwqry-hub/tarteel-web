@@ -51,7 +51,7 @@ export default function AccessManagement() {
   const canIssueSetupLink = (member: { isOwner: boolean }, userId: number) => isPlatformAdmin || (__TARTEEL_DEVICE__ && ownsSelectedCenter && !member.isOwner && userId !== currentUser?.id);
   const { data: codes, isLoading: codesLoading } = trpc.access.codes.list.useQuery({ centerId: centerId ?? 0 }, { enabled: Boolean(centerId) });
   const { data: memberDetail } = trpc.access.memberDetail.useQuery({ id: selectedMembershipId ?? 0 }, { enabled: Boolean(selectedMembershipId) && tab === "permissions" });
-  const { data: circles } = trpc.circles.list.useQuery({ branchId: undefined, seasonId: undefined }, { enabled: Boolean(centerId) });
+  const { data: circles } = trpc.circles.list.useQuery(undefined, { enabled: Boolean(centerId) });
   const { data: students } = trpc.students.list.useQuery({ centerId, circleId: undefined, search: undefined }, { enabled: Boolean(centerId) });
   const { data: securityEvents, isLoading: securityLoading } = trpc.access.securityActivity.useQuery({ centerId: centerId ?? 0 }, { enabled: Boolean(centerId) && tab === "security" });
 

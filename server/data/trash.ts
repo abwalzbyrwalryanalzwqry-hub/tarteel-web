@@ -1,7 +1,6 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   attendance,
-  branches,
   centers,
   circles,
   evaluation,
@@ -16,11 +15,10 @@ import { getDb } from "./connection";
 // ===================== TRASH =====================
 export async function getTrashedItems() {
   const db = await getDb();
-  if (!db) return { centers: [], branches: [], teachers: [], students: [], circles: [], sessions: [] };
+  if (!db) return { centers: [], teachers: [], students: [], circles: [], sessions: [] };
 
-  const [trashedCenters, trashedBranches, trashedTeachers, trashedStudents, trashedCircles, trashedSessions] = await Promise.all([
+  const [trashedCenters, trashedTeachers, trashedStudents, trashedCircles, trashedSessions] = await Promise.all([
     db.select().from(centers).where(sql`${centers.deletedAt} IS NOT NULL`),
-    db.select().from(branches).where(sql`${branches.deletedAt} IS NOT NULL`),
     db.select().from(teachers).where(sql`${teachers.deletedAt} IS NOT NULL`),
     db.select().from(students).where(sql`${students.deletedAt} IS NOT NULL`),
     db.select().from(circles).where(sql`${circles.deletedAt} IS NOT NULL`),
@@ -29,7 +27,6 @@ export async function getTrashedItems() {
 
   return {
     centers: trashedCenters,
-    branches: trashedBranches,
     teachers: trashedTeachers,
     students: trashedStudents,
     circles: trashedCircles,
@@ -38,37 +35,35 @@ export async function getTrashedItems() {
 }
 
 export async function getTrashedItemsForCenters(centerIds: number[]) {
-  if (!centerIds.length) return { centers: [], branches: [], teachers: [], students: [], circles: [], sessions: [] };
+  if (!centerIds.length) return { centers: [], teachers: [], students: [], circles: [], sessions: [] };
   const db = await getDb();
-  if (!db) return { centers: [], branches: [], teachers: [], students: [], circles: [], sessions: [] };
-  const [trashedCenters, trashedBranches, trashedTeachers, trashedStudents, trashedCircles, trashedSessions] = await Promise.all([
+  if (!db) return { centers: [], teachers: [], students: [], circles: [], sessions: [] };
+  const [trashedCenters, trashedTeachers, trashedStudents, trashedCircles, trashedSessions] = await Promise.all([
     db.select().from(centers).where(and(inArray(centers.id, centerIds), sql`${centers.deletedAt} IS NOT NULL`)),
-    db.select().from(branches).where(and(inArray(branches.centerId, centerIds), sql`${branches.deletedAt} IS NOT NULL`)),
     db.select().from(teachers).where(and(inArray(teachers.centerId, centerIds), sql`${teachers.deletedAt} IS NOT NULL`)),
     db.select().from(students).where(and(inArray(students.centerId, centerIds), sql`${students.deletedAt} IS NOT NULL`)),
-    db.select().from(circles).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), sql`${circles.deletedAt} IS NOT NULL`)),
-    db.select().from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), sql`${sessions.deletedAt} IS NOT NULL`)),
+    db.select().from(circles).where(and(inArray(circles.centerId, centerIds), sql`${circles.deletedAt} IS NOT NULL`)),
+    db.select().from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).where(and(inArray(circles.centerId, centerIds), sql`${sessions.deletedAt} IS NOT NULL`)),
   ]);
-  return { centers: trashedCenters, branches: trashedBranches, teachers: trashedTeachers, students: trashedStudents, circles: trashedCircles.map((row) => row.circles), sessions: trashedSessions.map((row) => row.sessions) };
+  return { centers: trashedCenters, teachers: trashedTeachers, students: trashedStudents, circles: trashedCircles, sessions: trashedSessions.map((row) => row.sessions) };
 }
 
 export async function getTrashedItemsForCircles(circleIds: number[]) {
-  if (!circleIds.length) return { centers: [], branches: [], teachers: [], students: [], circles: [], sessions: [] };
+  if (!circleIds.length) return { centers: [], teachers: [], students: [], circles: [], sessions: [] };
   const db = await getDb();
-  if (!db) return { centers: [], branches: [], teachers: [], students: [], circles: [], sessions: [] };
+  if (!db) return { centers: [], teachers: [], students: [], circles: [], sessions: [] };
   const trashedSessions = await db.select().from(sessions).where(and(inArray(sessions.circleId, circleIds), sql`${sessions.deletedAt} IS NOT NULL`));
-  return { centers: [], branches: [], teachers: [], students: [], circles: [], sessions: trashedSessions };
+  return { centers: [], teachers: [], students: [], circles: [], sessions: trashedSessions };
 }
 
-export async function getTrashedItemCenterId(table: "centers" | "branches" | "teachers" | "students" | "circles" | "sessions", id: number) {
+export async function getTrashedItemCenterId(table: "centers" | "teachers" | "students" | "circles" | "sessions", id: number) {
   const db = await getDb();
   if (!db) return undefined;
   if (table === "centers") return id;
-  if (table === "branches") return (await db.select({ centerId: branches.centerId }).from(branches).where(and(eq(branches.id, id), sql`${branches.deletedAt} IS NOT NULL`)).limit(1))[0]?.centerId;
   if (table === "teachers") return (await db.select({ centerId: teachers.centerId }).from(teachers).where(and(eq(teachers.id, id), sql`${teachers.deletedAt} IS NOT NULL`)).limit(1))[0]?.centerId;
   if (table === "students") return (await db.select({ centerId: students.centerId }).from(students).where(and(eq(students.id, id), sql`${students.deletedAt} IS NOT NULL`)).limit(1))[0]?.centerId;
-  if (table === "circles") return (await db.select({ centerId: branches.centerId }).from(circles).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(eq(circles.id, id), sql`${circles.deletedAt} IS NOT NULL`)).limit(1))[0]?.centerId;
-  return (await db.select({ centerId: branches.centerId }).from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(eq(sessions.id, id), sql`${sessions.deletedAt} IS NOT NULL`)).limit(1))[0]?.centerId;
+  if (table === "circles") return (await db.select({ centerId: circles.centerId }).from(circles).where(and(eq(circles.id, id), sql`${circles.deletedAt} IS NOT NULL`)).limit(1))[0]?.centerId;
+  return (await db.select({ centerId: circles.centerId }).from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).where(and(eq(sessions.id, id), sql`${sessions.deletedAt} IS NOT NULL`)).limit(1))[0]?.centerId;
 }
 
 export async function getTrashedSessionCircleId(id: number) {
@@ -81,9 +76,8 @@ export async function restoreItem(table: string, id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
 
-  const tableMap: Record<string, typeof centers | typeof branches | typeof teachers | typeof students | typeof circles | typeof sessions> = {
+  const tableMap: Record<string, typeof centers | typeof teachers | typeof students | typeof circles | typeof sessions> = {
     centers,
-    branches,
     teachers,
     students,
     circles,

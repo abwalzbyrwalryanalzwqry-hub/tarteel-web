@@ -200,7 +200,7 @@ export default function LoginPage() {
           {/* Features */}
           <div className="grid grid-cols-2 gap-3 mb-8 text-right">
             {[
-              { icon: "🕌", text: "إدارة المراكز والفروع" },
+              { icon: "🕌", text: "إدارة المراكز والحلقات" },
               { icon: "📖", text: "تتبع الحفظ والمراجعة" },
               { icon: "👥", text: "إدارة المعلمين والطلاب" },
               { icon: "📊", text: "تقارير وإحصائيات شاملة" },

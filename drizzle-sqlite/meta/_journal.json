@@ -29,6 +29,20 @@
       "when": 1791936390369,
       "tag": "0003_drop_legacy_quran_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1792010988345,
+      "tag": "0004_circles_center_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792011004782,
+      "tag": "0005_drop_branches_seasons",
+      "breakpoints": true
     }
   ]
 }

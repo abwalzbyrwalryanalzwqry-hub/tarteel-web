@@ -19,7 +19,6 @@ export default function Trash() {
 
   const sections = [
     { key: "centers", label: "المراكز", items: trashed?.centers ?? [] },
-    { key: "branches", label: "الفروع", items: trashed?.branches ?? [] },
     { key: "teachers", label: "المعلمون", items: trashed?.teachers ?? [] },
     { key: "students", label: "الطلاب", items: trashed?.students ?? [] },
     { key: "circles", label: "الحلقات", items: trashed?.circles ?? [] },

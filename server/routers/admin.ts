@@ -71,7 +71,7 @@ export const adminRouters = {
       return getTrashedItemsForCenters(centerIds);
     }),
     restore: protectedProcedure
-      .input(z.object({ table: z.enum(["centers", "branches", "teachers", "students", "circles", "sessions"]), id: z.number() }))
+      .input(z.object({ table: z.enum(["centers", "teachers", "students", "circles", "sessions"]), id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         if (input.table === "sessions") {
           const circleId = await getTrashedSessionCircleId(input.id);
