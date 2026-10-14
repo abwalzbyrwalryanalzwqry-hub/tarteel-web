@@ -4,8 +4,9 @@
  * مدخل Tailwind مستقل عن index.css: يولّد أصناف شاشات المصحف وحدها (@source "./") بقيم زِن
  * (الأحجام والزوايا والظلال وأصناف glass وgradient-*)، وكلها محصورة داخل .tq-mushaf، فلا تمسّ بقية المنصة،
  * وتغلب أصناف ترتيل العامة ذات الاسم نفسه داخل القسم (خصوصية أعلى).
- * الألوان والخطوط من هوية ترتيل: الأخضر الزمردي العميق والذهبي وخط «Tarteel Serif Text»،
- * مع لونَي ورق المصحف وحبره كما في زِن (حبر صفحات المصحف ثابت داكن).
+ * الألوان والخطوط من هوية ترتيل: البرتقالي (لون الأيقونة #EC8C06) والذهبي وخط «Tarteel Serif Text»،
+ * مع ورق مصحف كريمي دافئ وحبر داكن ثابت. الأساسي الصلب درجة أعمق من برتقالي الأيقونة حتى يبقى
+ * النص الأبيض عليه، والنص البرتقالي على الخلفية الفاتحة، بتباين ≥ ٤٫٥:١.
  */
 @import "tailwindcss/theme.css" theme(reference inline);
 @source "./";
@@ -72,11 +73,11 @@
   --shadow-glow: 0 0 40px oklch(from var(--primary-glow) l c h / 0.35);
   --shadow-gold: 0 0 30px oklch(from var(--gold) l c h / 0.3);
   --shadow-soft:
-    0 2px 12px oklch(0.22 0.04 155 / 0.06),
-    0 1px 3px oklch(0.22 0.04 155 / 0.05);
+    0 2px 12px oklch(0.3 0.06 55 / 0.07),
+    0 1px 3px oklch(0.3 0.06 55 / 0.05);
   --shadow-elegant:
-    0 12px 40px oklch(0.22 0.04 155 / 0.14),
-    0 2px 8px oklch(0.22 0.04 155 / 0.06);
+    0 12px 40px oklch(0.3 0.06 55 / 0.16),
+    0 2px 8px oklch(0.3 0.06 55 / 0.06);
 }
 
 /* ─────────── هوية ترتيل داخل القسم ─────────── */
@@ -96,16 +97,17 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.15 0.04 240);
 
-  --primary: oklch(0.32 0.12 155);
-  --primary-foreground: oklch(0.97 0.02 85);
-  --primary-glow: oklch(0.48 0.16 155);
+  /* برتقالي ترتيل: الصلب #A85700 (أبيض عليه ٥٫٢:١)، والتوهج لون الأيقونة #EC8C06. */
+  --primary: oklch(0.544 0.133 56);
+  --primary-foreground: oklch(0.99 0.01 85);
+  --primary-glow: oklch(0.726 0.164 64);
 
   --secondary: oklch(0.94 0.02 85);
-  --secondary-foreground: oklch(0.28 0.08 155);
+  --secondary-foreground: oklch(0.43 0.105 57);
   --muted: oklch(0.94 0.02 85);
   --muted-foreground: oklch(0.5 0.04 240);
-  --accent: oklch(0.93 0.04 85);
-  --accent-foreground: oklch(0.28 0.08 155);
+  --accent: oklch(0.93 0.05 75);
+  --accent-foreground: oklch(0.43 0.105 57);
 
   --gold: oklch(0.72 0.18 72);
   --gold-foreground: oklch(0.15 0.04 240);
@@ -121,27 +123,28 @@
 
   --border: oklch(0.88 0.03 85);
   --input: oklch(0.88 0.03 85);
-  --ring: oklch(0.32 0.12 155);
+  --ring: oklch(0.544 0.133 56);
 
   --glass: oklch(1 0 0 / 0.62);
   --glass-border: oklch(1 0 0 / 0.5);
 
+  /* كتدرج أزرار ترتيل الذهبية، بدرجة أعمق قليلاً لنص أبيض مقروء. */
   --gradient-primary: linear-gradient(
     135deg,
-    var(--primary),
-    oklch(0.4 0.14 155)
+    oklch(0.66 0.16 62),
+    var(--primary)
   );
   --gradient-gold: linear-gradient(
     135deg,
     var(--gold),
     oklch(from var(--gold) calc(l + 0.1) c h)
   );
-  /* تدرج «الليل» من لوح ترتيل الجانبي: أخضر زمردي عميق. */
+  /* تدرج البطاقات البارزة: برتقالي ترتيل من الأيقونة إلى عنبري عميق. */
   --gradient-night: linear-gradient(
     150deg,
-    oklch(0.3 0.1 155),
-    oklch(0.22 0.07 155) 60%,
-    oklch(0.16 0.05 160)
+    oklch(0.62 0.15 60),
+    oklch(0.52 0.13 56) 55%,
+    oklch(0.42 0.1 54)
   );
 
   font-family: var(--tq-font-sans);
@@ -157,15 +160,16 @@
   --popover: oklch(0.16 0.04 240);
   --popover-foreground: oklch(0.93 0.02 85);
 
-  --primary: oklch(0.62 0.16 155);
+  /* برتقالي ترتيل الساطع على كحلي ترتيل الداكن (#F29A1E، تباين ٨:١ مع الحبر الكحلي). */
+  --primary: oklch(0.758 0.16 68);
   --primary-foreground: oklch(0.12 0.04 240);
-  --primary-glow: oklch(0.7 0.17 155);
+  --primary-glow: oklch(0.824 0.149 73);
 
   --secondary: oklch(0.2 0.04 240);
   --secondary-foreground: oklch(0.93 0.02 85);
   --muted: oklch(0.2 0.04 240);
   --muted-foreground: oklch(0.68 0.04 240);
-  --accent: oklch(0.24 0.05 155);
+  --accent: oklch(0.25 0.05 60);
   --accent-foreground: oklch(0.93 0.02 85);
 
   --gold: oklch(0.78 0.16 75);
@@ -179,7 +183,7 @@
 
   --border: oklch(0.25 0.04 240);
   --input: oklch(0.25 0.04 240);
-  --ring: oklch(0.58 0.17 155);
+  --ring: oklch(0.758 0.16 68);
 
   --glass: oklch(0.2 0.04 220 / 0.55);
   --glass-border: oklch(1 0 0 / 0.1);
@@ -191,9 +195,9 @@
   );
   --gradient-night: linear-gradient(
     150deg,
-    oklch(0.26 0.08 155),
-    oklch(0.18 0.06 155) 60%,
-    oklch(0.13 0.04 160)
+    oklch(0.4 0.1 56),
+    oklch(0.28 0.07 52) 55%,
+    oklch(0.17 0.04 240)
   );
 }
 
@@ -438,29 +442,29 @@
   --muted: #eadbbd;
   --border: rgb(122 90 40 / 0.22);
   --gold: #9a6a12;
-  --primary: #6f5a2a;
-  --primary-glow: #947636;
+  --primary: #8a4b0c;
+  --primary-glow: #b8650f;
   --primary-foreground: #fbf5e8;
   --glass: rgb(255 250 238 / 0.6);
   --glass-border: rgb(122 90 40 / 0.18);
-  --gradient-primary: linear-gradient(135deg, #6f5a2a, #7d6329);
+  --gradient-primary: linear-gradient(135deg, #a45a0e, #8a4b0c);
   color-scheme: light;
 }
 .tq-mushaf .reading-paper-night {
   --gold-ink: #c9a14a;
-  --background: #0d1210;
-  --card: #151b18;
+  --background: #0c111b;
+  --card: #141a26;
   --foreground: #e6dcc3;
   --muted-foreground: #9c937f;
-  --muted: #212925;
+  --muted: #1e2532;
   --border: rgb(230 220 195 / 0.1);
   --gold: #c9a14a;
-  --primary: #b9a26a;
-  --primary-glow: #d0bb84;
+  --primary: #e0953a;
+  --primary-glow: #f0ad55;
   --primary-foreground: #15181c;
   --glass: rgb(255 255 255 / 0.05);
   --glass-border: rgb(255 255 255 / 0.08);
-  --gradient-primary: linear-gradient(135deg, #a08a55, #b9a26a);
+  --gradient-primary: linear-gradient(135deg, #c97f28, #e0953a);
   color-scheme: dark;
 }
 .tq-mushaf .reading-paper-black {
@@ -472,12 +476,12 @@
   --muted: #151515;
   --border: rgb(232 225 204 / 0.12);
   --gold: #c9a14a;
-  --primary: #b9a26a;
-  --primary-glow: #d0bb84;
+  --primary: #e0953a;
+  --primary-glow: #f0ad55;
   --primary-foreground: #0b0b0b;
   --glass: rgb(255 255 255 / 0.04);
   --glass-border: rgb(255 255 255 / 0.08);
-  --gradient-primary: linear-gradient(135deg, #a08a55, #b9a26a);
+  --gradient-primary: linear-gradient(135deg, #c97f28, #e0953a);
   color-scheme: dark;
 }
 .tq-mushaf .reading-paper-sepia,

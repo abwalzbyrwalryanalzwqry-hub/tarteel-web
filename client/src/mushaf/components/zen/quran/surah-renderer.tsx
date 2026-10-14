@@ -31,7 +31,7 @@ interface Props {
   activeAyah?: number | null;
   /** Tapping an ayah opens the actions sheet in the reader. */
   onAyahTap?: (ayah: AyahText) => void;
-  /** Ayah currently being recited — highlighted in emerald. */
+  /** Ayah currently being recited — highlighted in Tarteel orange. */
   playingAyah?: number | null;
 }
 

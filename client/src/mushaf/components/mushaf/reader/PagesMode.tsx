@@ -360,7 +360,7 @@ export function MushafPagesMode({
                   page: toArabicDigits(scrubPage),
                   surah: scrubSurah,
                 })}
-                className="w-full accent-[var(--color-primary)]"
+                className="w-full accent-[var(--primary)]"
               />
               <div
                 className={`text-center text-[0.625rem] tabular-nums text-muted-foreground transition-opacity ${

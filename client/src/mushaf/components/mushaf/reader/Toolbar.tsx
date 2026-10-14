@@ -24,7 +24,7 @@ void ensureMushafDict();
 const PAPER_SWATCH: Record<PaperKey, string> = {
   auto: "bg-gradient-to-br from-white to-zinc-800",
   sepia: "bg-[#f3e7cf]",
-  night: "bg-[#0d1210]",
+  night: "bg-[#0c111b]",
   black: "bg-black",
 };
 const PAPERS: PaperKey[] = ["auto", "sepia", "night", "black"];

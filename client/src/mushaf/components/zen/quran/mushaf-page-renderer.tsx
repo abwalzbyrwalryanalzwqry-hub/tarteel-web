@@ -362,8 +362,8 @@ function SurahBanner({ nameAr }: { nameAr: string }) {
   const t = useT();
   return (
     <div className="flex w-full justify-center">
-      <div className="relative w-full overflow-hidden rounded-md border-2 border-primary/70 bg-primary/90 p-[3px] shadow-soft">
-        <div className="relative flex items-center justify-center overflow-hidden rounded-[3px] border border-gold/50 bg-[color-mix(in_oklab,var(--color-primary)_10%,var(--color-card))] px-8 py-[0.22em]">
+      <div className="relative w-full overflow-hidden rounded-md border-2 border-primary/70 bg-gradient-to-l from-primary-glow to-primary p-[3px] shadow-soft">
+        <div className="relative flex items-center justify-center overflow-hidden rounded-[3px] border border-gold/50 bg-[color-mix(in_oklab,var(--primary)_10%,var(--card))] px-8 py-[0.22em]">
           <BannerFlourish className="absolute right-1 top-1/2 h-[1.1em] w-[3em] -translate-y-1/2 text-gold/70" />
           <BannerFlourish className="absolute left-1 top-1/2 h-[1.1em] w-[3em] -translate-y-1/2 scale-x-[-1] text-gold/70" />
           <span

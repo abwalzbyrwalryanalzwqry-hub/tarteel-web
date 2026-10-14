@@ -174,7 +174,7 @@ function RecitationsScreen() {
               max={Math.max(1, Math.floor(player.position.duration))}
               value={Math.floor(player.position.current)}
               onChange={e => player.seek(Number(e.target.value))}
-              className="h-1.5 w-full accent-[#C9A227]"
+              className="h-1.5 w-full accent-[var(--primary)]"
               dir="ltr"
               aria-label="موضع التلاوة"
             />
