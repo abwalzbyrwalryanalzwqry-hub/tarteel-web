@@ -75,14 +75,14 @@ export default function MushafScreen() {
   const retry = () => { setFailed(false); setWebKey((k) => k + 1); };
 
   if (startUrl === null) {
-    return <View style={styles.center}><ActivityIndicator color={colors.primary} size="large" /></View>;
+    return <View style={styles.center}><ActivityIndicator color={colors.orange} size="large" /></View>;
   }
 
   return (
     <SafeAreaView style={styles.root} edges={["top", "left", "right"]}>
       {failed ? (
         <View style={styles.center}>
-          <Ionicons name="alert-circle-outline" size={56} color={colors.primary} />
+          <Ionicons name="alert-circle-outline" size={56} color={colors.orange} />
           <Text style={styles.title}>تعذر فتح المصحف</Text>
           <Text style={styles.body}>المصحف مضمّن في التطبيق ويعمل دون اتصال؛ أعد المحاولة.</Text>
           <Pressable accessibilityRole="button" onPress={retry} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
@@ -117,7 +117,7 @@ export default function MushafScreen() {
           overScrollMode="never"
           bounces={false}
           startInLoadingState
-          renderLoading={() => <View style={styles.loadingOverlay}><ActivityIndicator color={colors.primary} size="large" /></View>}
+          renderLoading={() => <View style={styles.loadingOverlay}><ActivityIndicator color={colors.orange} size="large" /></View>}
         />
       )}
     </SafeAreaView>
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   web: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28, gap: 14, backgroundColor: colors.background },
-  title: { fontSize: 20, fontWeight: "700", color: colors.primary, textAlign: "center" },
+  title: { fontSize: 20, fontWeight: "700", color: colors.orange, textAlign: "center" },
   body: { fontSize: 15, lineHeight: 24, color: colors.muted, textAlign: "center" },
   primaryButton: { marginTop: 8, minWidth: 220, borderRadius: 16, backgroundColor: colors.gold, paddingVertical: 14, paddingHorizontal: 22, alignItems: "center" },
   primaryButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },

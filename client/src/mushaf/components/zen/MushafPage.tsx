@@ -198,7 +198,7 @@ function PageLines({
                       data-a={ayah}
                       aria-pressed={sel}
                       aria-label={`${SURAHS[line.s - 1]?.name ?? ""} ${ayah}`}
-                      className={`text-[#7f5c12] leading-none rounded-sm focus-visible:outline-2 focus-visible:outline-primary ${on}`}
+                      className={`text-[#9a5a06] leading-none rounded-sm focus-visible:outline-2 focus-visible:outline-primary ${on}`}
                     >
                       {arDigits(ayah)}
                     </button>
@@ -208,7 +208,7 @@ function PageLines({
                 ) : (
                   <span
                     key={j}
-                    className="text-[#7f5c12]"
+                    className="text-[#9a5a06]"
                     aria-label={`الآية ${ayah}`}
                   >
                     {arDigits(ayah)}
@@ -227,10 +227,10 @@ function PageLines({
 function SurahBanner({ name }: { name: string }) {
   return (
     <div className="flex w-full justify-center">
-      <div className="relative w-full overflow-hidden rounded-md border-2 border-primary/70 bg-primary/90 p-[3px]">
-        <div className="relative flex items-center justify-center overflow-hidden rounded-[3px] border border-[#c9a449]/60 bg-[#f4ecd6] px-8 py-[0.22em]">
-          <Flourish className="absolute right-1 top-1/2 h-[1.1em] w-[3em] -translate-y-1/2 text-[#b08a2e]" />
-          <Flourish className="absolute left-1 top-1/2 h-[1.1em] w-[3em] -translate-y-1/2 scale-x-[-1] text-[#b08a2e]" />
+      <div className="relative w-full overflow-hidden rounded-md border-2 border-primary/70 bg-gradient-to-l from-[#ec8c06] to-[#a85700] p-[3px]">
+        <div className="relative flex items-center justify-center overflow-hidden rounded-[3px] border border-[#e3a83c]/70 bg-[#fbeed6] px-8 py-[0.22em]">
+          <Flourish className="absolute right-1 top-1/2 h-[1.1em] w-[3em] -translate-y-1/2 text-[#c27a12]" />
+          <Flourish className="absolute left-1 top-1/2 h-[1.1em] w-[3em] -translate-y-1/2 scale-x-[-1] text-[#c27a12]" />
           <span
             className="relative font-display font-medium leading-none"
             style={{ fontSize: "0.72em" }}
@@ -261,11 +261,11 @@ function Flourish({ className }: { className?: string }) {
 export function PageNumberPlate({ page }: { page: number }) {
   return (
     <div className="flex items-center justify-center gap-1.5">
-      <Flourish className="h-4 w-10 scale-x-[-1] text-[#b08a2e]" />
-      <span className="rounded-md border border-primary/50 bg-primary/10 px-4 py-0.5 text-xs font-medium tabular-nums text-[#1f1a10]">
+      <Flourish className="h-4 w-10 scale-x-[-1] text-[#c27a12]" />
+      <span className="rounded-md border border-[#e3a83c]/80 bg-[#fbeed6] px-4 py-0.5 text-xs font-medium tabular-nums text-[#1f1a10]">
         {arDigits(page)}
       </span>
-      <Flourish className="h-4 w-10 text-[#b08a2e]" />
+      <Flourish className="h-4 w-10 text-[#c27a12]" />
     </div>
   );
 }

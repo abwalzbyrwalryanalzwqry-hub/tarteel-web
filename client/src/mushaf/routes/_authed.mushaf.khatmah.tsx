@@ -240,12 +240,12 @@ function ActivePlan({
                   : `اليوم ${toArabicDigits(status.day)} من ${toArabicDigits(plan.days)}`}
             </div>
             {status.behind > 0 && !finished && (
-              <span className="rounded-full bg-amber-400/20 px-2.5 py-1 text-[0.625rem] text-amber-200">
+              <span className="rounded-full bg-black/20 px-2.5 py-1 text-[0.625rem] font-semibold text-white">
                 متأخّر {pagesWord(status.behind)}
               </span>
             )}
             {status.ahead > 0 && !finished && (
-              <span className="rounded-full bg-emerald-400/20 px-2.5 py-1 text-[0.625rem] text-emerald-200">
+              <span className="rounded-full bg-white/25 px-2.5 py-1 text-[0.625rem] font-semibold text-white">
                 متقدّم {pagesWord(status.ahead)}
               </span>
             )}

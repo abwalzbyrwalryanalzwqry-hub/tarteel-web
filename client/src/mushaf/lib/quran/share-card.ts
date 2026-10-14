@@ -9,12 +9,12 @@
 import { toArabicDigits } from "./format";
 export * from "./share-io";
 
-export type ShareTheme = "night" | "emerald" | "light";
+export type ShareTheme = "night" | "tarteel" | "light";
 export type ShareSize = "square" | "story" | "post";
 
 export const SHARE_THEMES: { key: ShareTheme; label: string }[] = [
   { key: "night", label: "ليلي" },
-  { key: "emerald", label: "زمرّدي" },
+  { key: "tarteel", label: "برتقالي ترتيل" },
   { key: "light", label: "فاتح" },
 ];
 
@@ -40,7 +40,7 @@ export interface ShareCardInput {
   note?: string;
 }
 
-/* ألوان زِن: ليلي أخضر عميق (gradient-night)، زمردي من الأخضر الأساسي، وفاتح بورق زِن الدافئ. */
+/* ألوان ترتيل: ليلي بكحلي ترتيل، وبرتقالي من لون الأيقونة، وفاتح بورق المصحف الكريمي. */
 const PALETTE: Record<
   ShareTheme,
   {
@@ -53,28 +53,28 @@ const PALETTE: Record<
   }
 > = {
   night: {
-    from: "#0A1A14",
-    to: "#153A2B",
+    from: "#0B1220",
+    to: "#1B2740",
     ink: "#F7F3EA",
     muted: "rgba(247,243,234,0.68)",
     gold: "#E3BD5B",
     frame: "rgba(227,189,91,0.55)",
   },
-  emerald: {
-    from: "#0F3B27",
-    to: "#1F7A4D",
+  tarteel: {
+    from: "#7E3F00",
+    to: "#D27400",
     ink: "#F7F3EA",
     muted: "rgba(247,243,234,0.72)",
-    gold: "#F0D78C",
-    frame: "rgba(240,215,140,0.55)",
+    gold: "#FFE2A8",
+    frame: "rgba(255,226,168,0.6)",
   },
   light: {
     from: "#FCF8EF",
     to: "#F1E9D6",
-    ink: "#173226",
-    muted: "rgba(23,50,38,0.66)",
-    gold: "#8A6412",
-    frame: "rgba(138,100,18,0.5)",
+    ink: "#1B2333",
+    muted: "rgba(27,35,51,0.66)",
+    gold: "#A85700",
+    frame: "rgba(168,87,0,0.5)",
   },
 };
 
