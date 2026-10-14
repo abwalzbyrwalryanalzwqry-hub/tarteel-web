@@ -7,26 +7,22 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleSimulationProvider } from "./contexts/RoleSimulationContext";
 import TarteelLayout from "./components/TarteelLayout";
 import { PageLoader } from "./components/PageLoader";
+import { ConfirmProvider } from "./components/ConfirmProvider";
 
 // كل صفحة في ملف مستقل يُحمَّل عند فتحها فقط؛ كانت كلها في حزمة واحدة (~2.1MB).
 // الإطار (TarteelLayout) يبقى في الحزمة الرئيسية ليظهر الشريط الجانبي فوراً أثناء تحميل الصفحة.
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Centers = lazy(() => import("./pages/Centers"));
-const Branches = lazy(() => import("./pages/Branches"));
 const Teachers = lazy(() => import("./pages/Teachers"));
 const Students = lazy(() => import("./pages/Students"));
 const StudentProfile = lazy(() => import("./pages/StudentProfile"));
 const Circles = lazy(() => import("./pages/Circles"));
 const CircleDetail = lazy(() => import("./pages/CircleDetail"));
-const Sessions = lazy(() => import("./pages/Sessions"));
-const SessionDetail = lazy(() => import("./pages/SessionDetail"));
-const Reports = lazy(() => import("./pages/Reports"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Trash = lazy(() => import("./pages/Trash"));
 const AuditLog = lazy(() => import("./pages/AuditLog"));
-const AcademicSeasons = lazy(() => import("./pages/AcademicSeasons"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const SetPassword = lazy(() => import("./pages/SetPassword"));
 const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
@@ -35,6 +31,8 @@ const SplashScreen = lazy(() => import("./pages/SplashScreen"));
 const DeveloperInfo = lazy(() => import("./pages/DeveloperInfo"));
 /** قسم المصحف (منقول من زِن): شاشاته كلها تحت /quran بإطارها الخاص وملء الشاشة. */
 const MushafApp = lazy(() => import("./mushaf/app/MushafApp"));
+/** السجل اليومي للحلقة والتقارير (منقولان من زِن): /daily و/reports بإطارهما الخاص. */
+const DailyApp = lazy(() => import("./mushaf/app/DailyApp"));
 const ParentMessages = lazy(() => import("./pages/ParentMessages"));
 const TeacherInvites = lazy(() => import("./pages/TeacherInvites"));
 const RedeemTeacherInvite = lazy(() => import("./pages/RedeemTeacherInvite"));
@@ -70,18 +68,14 @@ const idParam = (params: Record<string, string | undefined>) =>
 
 const DashboardRoute = inLayout(Dashboard);
 const CentersRoute = inLayout(Centers);
-const BranchesRoute = inLayout(Branches);
-const AcademicSeasonsRoute = inLayout(AcademicSeasons);
 const CirclesRoute = inLayout(Circles);
 const TeachersRoute = inLayout(Teachers);
 const StudentsRoute = inLayout(Students);
-const SessionsRoute = inLayout(Sessions);
 const AIAssistantRoute = inLayout(AIAssistant);
 const ParentMessagesRoute = inLayout(ParentMessages);
 const TeacherInvitesRoute = inLayout(TeacherInvites);
 const AccessManagementRoute = inLayout(AccessManagement);
 const GuideDashboardRoute = inLayout(GuideDashboard);
-const ReportsRoute = inLayout(Reports);
 const NotificationsRoute = inLayout(Notifications);
 const SettingsRoute = inLayout(Settings);
 const DeveloperInfoRoute = inLayout(DeveloperInfo);
@@ -93,16 +87,9 @@ const CircleDetailRoute = inLayout(CircleDetail, params => ({
 const StudentProfileRoute = inLayout(StudentProfile, params => ({
   studentId: idParam(params),
 }));
-const SessionDetailRoute = inLayout(SessionDetail, params => ({
-  sessionId: idParam(params),
-}));
-
-function LegacySessionRedirect({ id }: { id?: number }) {
-  const [, navigate] = useLocation();
-  useEffect(() => {
-    navigate(id ? `/periods/${id}` : "/periods");
-  }, [id, navigate]);
-  return null;
+/** روابط الفترات والجلسات القديمة تفتح السجل اليومي. */
+function LegacyDailyRedirect() {
+  return <Redirect to="/daily" replace />;
 }
 
 function Router() {
@@ -117,22 +104,14 @@ function Router() {
         <Route path="/delete-account" component={DeleteAccountInfo} />
         <Route path="/dashboard" component={DashboardRoute} />
         <Route path="/centers" component={CentersRoute} />
-        <Route path="/branches" component={BranchesRoute} />
-        <Route path="/seasons" component={AcademicSeasonsRoute} />
         <Route path="/circles" component={CirclesRoute} />
         <Route path="/circles/:id" component={CircleDetailRoute} />
         <Route path="/teachers" component={TeachersRoute} />
         <Route path="/students/:id" component={StudentProfileRoute} />
         <Route path="/students" component={StudentsRoute} />
-        <Route path="/periods" component={SessionsRoute} />
-        <Route path="/periods/:id" component={SessionDetailRoute} />
-        <Route path="/sessions" component={() => <LegacySessionRedirect />} />
-        <Route
-          path="/sessions/:id"
-          component={(props: any) => (
-            <LegacySessionRedirect id={Number(props.params?.id)} />
-          )}
-        />
+        <Route path="/daily" component={DailyApp} />
+        <Route path="/periods/*?" component={LegacyDailyRedirect} />
+        <Route path="/sessions/*?" component={LegacyDailyRedirect} />
         <Route path="/assistant">{__TARTEEL_DEVICE__ ? <Redirect to="/dashboard" /> : <AIAssistantRoute />}</Route>
         <Route path="/quran/*?" component={MushafApp} />
         <Route path="/parent-messages" component={ParentMessagesRoute} />
@@ -142,7 +121,7 @@ function Router() {
         <Route path="/redeem-teacher-invite" component={RedeemTeacherInvite} />
         <Route path="/start" component={CenterOnboarding} />
         <Route path="/redeem-access-code" component={RedeemAccessCode} />
-        <Route path="/reports" component={ReportsRoute} />
+        <Route path="/reports" component={DailyApp} />
         <Route path="/notifications" component={NotificationsRoute} />
         <Route path="/settings" component={SettingsRoute} />
         <Route path="/developer" component={DeveloperInfoRoute} />
@@ -162,8 +141,10 @@ function App() {
       <ThemeProvider defaultTheme="light" switchable>
         <RoleSimulationProvider>
           <TooltipProvider>
-            <Toaster position="top-center" richColors />
-            <Router />
+            <ConfirmProvider>
+              <Toaster position="top-center" richColors closeButton />
+              <Router />
+            </ConfirmProvider>
           </TooltipProvider>
         </RoleSimulationProvider>
       </ThemeProvider>

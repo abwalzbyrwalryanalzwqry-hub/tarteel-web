@@ -581,3 +581,49 @@
 .tq-mushaf {
   @tailwind utilities;
 }
+
+/* ─────────── السجل اليومي والتقارير: ألوان المنصة ───────────
+ * شاشتا السجل اليومي والتقارير جزء من عمل المنصة (لا من المصحف)، فتأخذان ألوان واجهة ترتيل نفسها:
+ * الأخضر الأساسي (index.css: --color-primary) مع ذهبي ترتيل وخلفية الورق الكريمي والحبر الكحلي.
+ * النص الأبيض على الأخضر الصلب بتباين ≥ ٧:١، والأخضر على الخلفية الفاتحة ≥ ٤٫٥:١. */
+.tq-mushaf.tq-daily {
+  --primary: oklch(0.38 0.11 158);
+  --primary-foreground: oklch(0.99 0.01 85);
+  --primary-glow: oklch(0.5 0.13 158);
+  --secondary-foreground: oklch(0.32 0.1 158);
+  --accent: oklch(0.93 0.04 150);
+  --accent-foreground: oklch(0.3 0.09 158);
+  --ring: oklch(0.38 0.11 158);
+  --gradient-primary: linear-gradient(
+    135deg,
+    oklch(0.45 0.12 158),
+    oklch(0.32 0.1 158)
+  );
+  --gradient-night: linear-gradient(
+    150deg,
+    oklch(0.42 0.11 158),
+    oklch(0.32 0.1 158) 55%,
+    oklch(0.24 0.07 165)
+  );
+  --shadow-glow: 0 0 40px oklch(0.5 0.13 158 / 0.3);
+}
+.dark .tq-mushaf.tq-daily {
+  --primary: oklch(0.7 0.15 155);
+  --primary-foreground: oklch(0.12 0.04 240);
+  --primary-glow: oklch(0.78 0.14 155);
+  --secondary-foreground: oklch(0.93 0.02 85);
+  --accent: oklch(0.25 0.05 155);
+  --accent-foreground: oklch(0.93 0.02 85);
+  --ring: oklch(0.7 0.15 155);
+  --gradient-primary: linear-gradient(
+    135deg,
+    var(--primary),
+    var(--primary-glow)
+  );
+  --gradient-night: linear-gradient(
+    150deg,
+    oklch(0.36 0.09 158),
+    oklch(0.25 0.06 160) 55%,
+    oklch(0.17 0.04 240)
+  );
+}

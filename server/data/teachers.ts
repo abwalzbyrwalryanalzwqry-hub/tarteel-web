@@ -1,7 +1,7 @@
 import { and, desc, eq, isNull, or } from "drizzle-orm";
 import {
   circles,
-  sessions,
+  dailyRecords,
   teachers,
 } from "../../drizzle/schema";
 import { getDb } from "./connection";
@@ -70,8 +70,9 @@ export async function transferTeacherToCircle(teacherId: number, circleId: numbe
 export async function getTeacherLastActivity(teacherId: number) {
   const db = await getDb();
   if (!db) return null;
-  const result = await db.select({ scheduledAt: sessions.scheduledAt }).from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).where(and(or(eq(circles.teacherId, teacherId), eq(circles.assistantTeacherId, teacherId)), isNull(sessions.deletedAt), isNull(circles.deletedAt))).orderBy(desc(sessions.scheduledAt)).limit(1);
-  return result[0]?.scheduledAt ?? null;
+  // آخر نشاط: آخر تعديل على السجل اليومي في حلقة يعلّم فيها.
+  const result = await db.select({ at: dailyRecords.updatedAt }).from(dailyRecords).innerJoin(circles, eq(dailyRecords.circleId, circles.id)).where(and(or(eq(circles.teacherId, teacherId), eq(circles.assistantTeacherId, teacherId)), isNull(circles.deletedAt))).orderBy(desc(dailyRecords.updatedAt)).limit(1);
+  return result[0]?.at ?? null;
 }
 
 export async function softDeleteTeacher(id: number) {

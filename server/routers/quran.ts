@@ -1,4 +1,4 @@
-/** موجّهات tRPC: حالة القراءة في المصحف والمراجعة المتباعدة وسجل الصفحة وميزان الحفظ. تُدمج في appRouter (server/routers.ts) بالمفاتيح نفسها. */
+/** موجّهات tRPC: حالة القراءة في المصحف والمراجعة المتباعدة وسجل الصفحة. تُدمج في appRouter (server/routers.ts) بالمفاتيح نفسها. */
 import { z } from "zod";
 
 import { TRPCError } from "@trpc/server";
@@ -8,15 +8,13 @@ import { QURAN_SURAHS } from "../../shared/types";
 import { protectedProcedure, router } from "../_core/trpc";
 
 import {
-  getCircleMonthlyRecord,
   applyQuranReview,
   getDueQuranReviews,
   getQuranRecordsInRange,
   InvalidReadingStateError,
   syncQuranReadingState,
-  getStudentById,
 } from "../db";
-import { assertStudentReadAccess, assertTeacherCircleAccess, getStudentProfileForReader, listReadableStudents } from "./_shared";
+import { listReadableStudents } from "./_shared";
 
 const isoTime = z.string().max(40).nullish();
 const readingStateInput = z.object({
@@ -52,7 +50,7 @@ export const quranRouters = {
     due: protectedProcedure.query(({ ctx }) => getDueQuranReviews(ctx.user.id)),
   }),
 
-  // سجل الصفحة: تسجيلات الحفظ والمراجعة في الفترات التي تشمل صفحة المصحف، لمن يحق له قراءتها.
+  // سجل الصفحة: الحفظ والمراجعة في السجل اليومي التي تشمل صفحة المصحف، لمن يحق له قراءتها.
   quranRecords: router({
     byRange: protectedProcedure.input(z.object({ fromSurah: z.number().int().min(1).max(114), fromAyah: z.number().int().min(1), toSurah: z.number().int().min(1).max(114), toAyah: z.number().int().min(1) })).query(async ({ ctx, input }) => {
       const readable = await listReadableStudents(ctx.user, {});
@@ -60,15 +58,4 @@ export const quranRouters = {
     }),
   }),
 
-  mizan: router({
-    monthlyRecord: protectedProcedure.input(z.object({ circleId: z.number(), startDate: z.date().optional(), endDate: z.date().optional() })).query(async ({ ctx, input }) => {
-      await assertTeacherCircleAccess(ctx.user, input.circleId);
-      return getCircleMonthlyRecord(input.circleId, input.startDate, input.endDate);
-    }),
-    studentProfile: protectedProcedure.input(z.object({ studentId: z.number(), startDate: z.date().optional(), endDate: z.date().optional() })).query(async ({ ctx, input }) => {
-      const student = await getStudentById(input.studentId);
-      await assertStudentReadAccess(ctx.user, student);
-      return getStudentProfileForReader(ctx.user, input.studentId, input.startDate, input.endDate);
-    }),
-  }),
 };

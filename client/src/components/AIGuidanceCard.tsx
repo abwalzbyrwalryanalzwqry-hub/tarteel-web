@@ -3,11 +3,11 @@ import { Lightbulb, Sparkles } from "lucide-react";
 import { Link } from "wouter";
 import "@/lib/edition";
 
-type GuidanceContext = "dashboard" | "sessions" | "students" | "circles" | "reports";
+type GuidanceContext = "dashboard" | "daily" | "students" | "circles" | "reports";
 
 const contextCopy: Record<GuidanceContext, { title: string; body: string }> = {
   dashboard: { title: "أولوية ذكية", body: "حوّل مؤشرات اليوم إلى خطوات عملية للحلقة أو المركز." },
-  sessions: { title: "إرشاد للفترة", body: "احصل على تسلسل عملي للفترة أو فكرة تربوية للحضور والحفظ." },
+  daily: { title: "إرشاد للسجل اليومي", body: "احصل على تسلسل عملي ليوم الحلقة أو فكرة تربوية للحضور والحفظ." },
   students: { title: "تطوير الطالب", body: "اطلب خطة مراجعة أو أسلوب تحفيز يناسب مستوى الطالب." },
   circles: { title: "تحسين الحلقة", body: "اطلب فكرة لتوزيع الطلاب أو نشاطاً قرآنياً مناسباً للحلقة." },
   reports: { title: "اقرأ الأرقام بذكاء", body: "حوّل نتائج الحضور والحفظ إلى قرارات قابلة للتطبيق." },

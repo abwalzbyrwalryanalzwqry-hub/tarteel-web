@@ -12,7 +12,6 @@ import {
   Bell,
   BookOpen,
   BookOpenText,
-  BookText,
   Building2,
   ChevronLeft,
   ClipboardList,
@@ -36,15 +35,13 @@ import { Link, useLocation } from "wouter";
 const navItems = [
   { path: "/dashboard", label: "لوحة التحكم", icon: LayoutDashboard, permission: "dashboard:view" as const },
   { path: "/centers", label: "المراكز", icon: Building2, permission: "centers:manage" as const },
-  { path: "/branches", label: "الفروع", icon: Building2, permission: "branches:manage" as const },
-  { path: "/seasons", label: "المواسم الدراسية", icon: BookText, permission: "seasons:manage" as const },
   { path: "/circles", label: "الحلقات", icon: BookOpen, permission: "circles:view" as const },
   { path: "/teachers", label: "المعلمون", icon: GraduationCap, permission: "teachers:manage" as const },
   { path: "/teacher-invites", label: "دعوات المعلمين", icon: KeyRound, permission: "teachers:manage" as const },
   { path: "/guide", label: "لوحة الموجه", icon: UserCog, permission: "circles:view" as const },
   { path: "/access-management", label: "المستخدمون والصلاحيات", icon: UserCog, permission: "settings:manage" as const },
   { path: "/students", label: "الطلاب", icon: Users, permission: "students:view" as const },
-  { path: "/periods", label: "الفترات", icon: ClipboardList, permission: "sessions:view" as const },
+  { path: "/daily", label: "السجل اليومي", icon: ClipboardList, permission: "daily:view" as const },
   { path: "/quran", label: "القرآن الكريم", icon: BookOpenText, permission: "quran:view" as const },
   { path: "/parent-messages", label: "رسائل أولياء الأمور", icon: MessageSquareText, permission: "messages:manage" as const },
   { path: "/reports", label: "التقارير", icon: BarChart3, permission: "reports:view" as const },
@@ -55,6 +52,10 @@ const navItems = [
   { path: "/trash", label: "سلة المحذوفات", icon: ArchiveRestore, permission: "trash:manage" as const },
   { path: "/audit-log", label: "سجل التدقيق", icon: ClipboardList, permission: "audit:view" as const },
 ];
+
+/** الشريط السفلي على الجوال: أهم الوجهات حسب الدور بنقرة واحدة، والباقي في «المزيد». */
+const bottomNavPriority = ["/dashboard", "/daily", "/circles", "/students", "/quran", "/notifications", "/settings"];
+const bottomNavLabels: Record<string, string> = { "/dashboard": "الرئيسية", "/daily": "السجل", "/circles": "الحلقات", "/students": "الطلاب", "/quran": "المصحف", "/notifications": "الإشعارات", "/settings": "الإعدادات" };
 
 interface TarteelLayoutProps {
   children: React.ReactNode;
@@ -79,6 +80,10 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
     else navigate("/dashboard");
   };
   const visibleNavItems = navItems.filter((item) => getVisibleNavigationPaths(role).includes(item.path));
+  const bottomNavItems = bottomNavPriority
+    .map((path) => visibleNavItems.find((item) => item.path === path))
+    .filter((item): item is (typeof navItems)[number] => Boolean(item))
+    .slice(0, 4);
   const currentNav = location === "/developer"
     ? navItems.find((item) => item.path === "/settings")
     : navItems.find((item) =>
@@ -194,7 +199,7 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
           {visibleNavItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location === item.path;
+            const isActive = location === item.path || (item.path !== "/dashboard" && location.startsWith(`${item.path}/`));
             const label = item.path === "/students" && role === "student" ? "إنجازي" : item.path === "/students" && role === "guardian" ? "إنجازات الابن" : item.label;
             return (
               <Link key={item.path} href={item.path}>
@@ -205,9 +210,9 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
                 >
                   <div className="relative">
                     <Icon className="w-5 h-5 flex-shrink-0" />
-                    {item.path === "/notifications" && unreadCount && unreadCount > 0 && (
+                    {item.path === "/notifications" && (unreadCount ?? 0) > 0 && (
                       <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-[9px] flex items-center justify-center font-bold">
-                        {unreadCount > 9 ? "9+" : unreadCount}
+                        {(unreadCount ?? 0) > 9 ? "9+" : unreadCount}
                       </span>
                     )}
                   </div>
@@ -265,6 +270,7 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
         <header className="h-14 border-b border-border bg-card/80 backdrop-blur-sm flex items-center gap-4 px-4 sticky top-0 z-30">
           <button
             onClick={() => setSidebarOpen(true)}
+            aria-label="فتح القائمة"
             className="lg:hidden p-2 rounded-lg hover:bg-muted transition-colors"
           >
             <Menu className="w-5 h-5" />
@@ -280,15 +286,16 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
           </button>
           <div className="flex-1" />
           <Link href="/notifications">
-            <button className="relative p-2 rounded-lg hover:bg-muted transition-colors">
+            <button aria-label="الإشعارات" className="relative p-2 rounded-lg hover:bg-muted transition-colors">
               <Bell className="w-5 h-5 text-muted-foreground" />
-              {unreadCount && unreadCount > 0 && (
+              {(unreadCount ?? 0) > 0 && (
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
               )}
             </button>
           </Link>
           <button
             onClick={toggleTheme}
+            aria-label={theme === "dark" ? "الوضع النهاري" : "الوضع الليلي"}
             className="p-2 rounded-lg hover:bg-muted transition-colors"
           >
             {theme === "dark" ? (
@@ -309,7 +316,7 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto p-4 lg:p-6">
+        <main className="flex-1 overflow-auto p-4 pb-28 lg:p-6">
           {simulation && <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between"><span><strong>وضع محاكاة: {roleLabel}.</strong> الواجهة مقيدة للدور المختار وجميع عمليات التعديل موقوفة.</span><button onClick={stopSimulation} className="font-semibold underline underline-offset-4">إنهاء المحاكاة</button></div>}
           {mayViewCurrentRoute ? children : (
             <section className="mx-auto mt-16 max-w-md rounded-3xl border border-destructive/20 bg-destructive/5 p-8 text-center">
@@ -319,6 +326,31 @@ export default function TarteelLayout({ children }: TarteelLayoutProps) {
             </section>
           )}
         </main>
+
+        {/* Bottom nav (mobile) */}
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden" aria-label="التنقل السريع">
+          <div className="mx-auto grid max-w-lg" style={{ gridTemplateColumns: `repeat(${bottomNavItems.length + 1}, minmax(0, 1fr))` }}>
+            {bottomNavItems.map((item) => {
+              const Icon = item.icon;
+              const active = location === item.path || (item.path !== "/dashboard" && location.startsWith(`${item.path}/`));
+              const label = item.path === "/students" && role === "student" ? "إنجازي" : item.path === "/students" && role === "guardian" ? "الأبناء" : bottomNavLabels[item.path] ?? item.label;
+              return (
+                <Link key={item.path} href={item.path} aria-current={active ? "page" : undefined} className={`relative flex flex-col items-center gap-1 px-1 py-2 text-[11px] font-semibold transition-colors ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}>
+                  {active && <span className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-primary" />}
+                  <span className="relative">
+                    <Icon className="h-5 w-5" />
+                    {item.path === "/notifications" && unreadCount && unreadCount > 0 ? <span className="absolute -right-1.5 -top-1 h-2 w-2 rounded-full bg-red-500" /> : null}
+                  </span>
+                  <span className="truncate">{label}</span>
+                </Link>
+              );
+            })}
+            <button type="button" onClick={() => setSidebarOpen(true)} className="flex flex-col items-center gap-1 px-1 py-2 text-[11px] font-semibold text-muted-foreground hover:text-foreground" aria-label="كل الأقسام">
+              <Menu className="h-5 w-5" />
+              <span>المزيد</span>
+            </button>
+          </div>
+        </nav>
       </div>
     </div>
   );

@@ -1,79 +1,296 @@
 import { AIGuidanceCard } from "@/components/AIGuidanceCard";
 import { trpc } from "@/lib/trpc";
-import { ArrowRight, BookOpen, CalendarDays, ClipboardList, Clock3, ExternalLink, ListTree, Star, UserRound } from "lucide-react";
-import { useMemo, useState } from "react";
+import {
+  ArrowRight,
+  BookOpen,
+  CalendarDays,
+  ClipboardList,
+  Clock3,
+  FileBarChart,
+  NotebookPen,
+  Star,
+  UserRound,
+} from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { usePermissions } from "@/hooks/usePermissions";
-import { GRADE_LABELS, QURAN_SURAHS } from "../../../shared/types";
-import { scoreToStars } from "../../../shared/mizan";
-import { buildStudentLearningSummary, buildTeacherFollowUpRecommendations } from "../../../shared/studentLearningPlan";
+import { segmentsText } from "@/mushaf/lib/daily-record-text";
+import { gradeLabel, gradeOf } from "@/mushaf/lib/grading";
 
-type ProfileTab = "summary" | "memorization" | "revision" | "attendance" | "evaluations" | "timeline";
+type ProfileTab = "summary" | "days" | "notes";
 const profileTabs: { id: ProfileTab; label: string }[] = [
   { id: "summary", label: "الملخص" },
-  { id: "memorization", label: "الحفظ" },
-  { id: "revision", label: "المراجعة" },
-  { id: "attendance", label: "الحضور" },
-  { id: "evaluations", label: "التقييمات" },
-  { id: "timeline", label: "السجل" },
+  { id: "days", label: "أيام السجل" },
+  { id: "notes", label: "الملاحظات" },
 ];
 
+const STATUS: Record<string, { label: string; tone: string }> = {
+  present: { label: "حاضر", tone: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" },
+  late: { label: "متأخر", tone: "bg-amber-500/10 text-amber-700 dark:text-amber-300" },
+  absent: { label: "غائب", tone: "bg-destructive/10 text-destructive" },
+  excused: { label: "مستأذن", tone: "bg-primary/10 text-primary" },
+};
+
+const dayLabel = (date: string) =>
+  new Date(`${date}T12:00:00`).toLocaleDateString("ar-SA", {
+    weekday: "short",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+const scoreText = (score: number | null | undefined) =>
+  score == null ? "" : ` · ${gradeLabel(gradeOf(score))}`;
+
+/**
+ * ملف الطالب: كل بياناته من السجل اليومي للحلقة (حضور آخر 30 يوماً، وآخر حفظ ومراجعة وتقييم، وأيامه
+ * وملاحظاته)، مع إجراء مباشر لتسجيل يومه أو استخراج تقريره.
+ */
 export default function StudentProfile({ studentId }: { studentId?: number }) {
-  const { role } = usePermissions();
-  const isStudentReader = role === "student";
-  const isGuardianReader = role === "guardian";
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
+  const { can, role } = usePermissions();
+  const isReader = role === "student" || role === "guardian";
   const [activeTab, setActiveTab] = useState<ProfileTab>("summary");
-  const input = useMemo(() => ({ studentId: studentId ?? 0, startDate: start ? new Date(`${start}T00:00:00`) : undefined, endDate: end ? new Date(`${end}T23:59:59`) : undefined }), [studentId, start, end]);
-  const { data, isLoading } = trpc.mizan.studentProfile.useQuery(input, { enabled: Boolean(studentId) });
-  if (isLoading) return <div className="space-y-4"><div className="skeleton h-44 rounded-3xl" /><div className="skeleton h-72 rounded-2xl" /></div>;
-  if (!data) return <div className="py-16 text-center"><p className="text-muted-foreground">ملف الطالب غير متاح.</p><Link href="/students" className="btn-gold mt-4 inline-flex px-4 py-2 text-sm">العودة للطلاب</Link></div>;
+  const enabled = Boolean(studentId);
+  const student = studentId ?? 0;
+  const profile = trpc.students.byId.useQuery({ id: student }, { enabled });
+  const overview = trpc.daily.studentOverview.useQuery({ student }, { enabled });
+  const days = trpc.daily.studentDays.useQuery({ student, limit: 120 }, { enabled });
 
-  const { student, attendance, memorization, revision, evaluations } = data;
-  const count = (status: string) => attendance.filter((item) => item.status === status).length;
-  const pages = (items: { pages: string | null }[]) => items.reduce((sum, item) => sum + Number(item.pages ?? 0), 0);
-  const activity = [...memorization.map((item) => ({ ...item, kind: "memorization" as const })), ...revision.map((item) => ({ ...item, kind: "revision" as const }))].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  const surah = (number: number) => QURAN_SURAHS.find((item) => item.number === number)?.name ?? `سورة ${number}`;
-  const attendanceRate = attendance.length ? Math.round((count("present") / attendance.length) * 100) : 0;
-  const averageScore = evaluations.length ? Math.round(evaluations.reduce((sum, item) => sum + Number(item.totalScore ?? 0), 0) / evaluations.length) : 0;
-  const learningSummary = buildStudentLearningSummary({ memorization, revision, attendance });
-  const followUpRecommendations = buildTeacherFollowUpRecommendations(learningSummary);
-  const latestMemorization = learningSummary.latestMemorization;
-  const latestRevision = learningSummary.latestRevision;
+  if (profile.isLoading || overview.isLoading)
+    return (
+      <div className="space-y-4">
+        <div className="skeleton h-44 rounded-3xl" />
+        <div className="skeleton h-72 rounded-2xl" />
+      </div>
+    );
+  const info = profile.data;
+  if (!info)
+    return (
+      <div className="py-16 text-center">
+        <p className="text-muted-foreground">ملف الطالب غير متاح.</p>
+        <Link href="/students" className="btn-gold mt-4 inline-flex px-4 py-2 text-sm">
+          العودة للطلاب
+        </Link>
+      </div>
+    );
 
-  const visibleTabs = isStudentReader ? profileTabs.filter((tab) => ["summary", "memorization", "revision", "timeline"].includes(tab.id)) : isGuardianReader ? profileTabs.filter((tab) => ["summary", "memorization", "revision", "attendance", "timeline"].includes(tab.id)) : profileTabs;
-  return <div className="space-y-6" dir="rtl">
-    <Link href="/students" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowRight className="h-4 w-4" />الطلاب</Link>
-    <section className="glass-card rounded-3xl p-5 sm:p-7"><div className="flex flex-col gap-5 sm:flex-row sm:items-center"><div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/15 font-display text-2xl font-bold text-primary">{student.name.charAt(0)}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h1 className="page-title">{student.name}</h1><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${student.isActive ? "bg-emerald-500/10 text-emerald-700" : "bg-muted text-muted-foreground"}`}>{student.isActive ? "نشط" : "موقوف"}</span></div><p className="mt-1 text-sm text-muted-foreground">الحلقة الحالية · آخر حفظ: {surah(student.lastMemorizedSurah ?? 1)}، آية {student.lastMemorizedAyah ?? 1}</p></div>{!isStudentReader && !isGuardianReader && <div className="text-sm text-muted-foreground">{student.guardianName ? `ولي الأمر: ${student.guardianName}` : "لا يوجد ولي أمر مسجل"}</div>}</div></section>
-    {!isStudentReader && !isGuardianReader && <AIGuidanceCard context="students" />}
-    <section className="glass-card rounded-2xl p-4"><div className="flex flex-col gap-3 md:flex-row md:items-end"><label className="flex-1 text-sm font-medium text-foreground">من تاريخ<input type="date" className="tarteel-input mt-1" value={start} onChange={(event) => setStart(event.target.value)} /></label><label className="flex-1 text-sm font-medium text-foreground">إلى تاريخ<input type="date" className="tarteel-input mt-1" value={end} onChange={(event) => setEnd(event.target.value)} /></label><div className="pb-2 text-xs text-muted-foreground">تتحدث النتائج تلقائياً عند تغيير الفترة.</div></div></section>
-    <div className="flex gap-1 overflow-x-auto rounded-2xl bg-muted/50 p-1">{visibleTabs.map((tab) => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${activeTab === tab.id ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>{tab.label}</button>)}</div>
+  const o = overview.data;
+  const att = o?.attendance ?? { present: 0, late: 0, absent: 0, excused: 0 };
+  const marked = att.present + att.late + att.absent + att.excused;
+  const rate = marked ? Math.round(((att.present + att.late) / marked) * 100) : null;
+  const evaluation = o?.last_evaluation;
+  const evalAvg = evaluation
+    ? (() => {
+        const v = [evaluation.overall, evaluation.tajweed, evaluation.pronunciation, evaluation.behavior].filter(
+          (x): x is number => typeof x === "number"
+        );
+        return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+      })()
+    : null;
+  const circleId = info.circleId;
+  const rows = days.data ?? [];
 
-    {activeTab === "summary" && <>
-      {!isStudentReader && !isGuardianReader && <section className="grid grid-cols-2 gap-3 md:grid-cols-4"><Stat label="نسبة الحضور" value={`${attendanceRate}%`} icon={<UserRound className="h-4 w-4" />} tone="text-emerald-700" /><Stat label="إجمالي الغياب" value={count("absent")} icon={<Clock3 className="h-4 w-4" />} tone="text-destructive" /><Stat label="متوسط التقييم" value={evaluations.length ? `${averageScore}/100` : "—"} icon={<Star className="h-4 w-4" />} tone="text-primary" /><Stat label="التأخر" value={count("late")} icon={<CalendarDays className="h-4 w-4" />} tone="text-amber-600" /></section>}
-      <LearningPlanPanel summary={learningSummary} surah={surah} showAttendance={!isStudentReader} />
-      {!isStudentReader && !isGuardianReader && <TeacherFollowUpPanel recommendations={followUpRecommendations} />}
-      <section className="grid gap-4 lg:grid-cols-2"><AchievementSummary title="الحفظ" icon={<BookOpen className="h-5 w-5 text-primary" />} pages={pages(memorization)} latest={latestMemorization} surah={surah} /><AchievementSummary title="المراجعة" icon={<ClipboardList className="h-5 w-5 text-primary" />} pages={pages(revision)} latest={latestRevision} surah={surah} /></section>
-    </>}
+  return (
+    <div className="space-y-6" dir="rtl">
+      <Link href="/students" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <ArrowRight className="h-4 w-4" />
+        الطلاب
+      </Link>
+      <section className="glass-card rounded-3xl p-5 sm:p-7">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/15 font-display text-2xl font-bold text-primary">
+            {info.name.charAt(0)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="page-title">{info.name}</h1>
+              <span
+                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${info.isActive ? "bg-emerald-500/10 text-emerald-700" : "bg-muted text-muted-foreground"}`}
+              >
+                {info.isActive ? "نشط" : "موقوف"}
+              </span>
+            </div>
+            {circleId && !isReader && (
+              <Link href={`/circles/${circleId}`} className="mt-1 inline-block text-sm text-primary hover:underline">
+                صفحة الحلقة
+              </Link>
+            )}
+          </div>
+          {!isReader && circleId && (
+            <div className="flex flex-wrap gap-2">
+              {can("daily:manage") && (
+                <Link
+                  href={`/daily?halaqa=${circleId}&student=${info.id}`}
+                  className="btn-gold flex items-center gap-2 px-4 py-2 text-sm"
+                >
+                  <ClipboardList className="h-4 w-4" />
+                  تسجيل اليوم
+                </Link>
+              )}
+              {can("reports:view") && (
+                <Link
+                  href={`/reports?halaqa=${circleId}&student=${info.id}`}
+                  className="flex items-center gap-2 rounded-xl border border-border bg-background/70 px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted"
+                >
+                  <FileBarChart className="h-4 w-4 text-primary" />
+                  تقرير الطالب
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+      {!isReader && <AIGuidanceCard context="students" />}
+      <div className="flex gap-1 overflow-x-auto rounded-2xl bg-muted/50 p-1" role="tablist">
+        {profileTabs.map(tab => (
+          <button
+            key={tab.id}
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${activeTab === tab.id ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-    {activeTab === "memorization" && <AchievementList title="سجل الحفظ" kind="memorization" items={memorization} surah={surah} />}
-    {activeTab === "revision" && <AchievementList title="سجل المراجعة" kind="revision" items={revision} surah={surah} />}
-    {activeTab === "attendance" && <section className="glass-card overflow-x-auto rounded-2xl"><SectionTitle title="سجل الحضور" note="حالات الحضور ضمن الفترة المحددة." /><table className="min-w-[560px] w-full text-right text-sm"><thead className="bg-muted/40 text-muted-foreground"><tr><th className="p-3">الحالة</th><th className="p-3">رقم الفترة</th></tr></thead><tbody>{attendance.map((item) => <tr key={item.id} className="border-b border-border/50 last:border-0"><td className="p-3 font-semibold text-foreground">{attendanceLabel(item.status)}</td><td className="p-3 text-muted-foreground">#{item.sessionId}</td></tr>)}{!attendance.length && <EmptyRows colSpan={2} text="لا توجد سجلات حضور في هذه الفترة." />}</tbody></table></section>}
-    {activeTab === "evaluations" && <section className="grid gap-4 md:grid-cols-2">{evaluations.map((item) => <div key={item.id} className="glass-card rounded-2xl p-5"><div className="flex items-center justify-between"><h2 className="font-display text-lg font-bold text-foreground">تقييم الفترة #{item.sessionId}</h2><Stars value={scoreToStars(item.totalScore)} /></div><p className="mt-3 text-3xl font-display font-bold text-primary">{item.totalScore ?? "—"}<span className="mr-1 text-sm font-normal text-muted-foreground">/100</span></p>{item.notes && <p className="mt-3 rounded-xl bg-muted/40 p-3 text-sm text-muted-foreground">{item.notes}</p>}<p className="mt-3 text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleDateString("ar-SA")}</p></div>)}{!evaluations.length && <EmptyCard text="لا توجد تقييمات ضمن الفترة المحددة." />}</section>}
-    {activeTab === "timeline" && <Timeline activity={activity} surah={surah} />}
-  </div>;
+      {activeTab === "summary" && (
+        <>
+          <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Stat label="نسبة الحضور (30 يوماً)" value={rate === null ? "—" : `${rate}%`} icon={<UserRound className="h-4 w-4" />} tone="text-emerald-700" />
+            <Stat label="الغياب" value={att.absent} icon={<Clock3 className="h-4 w-4" />} tone="text-destructive" />
+            <Stat label="التأخر" value={att.late} icon={<CalendarDays className="h-4 w-4" />} tone="text-amber-600" />
+            <Stat label="الاستئذان" value={att.excused} icon={<CalendarDays className="h-4 w-4" />} tone="text-primary" />
+          </section>
+          <section className="grid gap-4 lg:grid-cols-3">
+            <Card title="آخر حفظ" icon={<BookOpen className="h-5 w-5 text-primary" />}>
+              {o?.last_memorize ? (
+                <>
+                  <p className="font-semibold text-foreground">{segmentsText([o.last_memorize])}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{dayLabel(o.last_memorize.session_date)}</p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">لم يُسجّل بعد</p>
+              )}
+            </Card>
+            <Card title="آخر مراجعة" icon={<ClipboardList className="h-5 w-5 text-primary" />}>
+              {o?.last_review ? (
+                <>
+                  <p className="font-semibold text-foreground">{segmentsText([o.last_review])}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{dayLabel(o.last_review.session_date)}</p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">لم تُسجّل بعد</p>
+              )}
+            </Card>
+            <Card title="آخر تقييم" icon={<Star className="h-5 w-5 text-primary" />}>
+              {evaluation && evalAvg !== null ? (
+                <>
+                  <Stars value={evalAvg} />
+                  <p className="mt-1 text-xs text-muted-foreground">{dayLabel(evaluation.session_date)}</p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">لا يوجد تقييم بعد</p>
+              )}
+            </Card>
+          </section>
+        </>
+      )}
+
+      {activeTab === "days" && (
+        <section className="space-y-3">
+          {days.isLoading && <div className="skeleton h-24 rounded-2xl" />}
+          {days.data && !rows.length && <EmptyCard text="لا توجد أيام مسجلة لهذا الطالب بعد." />}
+          {rows.map(day => {
+            const status = day.status ? STATUS[day.status] : null;
+            return (
+              <div key={`${day.date}-${day.circleId}`} className="glass-card rounded-2xl p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-semibold text-foreground">{dayLabel(day.date)}</p>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${status ? status.tone : "bg-muted text-muted-foreground"}`}>
+                    {status ? status.label : "لم يُرصد"}
+                  </span>
+                </div>
+                <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                  {day.memorize && (
+                    <p>
+                      حفظ: <span className="text-foreground">{segmentsText(day.memorize.segments)}</span>
+                      {scoreText(day.memorize.score)}
+                    </p>
+                  )}
+                  {day.review && (
+                    <p>
+                      مراجعة: <span className="text-foreground">{segmentsText(day.review.segments)}</span>
+                      {scoreText(day.review.score)}
+                    </p>
+                  )}
+                  {day.reason && <p>السبب: {day.reason}</p>}
+                  {day.note && <p>ملاحظة: {day.note}</p>}
+                </div>
+                {!isReader && (
+                  <Link
+                    href={`/daily?halaqa=${day.circleId}&date=${day.date}&student=${info.id}`}
+                    className="mt-2 inline-block text-xs font-semibold text-primary hover:underline"
+                  >
+                    فتح في السجل اليومي
+                  </Link>
+                )}
+              </div>
+            );
+          })}
+        </section>
+      )}
+
+      {activeTab === "notes" && (
+        <section className="space-y-3">
+          {!o?.notes.length && <EmptyCard text="لا توجد ملاحظات بعد." />}
+          {o?.notes.map(n => (
+            <div key={`${n.session_date}-${n.note}`} className="glass-card flex gap-3 rounded-2xl p-4">
+              <NotebookPen className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+              <div>
+                <p className="text-sm text-foreground">{n.note}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{dayLabel(n.session_date)}</p>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+    </div>
+  );
 }
 
-function AchievementSummary({ title, icon, pages, latest, surah }: { title: string; icon: React.ReactNode; pages: number; latest: any; surah: (number: number) => string }) { return <div className="glass-card rounded-2xl p-5"><div className="flex items-center gap-2">{icon}<h2 className="font-display text-xl font-bold text-foreground">{title}</h2></div><p className="mt-4 text-3xl font-display font-bold text-foreground">{pages.toFixed(1)} <span className="text-sm font-normal text-muted-foreground">صفحة</span></p><p className="mt-2 text-sm text-muted-foreground">آخر سجل: {latest ? `${surah(latest.surahNumber)} · آية ${latest.toAyah}` : "لا توجد سجلات"}</p>{latest && <Link href={`/quran?surah=${latest.surahNumber}&ayah=${latest.fromAyah}`} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">فتح في المصحف <ExternalLink className="h-3.5 w-3.5" /></Link>}</div>; }
-function LearningPlanPanel({ summary, surah, showAttendance }: { summary: ReturnType<typeof buildStudentLearningSummary>; surah: (number: number) => string; showAttendance: boolean }) { const point = (record: typeof summary.latestMemorization) => record ? `${surah(record.toSurahNumber ?? record.surahNumber)} · آية ${record.toAyah}` : "لم يُسجّل بعد"; return <section className="glass-card rounded-2xl p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><ListTree className="h-5 w-5 text-primary" /><h2 className="font-display text-xl font-bold text-foreground">مسار المتابعة الحالي</h2></div><p className="mt-1 text-sm leading-6 text-muted-foreground">يعرض آخر ما وثّق في السجلات ضمن الفترة المحددة، ولا يضع هدفاً جديداً بدلاً من المعلم.</p></div>{summary.hasRecordedProgress && <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">تقدّم موثّق</span>}</div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><ProgressPoint label="آخر موضع حفظ" value={point(summary.latestMemorization)} note={`${summary.memorizationRecordCount} سجل · ${summary.memorizationPages.toFixed(1)} صفحة`} /><ProgressPoint label="آخر موضع مراجعة" value={point(summary.latestRevision)} note={`${summary.revisionRecordCount} سجل · ${summary.revisionPages.toFixed(1)} صفحة`} />{showAttendance && <ProgressPoint label="الحضور في الفترة" value={summary.attendanceRate === null ? "لا توجد حالات" : `${summary.attendanceRate}% حضور`} note={summary.attendanceRate === null ? "لا توجد فترة معتمدة ضمن النطاق" : summary.absences ? `${summary.absences} غياب مسجل` : "لا يوجد غياب مسجل"} />}</div>{!summary.hasRecordedProgress && <p className="mt-4 rounded-xl border border-dashed border-primary/25 bg-primary/5 p-3 text-sm leading-6 text-muted-foreground">لم تسجّل للحفظ أو المراجعة بيانات في الفترة المحددة؛ أضفها من سجل الطالب داخل الفترة لتظهر هنا.</p>}</section>; }
-function ProgressPoint({ label, value, note }: { label: string; value: string; note: string }) { return <div className="rounded-xl border border-border/70 bg-background/60 p-3"><p className="text-xs font-semibold text-muted-foreground">{label}</p><p className="mt-1 font-bold text-foreground">{value}</p><p className="mt-1 text-xs text-muted-foreground">{note}</p></div>; }
-function TeacherFollowUpPanel({ recommendations }: { recommendations: ReturnType<typeof buildTeacherFollowUpRecommendations> }) { if (!recommendations.length) return null; const tone = { neutral: "border-primary/20 bg-primary/5", attention: "border-amber-500/25 bg-amber-500/10", positive: "border-emerald-500/25 bg-emerald-500/10" }; return <section className="rounded-2xl border border-border bg-background/60 p-5"><div className="flex items-center gap-2"><ClipboardList className="h-5 w-5 text-primary" /><h2 className="font-display text-xl font-bold text-foreground">تنبيهات متابعة المعلم</h2></div><p className="mt-1 text-sm text-muted-foreground">مؤشرات تفسيرية من السجلات المعروضة، وليست حكماً على أداء الطالب.</p><div className="mt-4 grid gap-3 lg:grid-cols-2">{recommendations.map((recommendation) => <div key={recommendation.title} className={`rounded-xl border p-3 ${tone[recommendation.tone]}`}><p className="font-bold text-foreground">{recommendation.title}</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{recommendation.detail}</p></div>)}</div></section>; }
-function AchievementList({ title, kind, items, surah }: { title: string; kind: "memorization" | "revision"; items: any[]; surah: (number: number) => string }) { return <section className="glass-card overflow-x-auto rounded-2xl"><SectionTitle title={title} note="السجلات مرتبطة بالفترات ويمكن الرجوع إلى موضعها في المصحف." /><table className="min-w-[760px] w-full text-right text-sm"><thead className="bg-muted/40 text-muted-foreground"><tr><th className="p-3">من</th><th className="p-3">إلى</th><th className="p-3">الصفحات</th><th className="p-3">التقدير</th><th className="p-3">المصحف</th><th className="p-3">التاريخ</th></tr></thead><tbody>{items.map((item) => <tr key={item.id} className="border-b border-border/50 last:border-0"><td className="p-3">{surah(item.surahNumber)} · {item.fromAyah}</td><td className="p-3">{surah(item.toSurahNumber ?? item.surahNumber)} · {item.toAyah}</td><td className="p-3">{item.pages ?? "—"}</td><td className="p-3">{item.grade ? GRADE_LABELS[item.grade as keyof typeof GRADE_LABELS] : "—"}</td><td className="p-3"><Link href={`/quran?surah=${item.surahNumber}&ayah=${item.fromAyah}`} className="inline-flex items-center gap-1 text-primary hover:underline">فتح <ExternalLink className="h-3.5 w-3.5" /></Link></td><td className="p-3 text-muted-foreground">{new Date(item.createdAt).toLocaleDateString("ar-SA")}</td></tr>)}{!items.length && <EmptyRows colSpan={6} text={`لا توجد سجلات ${kind === "memorization" ? "حفظ" : "مراجعة"} في هذه الفترة.`} />}</tbody></table></section>; }
-function Timeline({ activity, surah }: { activity: any[]; surah: (number: number) => string }) { return <section className="glass-card rounded-2xl p-5"><SectionTitle title="السجل الزمني" note="تسلسل الحفظ والمراجعة من الأحدث إلى الأقدم." /><div className="relative mt-2 space-y-4 border-r border-primary/20 pr-5">{activity.map((item) => <div key={`${item.kind}-${item.id}`} className="relative"><span className="absolute -right-[1.65rem] top-1 h-3 w-3 rounded-full bg-primary ring-4 ring-background" /><p className="font-semibold text-foreground">{item.kind === "memorization" ? "حفظ" : "مراجعة"} · {surah(item.surahNumber)} {item.fromAyah}–{item.toAyah}</p><p className="mt-1 text-sm text-muted-foreground">{new Date(item.createdAt).toLocaleDateString("ar-SA")} {item.grade ? `· ${GRADE_LABELS[item.grade as keyof typeof GRADE_LABELS]}` : ""}</p></div>)}{!activity.length && <p className="text-sm text-muted-foreground">لا توجد أحداث ضمن الفترة المحددة.</p>}</div></section>; }
-function SectionTitle({ title, note }: { title: string; note: string }) { return <div className="border-b border-border p-5"><h2 className="font-display text-xl font-bold text-foreground">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{note}</p></div>; }
-function Stat({ label, value, icon, tone }: { label: string; value: React.ReactNode; icon: React.ReactNode; tone: string }) { return <div className="glass-card rounded-2xl p-4"><div className="flex items-center gap-1.5 text-xs text-muted-foreground">{icon}{label}</div><p className={`mt-2 font-display text-2xl font-bold ${tone}`}>{value}</p></div>; }
-function Stars({ value }: { value: number }) { return <div className="flex gap-0.5 text-primary">{[1,2,3,4,5].map((star) => <Star key={star} className="h-4 w-4" fill={star <= value ? "currentColor" : "none"} />)}</div>; }
-function EmptyRows({ colSpan, text }: { colSpan: number; text: string }) { return <tr><td colSpan={colSpan} className="p-10 text-center text-muted-foreground">{text}</td></tr>; }
-function EmptyCard({ text }: { text: string }) { return <div className="glass-card rounded-2xl py-10 text-center text-sm text-muted-foreground md:col-span-2">{text}</div>; }
-function attendanceLabel(status: string) { return ({ present: "حاضر", absent: "غائب", late: "متأخر", excused: "مستأذن" } as Record<string, string>)[status] ?? status; }
+function Card({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
+  return (
+    <div className="glass-card rounded-2xl p-5">
+      <div className="mb-3 flex items-center gap-2">
+        {icon}
+        <h2 className="font-display text-lg font-bold text-foreground">{title}</h2>
+      </div>
+      {children}
+    </div>
+  );
+}
+function Stat({ label, value, icon, tone }: { label: string; value: ReactNode; icon: ReactNode; tone: string }) {
+  return (
+    <div className="glass-card rounded-2xl p-4">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        {icon}
+        {label}
+      </div>
+      <p className={`mt-2 font-display text-2xl font-bold ${tone}`}>{value}</p>
+    </div>
+  );
+}
+function Stars({ value }: { value: number }) {
+  return (
+    <div className="flex gap-0.5 text-primary" aria-label={`${Math.round(value)} من 5`}>
+      {[1, 2, 3, 4, 5].map(star => (
+        <Star key={star} className="h-5 w-5" fill={star <= Math.round(value) ? "currentColor" : "none"} />
+      ))}
+    </div>
+  );
+}
+function EmptyCard({ text }: { text: string }) {
+  return <div className="glass-card rounded-2xl py-10 text-center text-sm text-muted-foreground">{text}</div>;
+}

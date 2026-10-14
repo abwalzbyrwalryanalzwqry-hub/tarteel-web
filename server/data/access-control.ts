@@ -2,7 +2,6 @@ import { and, desc, eq, gt, inArray, isNull, lt, lte, or, sql } from "drizzle-or
 import {
   accessCodeAttempts,
   accessCodes,
-  branches,
   centerMemberships,
   centers,
   circles,
@@ -50,7 +49,7 @@ export async function getActiveUserScopes(userId: number, centerId: number) {
 export async function getCenterIdForCircle(circleId: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select({ centerId: branches.centerId }).from(circles).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(eq(circles.id, circleId), isNull(circles.deletedAt), isNull(branches.deletedAt))).limit(1);
+  const result = await db.select({ centerId: circles.centerId }).from(circles).where(and(eq(circles.id, circleId), isNull(circles.deletedAt))).limit(1);
   return result[0]?.centerId;
 }
 
@@ -259,7 +258,7 @@ async function redeemAccessCodeInTransaction(
         .map((scope: any) => scope.scopeId as number);
       const uniqueGuideCircleIds = Array.from(new Set(guideCircleIds));
       if (accessCode.maxUses !== 1 || uniqueGuideCircleIds.length === 0 || uniqueGuideCircleIds.length !== embeddedScopes.length) throw new Error("كود الموجّه غير صالح؛ يلزم حلقات محددة واستخدام واحد");
-      const guideCircles = await tx.select({ id: circles.id, centerId: branches.centerId }).from(circles).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(circles.id, uniqueGuideCircleIds), isNull(circles.deletedAt)));
+      const guideCircles = await tx.select({ id: circles.id, centerId: circles.centerId }).from(circles).where(and(inArray(circles.id, uniqueGuideCircleIds), isNull(circles.deletedAt)));
       if (guideCircles.length !== uniqueGuideCircleIds.length || guideCircles.some((circle) => circle.centerId !== accessCode.centerId)) throw new Error("نطاق حلقات الموجّه غير صالح أو خارج المركز");
     }
     if (isReaderAccessCode) {

@@ -3,8 +3,6 @@ import {
   centerMemberships,
   centers,
   organizations,
-  reportingGoals,
-  reportingPreferences,
   userScopes,
   users,
 } from "../../drizzle/schema";
@@ -64,32 +62,3 @@ export async function softDeleteCenter(id: number) {
   await db.update(centers).set({ deletedAt: new Date(), isActive: false }).where(eq(centers.id, id));
 }
 
-export async function getReportingGoals(centerId: number) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const result = await db.select().from(reportingGoals).where(eq(reportingGoals.centerId, centerId)).limit(1);
-  return result[0];
-}
-
-export async function saveReportingGoals(input: { centerId: number; attendanceTarget?: number | null; memorizedPagesTarget?: number | null; reviewedPagesTarget?: number | null; updatedBy: number }) {
-  const db = await getDb();
-  if (!db) throw new Error("DB not available");
-  const now = new Date();
-  await db.insert(reportingGoals).values(input).onDuplicateKeyUpdate({ set: { attendanceTarget: input.attendanceTarget ?? null, memorizedPagesTarget: input.memorizedPagesTarget ?? null, reviewedPagesTarget: input.reviewedPagesTarget ?? null, updatedBy: input.updatedBy, updatedAt: now } });
-  return getReportingGoals(input.centerId);
-}
-
-export async function getReportingPreferences(centerId: number) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const result = await db.select().from(reportingPreferences).where(eq(reportingPreferences.centerId, centerId)).limit(1);
-  return result[0];
-}
-
-export async function saveReportingPreferences(input: { centerId: number; headerTitle?: string | null; footerText?: string | null; logoUrl?: string | null; logoKey?: string | null; teacherMessageTemplate?: string | null; updatedBy: number }) {
-  const db = await getDb();
-  if (!db) throw new Error("DB not available");
-  const now = new Date();
-  await db.insert(reportingPreferences).values(input).onDuplicateKeyUpdate({ set: { headerTitle: input.headerTitle ?? null, footerText: input.footerText ?? null, logoUrl: input.logoUrl ?? null, logoKey: input.logoKey ?? null, teacherMessageTemplate: input.teacherMessageTemplate ?? null, updatedBy: input.updatedBy, updatedAt: now } });
-  return getReportingPreferences(input.centerId);
-}

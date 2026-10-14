@@ -24,9 +24,7 @@ export function SurahList({
   const list = useMemo(() => {
     const k = normalizeName(q);
     if (!k) return SURAHS;
-    return SURAHS.filter(
-      s => String(s.n) === k || normalizeName(s.name).includes(k)
-    );
+    return SURAHS.filter((s) => String(s.n) === k || normalizeName(s.name).includes(k));
   }, [q]);
   return (
     <div className="space-y-2">
@@ -39,21 +37,18 @@ export function SurahList({
         <input
           type="search"
           value={q}
-          onChange={e => setQ(e.target.value)}
+          onChange={(e) => setQ(e.target.value)}
           placeholder={t("surahPicker.search")}
           className="w-full min-h-11 rounded-2xl border border-border/60 bg-background/70 ps-9 pe-3 text-sm"
         />
       </label>
       {list.length === 0 ? (
-        <p
-          className="py-6 text-center text-xs text-muted-foreground"
-          role="status"
-        >
+        <p className="py-6 text-center text-xs text-muted-foreground" role="status">
           {t("surahPicker.none")}
         </p>
       ) : (
         <ul className="grid gap-1" role="list">
-          {list.map(s => {
+          {list.map((s) => {
             const on = s.n === current;
             return (
               <li key={s.n}>
@@ -61,11 +56,7 @@ export function SurahList({
                   type="button"
                   disabled={s.n < min || s.n > max}
                   aria-current={on ? "true" : undefined}
-                  ref={
-                    on
-                      ? el => el?.scrollIntoView({ block: "center" })
-                      : undefined
-                  }
+                  ref={on ? (el) => el?.scrollIntoView({ block: "center" }) : undefined}
                   onClick={() => onPick(s.n)}
                   className={`w-full min-h-12 rounded-2xl px-2 flex items-center gap-2 text-start disabled:opacity-35 ${
                     on ? "bg-primary/12 ring-1 ring-primary/40" : "bg-muted/40"

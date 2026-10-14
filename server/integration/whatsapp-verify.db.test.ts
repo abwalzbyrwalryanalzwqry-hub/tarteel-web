@@ -18,8 +18,6 @@ import {
   vi,
 } from "vitest";
 import {
-  academicSeasons,
-  branches,
   centerMemberships,
   centers,
   circles,
@@ -443,18 +441,8 @@ describeWithDb("ربط ولي الأمر بكل أبنائه برقم هاتفه
       status: "active",
       isOwner: true,
     });
-    const [branch] = await d
-      .insert(branches)
-      .values({ centerId: centerA, name: "الفرع الرئيسي" });
-    const [season] = await d.insert(academicSeasons).values({
-      centerId: centerA,
-      name: "1448",
-      startDate: new Date("2026-09-01"),
-      endDate: new Date("2027-06-30"),
-    });
     const [circle] = await d.insert(circles).values({
-      branchId: Number(branch.insertId),
-      seasonId: Number(season.insertId),
+      centerId: centerA,
       name: "حلقة الفجر",
     });
     fx = {

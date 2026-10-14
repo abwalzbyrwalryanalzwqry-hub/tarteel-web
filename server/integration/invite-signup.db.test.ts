@@ -4,7 +4,7 @@
 import { describeWithDb, uniqueSuffix } from "../testing/database";
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeAll, expect, it } from "vitest";
-import { academicSeasons, accessCodeAttempts, accessCodes, branches, centerMemberships, centers, circles, localCredentials, organizations, students, teacherInvites, users } from "../../drizzle/schema";
+import { accessCodeAttempts, accessCodes, centerMemberships, centers, circles, localCredentials, organizations, students, teacherInvites, users } from "../../drizzle/schema";
 import { hashAccessCode } from "../accessCodeSecurity";
 import { ENV } from "../_core/env";
 import type { TrpcContext } from "../_core/context";
@@ -40,9 +40,7 @@ beforeAll(async () => {
   const [org] = await d.insert(organizations).values({ name: `منظمة ${s}` });
   const [center] = await d.insert(centers).values({ organizationId: Number(org.insertId), name: `مركز ${s}` });
   const centerId = Number(center.insertId);
-  const [branch] = await d.insert(branches).values({ centerId, name: "الفرع الرئيسي" });
-  const [season] = await d.insert(academicSeasons).values({ centerId, name: "1448", startDate: new Date("2026-09-01"), endDate: new Date("2027-06-30") });
-  const [circle] = await d.insert(circles).values({ branchId: Number(branch.insertId), seasonId: Number(season.insertId), name: "حلقة الفجر" });
+  const [circle] = await d.insert(circles).values({ centerId, name: "حلقة الفجر" });
   const [student] = await d.insert(students).values({ centerId, name: "طالب" });
   fx = { centerId, circleId: Number(circle.insertId), studentId: Number(student.insertId), adminId };
 });

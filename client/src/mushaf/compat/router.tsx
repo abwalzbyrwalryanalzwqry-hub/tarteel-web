@@ -33,6 +33,10 @@ export function toTarteelPath(to: string): string {
     mapped = STANDALONE_MUSHAF ? "/quran" : "/dashboard";
   else if (path === "/auth/login")
     mapped = STANDALONE_MUSHAF ? "/quran" : "/login";
+  // السجل اليومي والتقارير (منقولان من زِن) في جذر ترتيل.
+  else if (path === "/teacher/register") mapped = "/daily";
+  else if (path === "/teacher/reports") mapped = "/reports";
+  else if (path === "/teacher" || path === "/teacher/") mapped = "/dashboard";
   return mapped + rest;
 }
 
@@ -42,6 +46,8 @@ export function toZenPath(path: string): string {
   if (path.startsWith("/quran/"))
     return `/mushaf/${path.slice("/quran/".length)}`;
   if (path === "/dashboard") return "/today";
+  if (path === "/daily") return "/teacher/register";
+  if (path === "/reports") return "/teacher/reports";
   return path;
 }
 
@@ -191,6 +197,33 @@ export function createFileRoute(_path: string) {
       const Component = options.component;
       return <Component />;
     }
-    return { options, useSearch: useRouteSearch, Component: RouteComponent };
+    /**
+     * Route.useNavigate في TanStack: التنقل داخل الشاشة نفسها بتعديل الاستعلام (search كائناً أو دالة
+     * من الحالي)، مع البقاء على المسار الحالي ما لم يُعطَ `to`.
+     */
+    function useRouteNavigate() {
+      const [location] = useLocation();
+      const current = useRouteSearch();
+      return (opts: {
+        to?: string;
+        search?: SearchInput | ((prev: S) => SearchInput);
+        replace?: boolean;
+      }) => {
+        const next =
+          typeof opts.search === "function"
+            ? opts.search(current)
+            : opts.search;
+        go((opts.to ? toTarteelPath(opts.to) : location) + serializeSearch(next), {
+          replace: opts.replace,
+        });
+        return Promise.resolve();
+      };
+    }
+    return {
+      options,
+      useSearch: useRouteSearch,
+      useNavigate: useRouteNavigate,
+      Component: RouteComponent,
+    };
   };
 }

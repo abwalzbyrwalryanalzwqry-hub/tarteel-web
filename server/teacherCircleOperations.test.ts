@@ -21,17 +21,16 @@ describe("إدارة المعلم لحلقته", () => {
     expect(router).toContain("assertStudentManageAccess(ctx.user, input.circleId, \"students.create\"");
   });
 
-  it("يثبت معلم الجلسة وموسمها على الحلقة المرتبطة بحسابه", () => {
-    const router = readRouterSource();
-    expect(router).toContain("resolveSessionCreateInput");
-    expect(router).toContain("circle.teacherId !== teacher.id && circle.assistantTeacherId !== teacher.id");
-    expect(router).toContain("لا يمكنك تعيين معلم آخر لجلسة حلقتك");
-    expect(router).toContain("الموسم المحدد لا يطابق موسم الحلقة");
-    expect(router).toContain("sessions: router");
+  it("يحصر الكتابة في السجل اليومي على من يملك التحضير في الحلقة نفسها", () => {
+    const daily = readFileSync(path.join(root, "server/routers/daily.ts"), "utf8").replace(/\s+/g, " ");
+    expect(daily).toContain('assertCirclePermission(user, circleId, "attendance.view")');
+    expect(daily).toContain('assertCirclePermission(user, circleId, "attendance.create")');
+    expect(daily).toContain("if (!access.editor) throw new DailyError(\"NOT_YOUR_HALAQA\")");
   });
 
-  it("يفصل معاينة التقرير عن تصديره بصلاحية التصدير داخل نطاق الحلقة", () => {
-    const reporting = readFileSync(path.join(root, "server/routers/reporting.ts"), "utf8");
-    expect(reporting).toContain('assertReportScope(ctx.user, input.circleId, "reports.export")');
+  it("يقصر بيانات التقارير على صلاحية التصدير داخل نطاق الحلقة", () => {
+    const daily = readFileSync(path.join(root, "server/routers/daily.ts"), "utf8").replace(/\s+/g, " ");
+    expect(daily).toContain('assertCirclePermission(user, circleId, "reports.export")');
+    expect(daily).toContain("await reportAccess(ctx.user, input.halaqa)");
   });
 });

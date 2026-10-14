@@ -3,12 +3,14 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { WhatsAppVerifyPanel, type WhatsAppSession } from "@/components/WhatsAppVerifyPanel";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 const linkedMessage = (count?: number) => (count ? ` ورُبط حسابك بـ ${count === 1 ? "ابنك المسجل" : `${count} من أبنائك المسجلين`} بهذا الرقم` : "");
 
 /** تعيين/تغيير كلمة المرور للدخول بالبريد أو رقم الهاتف. */
 export function PasswordSettingsCard() {
   const utils = trpc.useUtils();
+  const confirm = useConfirm();
   const { data } = trpc.auth.myCredential.useQuery();
   const { data: emailStatus } = trpc.auth.emailStatus.useQuery();
   const resend = trpc.auth.resendVerification.useMutation({
@@ -78,8 +80,8 @@ export function PasswordSettingsCard() {
     },
     onError: (error) => toast.error(error.message),
   });
-  const confirmLogoutAll = () => {
-    if (window.confirm("سيتم تسجيل الخروج من كل الأجهزة، ومنها هذا الجهاز. هل تريد المتابعة؟")) logoutAll.mutate();
+  const confirmLogoutAll = async () => {
+    if (await confirm({ title: "تسجيل الخروج من كل الأجهزة؟", description: "سيتم تسجيل الخروج من كل الأجهزة، ومنها هذا الجهاز.", confirmLabel: "تسجيل الخروج", destructive: true })) logoutAll.mutate();
   };
   const submit = (event: FormEvent) => {
     event.preventDefault();

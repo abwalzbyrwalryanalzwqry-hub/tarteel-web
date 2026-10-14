@@ -87,41 +87,17 @@ export async function trpcQuery<T = unknown>(
   return body.result.data.json as T;
 }
 
-/** يجهز بيانات المركز الأساسية عبر الواجهة البرمجية (ليست موضوع الاختبار): فرع وموسم ومعلم وحلقة وطلاب. */
+/** يجهز بيانات المركز الأساسية عبر الواجهة البرمجية (ليست موضوع الاختبار): معلم وحلقة وطلاب. */
 export async function seedCircle(page: Page, students: string[]) {
   const [center] = await trpcQuery<{ id: number }[]>(page, "centers.list", {});
   const centerId = center.id;
-  await trpcMutation(page, "branches.create", {
-    centerId,
-    name: "الفرع الرئيسي",
-  });
-  const now = Date.now();
-  await trpcMutation(
-    page,
-    "seasons.create",
-    {
-      centerId,
-      name: "العام الدراسي",
-      type: "academic_year",
-      startDate: new Date(now - 30 * 864e5).toISOString(),
-      endDate: new Date(now + 300 * 864e5).toISOString(),
-    },
-    ["startDate", "endDate"]
-  );
   await trpcMutation(page, "teachers.create", { centerId, name: "الشيخ خالد" });
-  const [branch] = await trpcQuery<{ id: number }[]>(page, "branches.list", {
-    centerId,
-  });
-  const [season] = await trpcQuery<{ id: number }[]>(page, "seasons.list", {
-    centerId,
-  });
   await trpcMutation(page, "circles.create", {
-    branchId: branch.id,
-    seasonId: season.id,
+    centerId,
     name: "حلقة أبي بكر",
   });
   const [circle] = await trpcQuery<{ id: number }[]>(page, "circles.list", {
-    branchId: branch.id,
+    centerId,
   });
   for (const name of students)
     await trpcMutation(page, "students.create", { circleId: circle.id, name });

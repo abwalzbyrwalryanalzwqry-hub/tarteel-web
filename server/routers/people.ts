@@ -12,10 +12,8 @@ import {
   createTeacher,
   createTeacherInvite,
   redeemTeacherInvite,
-  getBranchById,
   getCenterIdForCircle,
   getCircleById,
-  getMemorizationByStudent,
   getStudentById,
   getStudentByUserId,
   getStudentsByGuardianUserId,
@@ -47,7 +45,8 @@ export const peopleRouters = {
     byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => { const teacher = await getTeacherById(input.id); if (!teacher) return teacher; await assertPermission(ctx.user, teacher.centerId, "teachers.view"); return teacher; }),
     create: protectedProcedure
       .input(z.object({
-        centerId: z.number(),
+        /** اختياري: إن كان للمستخدم مركز واحد يُستخدم تلقائياً. */
+        centerId: z.number().optional(),
         name: z.string().min(2),
         phone: z.string().optional(),
         email: z.string().email().optional().or(z.literal("")),
@@ -55,13 +54,25 @@ export const peopleRouters = {
         specialization: z.string().optional(),
         qualification: z.string().optional(),
       }))
-      .mutation(async ({ ctx, input }) => { await assertPermission(ctx.user, input.centerId, "teachers.create"); return createTeacher(input); }),
+      .mutation(async ({ ctx, input }) => {
+        let centerId = input.centerId;
+        if (!centerId) {
+          const centerIds = await getAccessibleCenterIds(ctx.user, "teachers.create");
+          if (centerIds.length !== 1) throw new TRPCError({ code: "BAD_REQUEST", message: centerIds.length ? "اختر مركز المعلم" : "لا يوجد مركز يمكنك إضافة معلم إليه" });
+          centerId = centerIds[0];
+        }
+        await assertPermission(ctx.user, centerId, "teachers.create");
+        return createTeacher({ ...input, centerId });
+      }),
     update: protectedProcedure
       .input(z.object({
         id: z.number(),
         name: z.string().optional(),
         phone: z.string().optional(),
+        email: z.string().email().optional().or(z.literal("")),
+        nationalId: z.string().optional(),
         specialization: z.string().optional(),
+        qualification: z.string().optional(),
         isActive: z.boolean().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
@@ -79,8 +90,7 @@ export const peopleRouters = {
       const [teacher, circle] = await Promise.all([getTeacherById(input.teacherId), getCircleById(input.circleId)]);
       if (!teacher || !circle) throw new TRPCError({ code: "NOT_FOUND", message: "المعلم أو الحَلَقة غير موجودة" });
       await assertPermission(ctx.user, teacher.centerId, "teachers.edit"); await assertCirclePermission(ctx.user, circle.id, "circles.assign_teacher");
-      const branch = await getBranchById(circle.branchId);
-      if (!branch || branch.centerId !== teacher.centerId) throw new TRPCError({ code: "BAD_REQUEST", message: "لا يمكن نقل المعلم إلى حَلَقة خارج مركزه" });
+      if (circle.centerId !== teacher.centerId) throw new TRPCError({ code: "BAD_REQUEST", message: "لا يمكن نقل المعلم إلى حَلَقة خارج مركزه" });
       try {
         await transferTeacherToCircle(input.teacherId, input.circleId, input.role);
         return { success: true } as const;
@@ -155,11 +165,17 @@ export const peopleRouters = {
         const circleCenterId = input.circleId ? await getCenterIdForCircle(input.circleId) : undefined;
         if (input.circleId && !circleCenterId) throw new TRPCError({ code: "NOT_FOUND", message: "الحلقة غير موجودة" });
         if (input.circleId && input.centerId && input.centerId !== circleCenterId) throw new TRPCError({ code: "BAD_REQUEST", message: "الحلقة لا تنتمي إلى المركز المحدد" });
-        await assertStudentManageAccess(ctx.user, input.circleId, "students.create", circleCenterId ?? input.centerId);
-        if (!circleCenterId) throw new TRPCError({ code: "BAD_REQUEST", message: "يلزم تحديد المركز للطالب غير المرتبط بحلقة" });
+        // دون حلقة: المركز المحدد، أو مركز المستخدم الوحيد تلقائياً.
+        let centerId = circleCenterId ?? input.centerId;
+        if (!centerId && !input.circleId) {
+          const centerIds = await getAccessibleCenterIds(ctx.user, "students.create");
+          if (centerIds.length === 1) centerId = centerIds[0];
+        }
+        await assertStudentManageAccess(ctx.user, input.circleId, "students.create", centerId);
+        if (!centerId) throw new TRPCError({ code: "BAD_REQUEST", message: "يلزم تحديد المركز للطالب غير المرتبط بحلقة" });
         const guardianPhone = normalizeGuardianPhone(input.guardianPhone);
-        const created = await createStudent({ ...input, guardianPhone, centerId: circleCenterId });
-        await autoLinkGuardianByPhone(guardianPhone, circleCenterId, ctx.user.id);
+        const created = await createStudent({ ...input, guardianPhone, centerId });
+        await autoLinkGuardianByPhone(guardianPhone, centerId, ctx.user.id);
         return created;
       }),
     update: protectedProcedure
@@ -188,6 +204,5 @@ export const peopleRouters = {
         if (student && guardianPhone !== undefined && guardianPhone !== student.guardianPhone) await autoLinkGuardianByPhone(guardianPhone, student.centerId, ctx.user.id);
       }),
     delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => { const student = await getStudentById(input.id); await assertStudentManageAccess(ctx.user, student?.circleId, "students.delete", student?.centerId); return softDeleteStudent(input.id); }),
-    memorizationHistory: protectedProcedure.input(z.object({ studentId: z.number() })).query(async ({ ctx, input }) => { const student = await getStudentById(input.studentId); await assertStudentReadAccess(ctx.user, student); return getMemorizationByStudent(input.studentId); }),
   }),
 };

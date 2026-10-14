@@ -32,15 +32,24 @@ import {
 import { intlLocale } from "@/mushaf/lib/i18n";
 import { trpc } from "@/lib/trpc";
 import { usePermissions } from "@/hooks/usePermissions";
-import { GRADE_LABELS, type Grade } from "../../../../shared/types";
+import { gradeKeyOf5, gradeLabel } from "@/mushaf/lib/grading";
+import { dailyErrorText } from "@/mushaf/hooks/use-daily-record";
+import { rangeSegments } from "../../../../shared/dailyRecord";
+import { getRiyadhDayKey } from "../../../../shared/dates";
 
-/** أنواع التسجيل في ترتيل: الحفظ والمراجعة (جدولا memorization وrevision). */
+/** أنواع التسجيل: الحفظ والمراجعة في السجل اليومي للحلقة. */
 type RecordKind = "memorize" | "review";
 const KIND_LABEL: Record<RecordKind, string> = {
   memorize: "حفظ",
   review: "مراجعة",
 };
-const GRADES = Object.keys(GRADE_LABELS) as Grade[];
+/** التقدير من 5 (ممتاز) إلى 1، كما في لوحة الطالب في السجل اليومي. */
+const GRADES = [5, 4, 3, 2, 1] as const;
+const gradeName = (g: number) => gradeLabel(gradeKeyOf5(g));
+const dayLabel = (day: string) =>
+  new Date(`${day}T12:00:00Z`).toLocaleDateString(intlLocale(), {
+    timeZone: "UTC",
+  });
 
 /** مدى الصفحة كاملاً: من أول آية فيها إلى آخر آية. */
 function pageRange(page: number) {
@@ -54,8 +63,8 @@ function pageRange(page: number) {
 /**
  * سجل الحفظ والمراجعة لكل صفحة من المصحف (من زِن، مربوطاً ببيانات ترتيل):
  * يرى كل حساب تسجيلات الطلاب الذين يحق له رؤيتهم (المعلّم طلاب حلقاته، والمدير طلاب مركزه، وولي الأمر
- * أبناءه، والطالب نفسه) في الفترات التي تشمل الصفحة، ومن يدير الفترات يسجّل حفظ الصفحة أو مراجعتها
- * في فترة من فترات حلقة الطالب بتقديرات ترتيل. القراءة نفسها في قارئ المصحف (/quran/read).
+ * أبناءه، والطالب نفسه) في السجل اليومي التي تشمل الصفحة، ومن يسجّل السجل اليومي يسجّل حفظ الصفحة أو
+ * مراجعتها في سجل اليوم لحلقة الطالب. القراءة نفسها في قارئ المصحف (/quran/read).
  */
 export const Route = createFileRoute("/_authed/mushaf/records")({
   head: () => ({
@@ -99,7 +108,7 @@ function MushafScreen() {
           .join("، ")
       : "";
   const { can, role } = usePermissions();
-  const teacher = can("sessions:manage");
+  const teacher = can("daily:manage");
   const self = role === "student";
   const range = useMemo(() => pageRange(page), [page]);
   const recordsQ = trpc.quranRecords.byRange.useQuery(range, {
@@ -261,14 +270,12 @@ function MushafScreen() {
                               ? ` – ${SURAHS[r.toSurahNumber - 1]?.name} ${r.toAyah}`
                               : `–${r.toAyah}`}
                             ،{" "}
-                            {new Date(r.scheduledAt).toLocaleDateString(
-                              intlLocale()
-                            )}
+                            {dayLabel(r.recordDate)}
                           </p>
                         </div>
-                        {r.grade && (
+                        {r.grade != null && (
                           <span className="shrink-0 rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[0.625rem] font-bold text-gold-ink">
-                            {GRADE_LABELS[r.grade]}
+                            {gradeName(r.grade)}
                           </span>
                         )}
                       </div>
@@ -279,10 +286,10 @@ function MushafScreen() {
                       )}
                       {teacher && (
                         <a
-                          href={`/periods/${r.sessionId}`}
+                          href={`/daily?halaqa=${r.circleId}&date=${r.recordDate}`}
                           className="mt-1.5 inline-block text-[0.625rem] font-medium text-primary"
                         >
-                          فتح الفترة
+                          فتح سجل اليوم
                         </a>
                       )}
                     </div>
@@ -318,71 +325,53 @@ function RecordSheet({
   onSaved: () => void;
 }) {
   const studentsQ = trpc.students.list.useQuery({});
-  const students = studentsQ.data ?? [];
+  const students = (studentsQ.data ?? []).filter(s => s.circleId);
   const [studentId, setStudentId] = useState(0);
   const student = students.find(s => s.id === studentId) ?? students[0];
-  const circleId = student?.circleId ?? 0;
-  const sessionsQ = trpc.sessions.list.useQuery(
-    { circleId, includeDrafts: true },
-    { enabled: circleId > 0 }
-  );
-  const periods = useMemo(
-    () =>
-      (sessionsQ.data ?? [])
-        .filter(p => p.status !== "cancelled")
-        .sort(
-          (a, b) =>
-            new Date(b.scheduledAt).getTime() -
-            new Date(a.scheduledAt).getTime()
-        )
-        .slice(0, 30),
-    [sessionsQ.data]
-  );
-  const [sessionId, setSessionId] = useState(0);
-  const period = periods.find(p => p.id === sessionId) ?? periods[0];
   const [kind, setKind] = useState<RecordKind>("memorize");
-  const [grade, setGrade] = useState<Grade>("good");
+  const [grade, setGrade] = useState<number>(4);
   const [notes, setNotes] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const utils = trpc.useUtils();
-  const done = () => {
-    void utils.sessions.latestStudentProgress.invalidate();
-    onSaved();
-  };
-  const onError = (e: { message: string }) =>
-    setErr(e.message || "تعذّر الحفظ");
-  const memorize = trpc.memorization.create.useMutation({
-    onSuccess: done,
-    onError,
-  });
-  const review = trpc.revision.create.useMutation({ onSuccess: done, onError });
-  const saving = memorize.isPending || review.isPending;
 
-  const save = () => {
+  /** يُسجَّل في سجل اليوم لحلقة الطالب: يُفتح السجل إن لم يكن مفتوحاً، ثم يُحفظ الحفظ أو المراجعة. */
+  const save = async () => {
     if (saving) return;
-    if (!student) {
+    if (!student?.circleId) {
       setErr("اختر طالباً أولاً");
       return;
     }
-    if (!period) {
-      setErr("لا توجد فترة لحلقة هذا الطالب؛ أنشئ فترة أولاً من «الفترات».");
-      return;
-    }
     setErr(null);
-    const r = pageRange(page);
-    const input = {
-      sessionId: period.id,
-      studentId: student.id,
-      surahNumber: r.fromSurah,
-      toSurahNumber: r.toSurah,
-      fromAyah: r.fromAyah,
-      toAyah: r.toAyah,
-      pages: String(page),
-      grade,
-      notes: notes.trim() || undefined,
-    };
-    if (kind === "memorize") memorize.mutate(input);
-    else review.mutate(input);
+    setSaving(true);
+    try {
+      const halaqa = student.circleId;
+      const date = getRiyadhDayKey(new Date());
+      const head = await utils.client.daily.open.mutate({ halaqa, date });
+      const sheet = await utils.client.daily.sheet.query({ halaqa, date });
+      const row = sheet.students.find(x => x.student_id === String(student.id));
+      if (!row) throw new Error("STUDENT_NOT_IN_HALAQA");
+      const r = pageRange(page);
+      await utils.client.daily.saveEntry.mutate({
+        record: head.id,
+        student: student.id,
+        version: row.version,
+        payload: {
+          [kind]: {
+            segments: rangeSegments(r),
+            grade,
+            error_type: "none",
+            notes: notes.trim() || null,
+          },
+        },
+      });
+      void utils.daily.invalidate();
+      onSaved();
+    } catch (e) {
+      setErr(dailyErrorText(e));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -410,7 +399,6 @@ function RecordSheet({
           value={student?.id ?? ""}
           onChange={e => {
             setStudentId(Number(e.target.value));
-            setSessionId(0);
           }}
           className="w-full glass rounded-xl px-3 py-2.5 text-sm outline-none mb-3"
         >
@@ -426,28 +414,9 @@ function RecordSheet({
           ))}
         </select>
 
-        <label className="block text-[0.6875rem] text-muted-foreground mb-1">
-          الفترة
-        </label>
-        <select
-          value={period?.id ?? ""}
-          onChange={e => setSessionId(Number(e.target.value))}
-          className="w-full glass rounded-xl px-3 py-2.5 text-sm outline-none mb-3"
-        >
-          {periods.length === 0 && (
-            <option value="">
-              {sessionsQ.isLoading
-                ? "جارٍ التحميل…"
-                : "لا توجد فترات لهذه الحلقة"}
-            </option>
-          )}
-          {periods.map(p => (
-            <option key={p.id} value={p.id}>
-              {new Date(p.scheduledAt).toLocaleDateString(intlLocale())}
-              {p.title ? ` — ${p.title}` : ""}
-            </option>
-          ))}
-        </select>
+        <p className="text-[0.6875rem] text-muted-foreground mb-3">
+          يُسجَّل في سجل اليوم لحلقة الطالب، ويظهر في السجل اليومي والتقارير.
+        </p>
 
         <label className="block text-[0.6875rem] text-muted-foreground mb-1">
           النوع
@@ -474,7 +443,7 @@ function RecordSheet({
               onClick={() => setGrade(g)}
               className={`py-2 rounded-xl text-[0.6875rem] font-medium transition-colors ${grade === g ? "bg-gold/20 text-gold-ink border border-gold/40" : "glass text-muted-foreground"}`}
             >
-              {GRADE_LABELS[g]}
+              {gradeName(g)}
             </button>
           ))}
         </div>
@@ -490,7 +459,7 @@ function RecordSheet({
         {err && <p className="text-[0.6875rem] text-destructive mb-2">{err}</p>}
 
         <button
-          onClick={save}
+          onClick={() => void save()}
           disabled={saving}
           className="w-full py-3 rounded-2xl bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60"
         >

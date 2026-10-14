@@ -3,9 +3,8 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { exportRouter } from "./routers/export";
 import { aiRouter } from "./routers/ai";
-import { reportingRouter } from "./routers/reporting";
+import { dailyRouter } from "./routers/daily";
 
 import { localAuthRouter } from "./auth/localAuth";
 import { accountDeletionRouter } from "./auth/accountDeletion";
@@ -13,7 +12,6 @@ import { quranRouters } from "./routers/quran";
 import { centersRouters } from "./routers/centers";
 import { circlesRouters } from "./routers/circles";
 import { peopleRouters } from "./routers/people";
-import { sessionsRouters } from "./routers/sessions";
 import { adminRouters } from "./routers/admin";
 import { accessRouters } from "./routers/access";
 
@@ -35,11 +33,8 @@ export const appRouter = router({
     }),
   }),
 
-  // ===================== EXPORT =====================
-  export: exportRouter,
-
-  // ===================== UNIFIED REPORTING =====================
-  reporting: reportingRouter,
+  // ===================== DAILY RECORD & REPORTS =====================
+  daily: dailyRouter,
 
   // ===================== AI ASSISTANT =====================
   ai: aiRouter,
@@ -48,7 +43,6 @@ export const appRouter = router({
   ...centersRouters,
   ...circlesRouters,
   ...peopleRouters,
-  ...sessionsRouters,
   ...adminRouters,
   ...accessRouters,
 });

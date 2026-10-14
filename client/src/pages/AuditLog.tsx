@@ -35,7 +35,7 @@ export default function AuditLog() {
       <div className="glass-card rounded-2xl p-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_180px_auto]">
         <div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث بالعملية أو الكيان أو المعرف..." className="tarteel-input pr-10" /></div>
         <label className="relative"><Filter className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" /><select value={actionFilter} onChange={(event) => setActionFilter(event.target.value)} className="tarteel-input pr-10"><option value="all">كل العمليات</option><option value="create">إنشاء</option><option value="update">تعديل</option><option value="delete">حذف</option></select></label>
-        <select value={dateRange} onChange={(event) => setDateRange(event.target.value as typeof dateRange)} className="tarteel-input"><option value="all">كل الفترات</option><option value="week">آخر 7 أيام</option><option value="month">آخر 30 يوماً</option></select>
+        <select value={dateRange} onChange={(event) => setDateRange(event.target.value as typeof dateRange)} className="tarteel-input"><option value="all">كل الأوقات</option><option value="week">آخر 7 أيام</option><option value="month">آخر 30 يوماً</option></select>
         <button onClick={exportCsv} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"><Download className="h-4 w-4 text-primary" />CSV</button>
       </div>
 

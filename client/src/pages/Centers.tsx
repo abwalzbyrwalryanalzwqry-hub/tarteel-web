@@ -1,11 +1,15 @@
-import EntityForm, { FormInput, FormTextarea } from "@/components/EntityForm";
+import EntityForm, { FormInput, FormMore, FormPhoneInput, FormTextarea } from "@/components/EntityForm";
+import { ContactLinks } from "@/components/ContactLinks";
+import { SearchField } from "@/components/SearchField";
+import { useCreateFormParam } from "@/hooks/useUrlParams";
+import { useMoveToTrash } from "@/hooks/useMoveToTrash";
 import { trpc } from "@/lib/trpc";
-import { Building2, Edit, ImagePlus, MapPin, Phone, Plus, Search, Trash2 } from "lucide-react";
+import { Building2, Edit, ImagePlus, MapPin, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 export default function Centers() {
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useCreateFormParam();
   const [search, setSearch] = useState("");
   const [editItem, setEditItem] = useState<any>(null);
 
@@ -20,10 +24,8 @@ export default function Centers() {
     onSuccess: () => { toast.success("تم تحديث المركز"); setEditItem(null); refetch(); },
     onError: (e) => toast.error(e.message),
   });
-  const deleteMutation = trpc.centers.delete.useMutation({
-    onSuccess: () => { toast.success("تم نقل المركز إلى سلة المحذوفات"); refetch(); },
-    onError: (e) => toast.error(e.message),
-  });
+  const deleteMutation = trpc.centers.delete.useMutation();
+  const moveToTrash = useMoveToTrash("centers", () => refetch());
 
   const filtered = centers?.filter((c) => c.name.includes(search) || (c.city ?? "").includes(search)) ?? [];
 
@@ -54,12 +56,9 @@ export default function Centers() {
           <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center"><Building2 className="w-5 h-5 text-white" /></div>
           <div><h1 className="page-title">المراكز</h1><p className="page-subtitle">إدارة مراكز تحفيظ القرآن الكريم</p></div>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-gold flex items-center gap-2 text-sm"><Plus className="w-4 h-4" />مركز جديد</button>
+        <button onClick={() => setShowForm(true)} className="btn-gold flex shrink-0 items-center gap-2 whitespace-nowrap text-sm"><Plus className="w-4 h-4" />مركز جديد</button>
       </div>
-      <div className="relative">
-        <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث في المراكز..." className="tarteel-input pr-10" />
-      </div>
+      {(centers?.length ?? 0) > 3 && <SearchField value={search} onChange={setSearch} placeholder="بحث بالاسم أو المدينة..." />}
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{[1,2,3].map(i=><div key={i} className="glass-card rounded-2xl p-5"><div className="skeleton h-5 w-32 mb-3"/><div className="skeleton h-4 w-24 mb-2"/><div className="skeleton h-4 w-20"/></div>)}</div>
       ) : filtered.length === 0 ? (
@@ -71,13 +70,13 @@ export default function Centers() {
               <div className="flex items-start justify-between mb-3">
                 {center.logoUrl ? <img src={center.logoUrl} alt={`شعار ${center.name}`} className="w-10 h-10 rounded-xl border border-border bg-background object-contain p-0.5" /> : <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center"><Building2 className="w-5 h-5 text-blue-600"/></div>}
                 <div className="flex gap-1">
-                  <button onClick={()=>setEditItem(center)} className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"><Edit className="w-3.5 h-3.5 text-muted-foreground"/></button>
-                  <button onClick={()=>{if(confirm("نقل إلى سلة المحذوفات؟"))deleteMutation.mutate({id:center.id})}} className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center transition-colors"><Trash2 className="w-3.5 h-3.5 text-destructive"/></button>
+                  <button onClick={()=>setEditItem(center)} aria-label={`تعديل ${center.name}`} title="تعديل" className="w-9 h-9 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"><Edit className="w-4 h-4 text-muted-foreground"/></button>
+                  <button onClick={()=>void moveToTrash(center, (id) => deleteMutation.mutateAsync({ id }))} aria-label={`حذف ${center.name}`} title="نقل إلى السلة" className="w-9 h-9 rounded-lg hover:bg-destructive/10 flex items-center justify-center transition-colors"><Trash2 className="w-4 h-4 text-destructive"/></button>
                 </div>
               </div>
               <h3 className="font-display font-bold text-foreground text-lg mb-1">{center.name}</h3>
               {center.city&&<div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-1"><MapPin className="w-3.5 h-3.5"/>{center.city}</div>}
-              {center.phone&&<div className="flex items-center gap-1.5 text-sm text-muted-foreground"><Phone className="w-3.5 h-3.5"/>{center.phone}</div>}
+              <ContactLinks phone={center.phone} />
               <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
                 <span className={`text-xs px-2 py-0.5 rounded-full ${center.isActive?"bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400":"bg-gray-100 text-gray-500"}`}>{center.isActive?"نشط":"غير نشط"}</span>
                 <span className="text-xs text-muted-foreground">{new Date(center.createdAt).toLocaleDateString("ar-SA")}</span>
@@ -87,17 +86,19 @@ export default function Centers() {
         </div>
       )}
       {showForm&&<EntityForm title="إضافة مركز جديد" onClose={()=>setShowForm(false)} onSubmit={handleCreate} isLoading={createMutation.isPending}>
-        {orgs&&orgs.length>0&&<div><label className="block text-sm font-medium text-foreground mb-1.5">المنظمة</label><select name="organizationId" className="tarteel-input">{orgs.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></div>}
-        <FormInput label="اسم المركز" name="name" required placeholder="مركز تحفيظ القرآن الكريم"/>
-        <FormInput label="المدينة" name="city" placeholder="الرياض"/>
-        <FormInput label="رقم الهاتف" name="phone" placeholder="0500000000"/>
-        <FormInput label="العنوان" name="address" placeholder="حي النزهة"/>
-        <FormTextarea label="الوصف" name="description" placeholder="وصف مختصر..."/>
+        <FormInput label="اسم المركز" name="name" required placeholder="مركز تحفيظ القرآن الكريم" autoComplete="off"/>
+        {orgs&&orgs.length>1&&<div><label className="block text-sm font-medium text-foreground mb-1.5">المنظمة</label><select name="organizationId" className="tarteel-input">{orgs.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></div>}
+        <FormInput label="المدينة" name="city" placeholder="صنعاء"/>
+        <FormPhoneInput label="رقم الهاتف" name="phone"/>
+        <FormMore>
+          <FormInput label="العنوان" name="address" placeholder="الحي، الشارع"/>
+          <FormTextarea label="الوصف" name="description" placeholder="وصف مختصر..."/>
+        </FormMore>
       </EntityForm>}
-      {editItem&&<EntityForm title="تعديل المركز" onClose={()=>setEditItem(null)} onSubmit={handleUpdate} isLoading={updateMutation.isPending} submitLabel="تحديث">
+      {editItem&&<EntityForm title="تعديل المركز" onClose={()=>setEditItem(null)} onSubmit={handleUpdate} isLoading={updateMutation.isPending} submitLabel="حفظ التعديلات">
         <FormInput label="اسم المركز" name="name" required defaultValue={editItem.name}/>
         <FormInput label="المدينة" name="city" defaultValue={editItem.city??""}/>
-        <FormInput label="رقم الهاتف" name="phone" defaultValue={editItem.phone??""}/>
+        <FormPhoneInput label="رقم الهاتف" name="phone" defaultValue={editItem.phone??""}/>
         <FormInput label="العنوان" name="address" defaultValue={editItem.address??""}/>
         <CenterLogoUpload centerId={editItem.id} logoUrl={editItem.logoUrl} onUploaded={refetch} />
       </EntityForm>}

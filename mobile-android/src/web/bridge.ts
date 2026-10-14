@@ -92,6 +92,8 @@ export type BridgeMessage =
   | { type: "error"; message: string }
   | { type: "share"; title: string; text: string }
   | { type: "keep-awake"; on: boolean }
+  /** تقرير HTML جاهز للطباعة: يُحوَّل إلى ملف PDF على الجهاز ثم يُعرض للحفظ أو المشاركة. */
+  | { type: "pdf"; html: string; filename: string; landscape?: boolean }
   /** نسخة الجهاز: الواجهة تطلب آخر نسخة من ملف قاعدة البيانات، أو ترسل نسخة لحفظها. */
   | { type: "tarteel:db-load"; requestId: string }
   | { type: "tarteel:db-save"; base64: string };

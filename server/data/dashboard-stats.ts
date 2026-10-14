@@ -1,141 +1,232 @@
-import { and, desc, eq, gte, inArray, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import {
-  attendance,
-  branches,
-  centers,
   circles,
-  memorization,
-  sessions,
+  dailyEntries,
+  dailyRecords,
   students,
   teachers,
 } from "../../drizzle/schema";
-import { keepLatestAttendanceRows } from "./attendance";
+import { addDays } from "../../shared/dailyRecord";
+import { getRiyadhDayKey } from "../../shared/dates";
 import { getCenterById } from "./centers";
 import { getDb } from "./connection";
 
-// ===================== DASHBOARD STATS =====================
-export async function getDashboardStats() {
+/**
+ * إحصاءات اللوحات من السجل اليومي: عدد الأيام المسجّلة، والمفتوحة اليوم، وحضور اليوم وغيابه. اليوم هو
+ * اليوم التشغيلي نفسه الذي يفتح به المعلم سجل حلقته.
+ */
+const EMPTY = {
+  totalStudents: 0,
+  totalTeachers: 0,
+  totalCenters: 0,
+  totalCircles: 0,
+  totalDays: 0,
+  openToday: 0,
+  todayAttendance: 0,
+  todayAbsence: 0,
+};
+export type DashboardStats = typeof EMPTY;
+
+const count = sql<number>`count(*)`;
+
+async function dayStats(circleIds: number[]) {
   const db = await getDb();
-  if (!db) return { totalStudents: 0, totalTeachers: 0, totalCenters: 0, totalCircles: 0, totalSessions: 0 };
-
-  const [studentsCount, teachersCount, centersCount, circlesCount, sessionsCount, openSessionsCount, todayPresent, todayAbsent] = await Promise.all([
-    db.select({ count: sql<number>`count(*)` }).from(students).where(isNull(students.deletedAt)),
-    db.select({ count: sql<number>`count(*)` }).from(teachers).where(isNull(teachers.deletedAt)),
-    db.select({ count: sql<number>`count(*)` }).from(centers).where(isNull(centers.deletedAt)),
-    db.select({ count: sql<number>`count(*)` }).from(circles).where(isNull(circles.deletedAt)),
-    db.select({ count: sql<number>`count(*)` }).from(sessions).where(and(isNull(sessions.deletedAt), ne(sessions.status, "draft"))),
-    db.select({ count: sql<number>`count(*)` }).from(sessions).where(and(isNull(sessions.deletedAt), eq(sessions.status, 'open'))),
-    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).where(and(eq(attendance.status, 'present'), ne(sessions.status, "draft"))),
-    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).where(and(eq(attendance.status, 'absent'), ne(sessions.status, "draft"))),
+  if (!db || !circleIds.length) return { totalDays: 0, openToday: 0, todayAttendance: 0, todayAbsence: 0 };
+  const today = getRiyadhDayKey(new Date());
+  const [days, open, today_] = await Promise.all([
+    db.select({ n: count }).from(dailyRecords).where(inArray(dailyRecords.circleId, circleIds)),
+    db
+      .select({ n: count })
+      .from(dailyRecords)
+      .where(and(inArray(dailyRecords.circleId, circleIds), eq(dailyRecords.recordDate, today), eq(dailyRecords.status, "open"))),
+    db
+      .select({ status: dailyEntries.status, n: count })
+      .from(dailyEntries)
+      .where(and(inArray(dailyEntries.circleId, circleIds), eq(dailyEntries.recordDate, today)))
+      .groupBy(dailyEntries.status),
   ]);
-
+  const by = (s: string) => Number(today_.find(r => r.status === s)?.n ?? 0);
   return {
-    totalStudents: studentsCount[0]?.count ?? 0,
-    totalTeachers: teachersCount[0]?.count ?? 0,
-    totalCenters: centersCount[0]?.count ?? 0,
-    totalCircles: circlesCount[0]?.count ?? 0,
-    totalSessions: sessionsCount[0]?.count ?? 0,
-    openSessions: openSessionsCount[0]?.count ?? 0,
-    todayAttendance: todayPresent[0]?.count ?? 0,
-    todayAbsence: todayAbsent[0]?.count ?? 0,
+    totalDays: Number(days[0]?.n ?? 0),
+    openToday: Number(open[0]?.n ?? 0),
+    todayAttendance: by("present") + by("late"),
+    todayAbsence: by("absent"),
   };
 }
 
-export async function getDashboardStatsForCenters(centerIds: number[]) {
-  const empty = { totalStudents: 0, totalTeachers: 0, totalCenters: 0, totalCircles: 0, totalSessions: 0, openSessions: 0, todayAttendance: 0, todayAbsence: 0 };
-  if (!centerIds.length) return empty;
+export async function getDashboardStatsForCenters(centerIds: number[]): Promise<DashboardStats> {
+  if (!centerIds.length) return EMPTY;
   const db = await getDb();
-  if (!db) return empty;
-  const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endOfDay = new Date(startOfDay);
-  endOfDay.setDate(endOfDay.getDate() + 1);
-  const [studentsCount, teachersCount, circlesCount, sessionsCount, openSessionsCount, presentCount, absentCount] = await Promise.all([
-    db.select({ count: sql<number>`count(*)` }).from(students).where(and(inArray(students.centerId, centerIds), isNull(students.deletedAt))),
-    db.select({ count: sql<number>`count(*)` }).from(teachers).where(and(inArray(teachers.centerId, centerIds), isNull(teachers.deletedAt))),
-    db.select({ count: sql<number>`count(*)` }).from(circles).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), isNull(circles.deletedAt))),
-    db.select({ count: sql<number>`count(*)` }).from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), isNull(sessions.deletedAt), ne(sessions.status, "draft"))),
-    db.select({ count: sql<number>`count(*)` }).from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), isNull(sessions.deletedAt), eq(sessions.status, "open"))),
-    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), gte(sessions.scheduledAt, startOfDay), lt(sessions.scheduledAt, endOfDay), eq(attendance.status, "present"), ne(sessions.status, "draft"))),
-    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), gte(sessions.scheduledAt, startOfDay), lt(sessions.scheduledAt, endOfDay), eq(attendance.status, "absent"), ne(sessions.status, "draft"))),
+  if (!db) return EMPTY;
+  const [studentsCount, teachersCount, circleRows] = await Promise.all([
+    db.select({ n: count }).from(students).where(and(inArray(students.centerId, centerIds), isNull(students.deletedAt))),
+    db.select({ n: count }).from(teachers).where(and(inArray(teachers.centerId, centerIds), isNull(teachers.deletedAt))),
+    db.select({ id: circles.id }).from(circles).where(and(inArray(circles.centerId, centerIds), isNull(circles.deletedAt))),
   ]);
-  return { totalStudents: studentsCount[0]?.count ?? 0, totalTeachers: teachersCount[0]?.count ?? 0, totalCenters: centerIds.length, totalCircles: circlesCount[0]?.count ?? 0, totalSessions: sessionsCount[0]?.count ?? 0, openSessions: openSessionsCount[0]?.count ?? 0, todayAttendance: presentCount[0]?.count ?? 0, todayAbsence: absentCount[0]?.count ?? 0 };
+  const ids = circleRows.map(c => c.id);
+  return {
+    totalStudents: Number(studentsCount[0]?.n ?? 0),
+    totalTeachers: Number(teachersCount[0]?.n ?? 0),
+    totalCenters: centerIds.length,
+    totalCircles: ids.length,
+    ...(await dayStats(ids)),
+  };
 }
 
+/** إحصاءات لوحة المعلم/الموجه داخل الحلقات التي يملك صلاحية قراءتها فقط. */
+export async function getDashboardStatsForCircles(circleIds: number[]): Promise<DashboardStats> {
+  if (!circleIds.length) return EMPTY;
+  const db = await getDb();
+  if (!db) return EMPTY;
+  const [studentsCount, teachersCount, centersCount] = await Promise.all([
+    db.select({ n: count }).from(students).where(and(inArray(students.circleId, circleIds), isNull(students.deletedAt))),
+    db
+      .select({ n: sql<number>`count(distinct ${circles.teacherId})` })
+      .from(circles)
+      .where(and(inArray(circles.id, circleIds), isNull(circles.deletedAt))),
+    db
+      .select({ n: sql<number>`count(distinct ${circles.centerId})` })
+      .from(circles)
+      .where(and(inArray(circles.id, circleIds), isNull(circles.deletedAt))),
+  ]);
+  return {
+    totalStudents: Number(studentsCount[0]?.n ?? 0),
+    totalTeachers: Number(teachersCount[0]?.n ?? 0),
+    totalCenters: Number(centersCount[0]?.n ?? 0),
+    totalCircles: circleIds.length,
+    ...(await dayStats(circleIds)),
+  };
+}
+
+export async function getCircleIdsForCenters(centerIds: number[]) {
+  const db = await getDb();
+  if (!db || !centerIds.length) return [];
+  const rows = await db
+    .select({ id: circles.id })
+    .from(circles)
+    .where(and(inArray(circles.centerId, centerIds), isNull(circles.deletedAt)));
+  return rows.map(r => r.id);
+}
+
+/** آخر أيام السجل في الحلقات: الحلقة والتاريخ والحالة وأعداد الحضور والإنجاز. */
+export async function getRecentDailyRecords(circleIds: number[], limit = 5) {
+  const db = await getDb();
+  if (!db || !circleIds.length) return [];
+  const recs = await db
+    .select({
+      id: dailyRecords.id,
+      circleId: dailyRecords.circleId,
+      circleName: circles.name,
+      date: dailyRecords.recordDate,
+      status: dailyRecords.status,
+      updatedAt: dailyRecords.updatedAt,
+    })
+    .from(dailyRecords)
+    .innerJoin(circles, eq(circles.id, dailyRecords.circleId))
+    .where(inArray(dailyRecords.circleId, circleIds))
+    .orderBy(desc(dailyRecords.recordDate), desc(dailyRecords.updatedAt))
+    .limit(limit);
+  if (!recs.length) return [];
+  const rows = await db
+    .select({ recordId: dailyEntries.recordId, status: dailyEntries.status, mem: dailyEntries.memFromSurah, rev: dailyEntries.revFromSurah })
+    .from(dailyEntries)
+    .where(inArray(dailyEntries.recordId, recs.map(r => r.id)));
+  return recs.map(r => {
+    const mine = rows.filter(x => x.recordId === r.id);
+    return {
+      ...r,
+      present: mine.filter(x => x.status === "present" || x.status === "late").length,
+      absent: mine.filter(x => x.status === "absent").length,
+      memorized: mine.filter(x => x.mem != null).length,
+      reviewed: mine.filter(x => x.rev != null).length,
+    };
+  });
+}
+
+/** نظرة مدير المركز لآخر 30 يوماً: الحضور والإنجاز لكل حلقة، واتجاه يومي. */
 export async function getCenterManagerOverview(centerId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   const center = await getCenterById(centerId);
   if (!center) throw new Error("المركز غير موجود");
-  const since = new Date(); since.setDate(since.getDate() - 29); since.setHours(0, 0, 0, 0);
+  const today = getRiyadhDayKey(new Date());
+  const since = addDays(today, -29);
   const [teacherRows, studentRows, circleRows] = await Promise.all([
     db.select({ id: teachers.id }).from(teachers).where(and(eq(teachers.centerId, centerId), eq(teachers.isActive, true), isNull(teachers.deletedAt))),
     db.select({ id: students.id }).from(students).where(and(eq(students.centerId, centerId), eq(students.isActive, true), isNull(students.deletedAt))),
-    db.select({ id: circles.id, name: circles.name, teacherName: teachers.name }).from(circles).innerJoin(branches, eq(circles.branchId, branches.id)).leftJoin(teachers, eq(circles.teacherId, teachers.id)).where(and(eq(branches.centerId, centerId), eq(circles.isActive, true), isNull(circles.deletedAt), isNull(branches.deletedAt))),
+    db
+      .select({ id: circles.id, name: circles.name, teacherName: teachers.name })
+      .from(circles)
+      .leftJoin(teachers, eq(circles.teacherId, teachers.id))
+      .where(and(eq(circles.centerId, centerId), eq(circles.isActive, true), isNull(circles.deletedAt))),
   ]);
-  const circleIds = circleRows.map((circle) => circle.id);
-  const sessionRows = circleIds.length ? await db.select({ id: sessions.id, circleId: sessions.circleId, scheduledAt: sessions.scheduledAt }).from(sessions).where(and(inArray(sessions.circleId, circleIds), isNull(sessions.deletedAt), ne(sessions.status, "draft"), gte(sessions.scheduledAt, since))).orderBy(sessions.scheduledAt) : [];
-  const sessionIds = sessionRows.map((session) => session.id);
-  const [attendanceRows, memorizationRows] = await Promise.all([
-    sessionIds.length ? db.select().from(attendance).where(inArray(attendance.sessionId, sessionIds)) : Promise.resolve([] as (typeof attendance.$inferSelect)[]),
-    sessionIds.length ? db.select().from(memorization).where(inArray(memorization.sessionId, sessionIds)) : Promise.resolve([] as (typeof memorization.$inferSelect)[]),
-  ]);
-  const latestAttendance = keepLatestAttendanceRows(attendanceRows);
-  const circleMetrics = circleRows.map((circle) => { const ids = sessionRows.filter((session) => session.circleId === circle.id).map((session) => session.id); const rows = latestAttendance.filter((item) => ids.includes(item.sessionId)); const mem = memorizationRows.filter((item) => ids.includes(item.sessionId)); return { circleId: circle.id, circleName: circle.name, teacherName: circle.teacherName, sessions: ids.length, attendanceRate: rows.length ? Math.round((rows.filter((item) => item.status === "present").length / rows.length) * 100) : 0, memorizedPages: mem.reduce((total, item) => total + Number(item.pages ?? 0), 0) }; }).sort((left, right) => right.attendanceRate - left.attendanceRate || right.memorizedPages - left.memorizedPages);
-  const trendMap = new Map<string, { label: string; sessions: number; present: number; total: number; memorizedPages: number }>();
-  for (const session of sessionRows) { const key = session.scheduledAt.toISOString().slice(0, 10); const bucket = trendMap.get(key) ?? { label: new Date(session.scheduledAt).toLocaleDateString("ar-SA", { month: "short", day: "numeric" }), sessions: 0, present: 0, total: 0, memorizedPages: 0 }; const rows = latestAttendance.filter((item) => item.sessionId === session.id); const mem = memorizationRows.filter((item) => item.sessionId === session.id); bucket.sessions += 1; bucket.present += rows.filter((item) => item.status === "present").length; bucket.total += rows.length; bucket.memorizedPages += mem.reduce((total, item) => total + Number(item.pages ?? 0), 0); trendMap.set(key, bucket); }
-  const attendanceTotal = latestAttendance.length;
-  return { profile: { id: center.id, name: center.name, logoUrl: center.logoUrl, phone: center.phone, email: center.email, city: center.city }, summary: { teachers: teacherRows.length, students: studentRows.length, circles: circleRows.length, approvedSessions: sessionRows.length, attendanceRate: attendanceTotal ? Math.round((latestAttendance.filter((item) => item.status === "present").length / attendanceTotal) * 100) : 0, memorizedPages: memorizationRows.reduce((total, item) => total + Number(item.pages ?? 0), 0) }, trend: Array.from(trendMap.values()).map((item) => ({ ...item, attendanceRate: item.total ? Math.round((item.present / item.total) * 100) : 0 })), circles: circleMetrics };
-}
-
-/** إحصاءات لوحة المعلم/الموجه داخل الحلقات التي يملك صلاحية قراءتها فقط. */
-export async function getDashboardStatsForCircles(circleIds: number[]) {
-  const empty = { totalStudents: 0, totalTeachers: 0, totalCenters: 0, totalCircles: 0, totalSessions: 0, openSessions: 0, todayAttendance: 0, todayAbsence: 0 };
-  if (!circleIds.length) return empty;
-  const db = await getDb();
-  if (!db) return empty;
-  const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endOfDay = new Date(startOfDay);
-  endOfDay.setDate(endOfDay.getDate() + 1);
-  const [studentsCount, teachersCount, centersCount, sessionsCount, openSessionsCount, presentCount, absentCount] = await Promise.all([
-    db.select({ count: sql<number>`count(*)` }).from(students).where(and(inArray(students.circleId, circleIds), isNull(students.deletedAt))),
-    db.select({ count: sql<number>`count(distinct ${circles.teacherId})` }).from(circles).where(and(inArray(circles.id, circleIds), isNull(circles.deletedAt))),
-    db.select({ count: sql<number>`count(distinct ${branches.centerId})` }).from(circles).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(circles.id, circleIds), isNull(circles.deletedAt))),
-    db.select({ count: sql<number>`count(*)` }).from(sessions).where(and(inArray(sessions.circleId, circleIds), isNull(sessions.deletedAt), ne(sessions.status, "draft"))),
-    db.select({ count: sql<number>`count(*)` }).from(sessions).where(and(inArray(sessions.circleId, circleIds), isNull(sessions.deletedAt), eq(sessions.status, "open"))),
-    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).where(and(inArray(sessions.circleId, circleIds), gte(sessions.scheduledAt, startOfDay), lt(sessions.scheduledAt, endOfDay), eq(attendance.status, "present"), ne(sessions.status, "draft"))),
-    db.select({ count: sql<number>`count(*)` }).from(attendance).innerJoin(sessions, eq(attendance.sessionId, sessions.id)).where(and(inArray(sessions.circleId, circleIds), gte(sessions.scheduledAt, startOfDay), lt(sessions.scheduledAt, endOfDay), eq(attendance.status, "absent"), ne(sessions.status, "draft"))),
-  ]);
+  const circleIds = circleRows.map(c => c.id);
+  const [recs, entries] = circleIds.length
+    ? await Promise.all([
+        db
+          .select()
+          .from(dailyRecords)
+          .where(and(inArray(dailyRecords.circleId, circleIds), gte(dailyRecords.recordDate, since)))
+          .orderBy(dailyRecords.recordDate),
+        db
+          .select()
+          .from(dailyEntries)
+          .where(and(inArray(dailyEntries.circleId, circleIds), gte(dailyEntries.recordDate, since))),
+      ])
+    : [[], []];
+  const marked = (rows: typeof entries) => rows.filter(e => e.status != null);
+  const present = (rows: typeof entries) => rows.filter(e => e.status === "present" || e.status === "late").length;
+  const rate = (rows: typeof entries) => {
+    const m = marked(rows).length;
+    return m ? Math.round((present(rows) / m) * 100) : 0;
+  };
+  const circleMetrics = circleRows
+    .map(c => {
+      const rows = entries.filter(e => e.circleId === c.id);
+      return {
+        circleId: c.id,
+        circleName: c.name,
+        teacherName: c.teacherName,
+        days: recs.filter(r => r.circleId === c.id).length,
+        completedDays: recs.filter(r => r.circleId === c.id && r.status !== "open").length,
+        attendanceRate: rate(rows),
+        memorized: rows.filter(e => e.memFromSurah != null).length,
+        reviewed: rows.filter(e => e.revFromSurah != null).length,
+        recordedToday: recs.some(r => r.circleId === c.id && r.recordDate === today),
+      };
+    })
+    .sort((a, b) => b.attendanceRate - a.attendanceRate || b.memorized - a.memorized);
+  const trendMap = new Map<string, { date: string; label: string; days: number; present: number; total: number; memorized: number }>();
+  for (const r of recs) {
+    const bucket = trendMap.get(r.recordDate) ?? {
+      date: r.recordDate,
+      label: new Date(`${r.recordDate}T12:00:00Z`).toLocaleDateString("ar-SA", { month: "short", day: "numeric" }),
+      days: 0,
+      present: 0,
+      total: 0,
+      memorized: 0,
+    };
+    const rows = entries.filter(e => e.recordId === r.id);
+    bucket.days += 1;
+    bucket.present += present(rows);
+    bucket.total += marked(rows).length;
+    bucket.memorized += rows.filter(e => e.memFromSurah != null).length;
+    trendMap.set(r.recordDate, bucket);
+  }
   return {
-    totalStudents: studentsCount[0]?.count ?? 0,
-    totalTeachers: teachersCount[0]?.count ?? 0,
-    totalCenters: centersCount[0]?.count ?? 0,
-    totalCircles: circleIds.length,
-    totalSessions: sessionsCount[0]?.count ?? 0,
-    openSessions: openSessionsCount[0]?.count ?? 0,
-    todayAttendance: presentCount[0]?.count ?? 0,
-    todayAbsence: absentCount[0]?.count ?? 0,
+    profile: { id: center.id, name: center.name, logoUrl: center.logoUrl, phone: center.phone, email: center.email, city: center.city },
+    summary: {
+      teachers: teacherRows.length,
+      students: studentRows.length,
+      circles: circleRows.length,
+      days: recs.length,
+      recordedToday: circleMetrics.filter(c => c.recordedToday).length,
+      attendanceRate: rate(entries),
+      memorized: entries.filter(e => e.memFromSurah != null).length,
+      reviewed: entries.filter(e => e.revFromSurah != null).length,
+    },
+    trend: Array.from(trendMap.values()).map(t => ({ ...t, attendanceRate: t.total ? Math.round((t.present / t.total) * 100) : 0 })),
+    circles: circleMetrics,
   };
 }
 
-export async function getRecentSessions(limit = 5) {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select().from(sessions).where(and(isNull(sessions.deletedAt), ne(sessions.status, "draft"))).orderBy(desc(sessions.createdAt)).limit(limit);
-}
-
-export async function getRecentSessionsForCenters(centerIds: number[], limit = 5) {
-  if (!centerIds.length) return [];
-  const db = await getDb();
-  if (!db) return [];
-  const rows = await db.select({ session: sessions }).from(sessions).innerJoin(circles, eq(sessions.circleId, circles.id)).innerJoin(branches, eq(circles.branchId, branches.id)).where(and(inArray(branches.centerId, centerIds), isNull(sessions.deletedAt), ne(sessions.status, "draft"))).orderBy(desc(sessions.createdAt)).limit(limit);
-  return rows.map((row) => row.session);
-}
-
-export async function getRecentSessionsForCircles(circleIds: number[], limit = 5) {
-  if (!circleIds.length) return [];
-  const db = await getDb();
-  if (!db) return [];
-  return db.select().from(sessions).where(and(inArray(sessions.circleId, circleIds), isNull(sessions.deletedAt), ne(sessions.status, "draft"))).orderBy(desc(sessions.createdAt)).limit(limit);
-}

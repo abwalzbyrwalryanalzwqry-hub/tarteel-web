@@ -74,6 +74,8 @@ export const centers = mysqlTable("centers", {
   logoUrl: text("logoUrl"),
   logoKey: text("logoKey"),
   managerId: int("managerId"),
+  // هوية التقارير (الألوان والشعار والترويسة والتذييل) بصيغة JSON، حتى 400KB (reports/identity).
+  reportIdentity: mediumtext("reportIdentity"),
   isActive: boolean("isActive").default(true).notNull(),
   deletedAt: timestamp("deletedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -82,36 +84,6 @@ export const centers = mysqlTable("centers", {
 
 export type Center = typeof centers.$inferSelect;
 export type InsertCenter = typeof centers.$inferInsert;
-
-// أهداف إدارة المركز؛ تُحفظ اختيارياً حتى تقارن لوحة التحليلات الأداء الفعلي بالهدف الشهري المحدد من الإدارة.
-export const reportingGoals = mysqlTable("reporting_goals", {
-  id: int("id").autoincrement().primaryKey(),
-  centerId: int("centerId").notNull(),
-  attendanceTarget: int("attendanceTarget"),
-  memorizedPagesTarget: int("memorizedPagesTarget"),
-  reviewedPagesTarget: int("reviewedPagesTarget"),
-  updatedBy: int("updatedBy"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => [uniqueIndex("reporting_goals_center_unique").on(table.centerId)]);
-export type ReportingGoal = typeof reportingGoals.$inferSelect;
-export type InsertReportingGoal = typeof reportingGoals.$inferInsert;
-
-// إعدادات الهوية الخاصة بملفات التقارير ورسالة متابعة المعلم داخل كل مركز.
-export const reportingPreferences = mysqlTable("reporting_preferences", {
-  id: int("id").autoincrement().primaryKey(),
-  centerId: int("centerId").notNull(),
-  headerTitle: varchar("headerTitle", { length: 255 }),
-  footerText: varchar("footerText", { length: 500 }),
-  logoUrl: text("logoUrl"),
-  logoKey: text("logoKey"),
-  teacherMessageTemplate: text("teacherMessageTemplate"),
-  updatedBy: int("updatedBy"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => [uniqueIndex("reporting_preferences_center_unique").on(table.centerId)]);
-export type ReportingPreference = typeof reportingPreferences.$inferSelect;
-export type InsertReportingPreference = typeof reportingPreferences.$inferInsert;
 
 // ===================== ACCESS CONTROL =====================
 // تفصل العضوية هوية الحساب العامة عن دوره وحالته داخل كل مركز.
@@ -155,46 +127,10 @@ export const parentStudentLinks = mysqlTable("parent_student_links", {
   id: int("id").autoincrement().primaryKey(), guardianUserId: int("guardianUserId").notNull(), studentId: int("studentId").notNull(), centerId: int("centerId").notNull(), linkedBy: int("linkedBy"), createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [uniqueIndex("parent_student_links_guardian_student_unique").on(table.guardianUserId, table.studentId), index("parent_student_links_guardian_center_idx").on(table.guardianUserId, table.centerId)]);
 
-// ===================== BRANCHES =====================
-export const branches = mysqlTable("branches", {
-  id: int("id").autoincrement().primaryKey(),
-  centerId: int("centerId").notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description"),
-  phone: varchar("phone", { length: 32 }),
-  address: text("address"),
-  supervisorId: int("supervisorId"),
-  isActive: boolean("isActive").default(true).notNull(),
-  deletedAt: timestamp("deletedAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
-
-export type Branch = typeof branches.$inferSelect;
-export type InsertBranch = typeof branches.$inferInsert;
-
-// ===================== ACADEMIC SEASONS =====================
-export const academicSeasons = mysqlTable("academic_seasons", {
-  id: int("id").autoincrement().primaryKey(),
-  centerId: int("centerId").notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
-  type: mysqlEnum("type", ["academic_year", "semester", "summer", "ramadan", "custom"]).default("academic_year").notNull(),
-  startDate: timestamp("startDate").notNull(),
-  endDate: timestamp("endDate").notNull(),
-  isActive: boolean("isActive").default(true).notNull(),
-  deletedAt: timestamp("deletedAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
-
-export type AcademicSeason = typeof academicSeasons.$inferSelect;
-export type InsertAcademicSeason = typeof academicSeasons.$inferInsert;
-
 // ===================== CIRCLES (HALAQAT) =====================
 export const circles = mysqlTable("circles", {
   id: int("id").autoincrement().primaryKey(),
-  branchId: int("branchId").notNull(),
-  seasonId: int("seasonId").notNull(),
+  centerId: int("centerId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   teacherId: int("teacherId"),
@@ -209,26 +145,6 @@ export const circles = mysqlTable("circles", {
 
 export type Circle = typeof circles.$inferSelect;
 export type InsertCircle = typeof circles.$inferInsert;
-
-// ===================== CIRCLE PERIODS =====================
-// فترات متكررة خاصة بالحَلَقة؛ لا تنشئ جلسات تلقائياً من دون إجراء معلم صريح.
-export const circlePeriods = mysqlTable("circle_periods", {
-  id: int("id").autoincrement().primaryKey(),
-  circleId: int("circleId").notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
-  sessionType: varchar("sessionType", { length: 64 }).notNull().default("جلسة يومية"),
-  daysOfWeek: varchar("daysOfWeek", { length: 128 }).notNull(),
-  startTime: varchar("startTime", { length: 8 }).notNull(),
-  endTime: varchar("endTime", { length: 8 }),
-  isActive: boolean("isActive").default(true).notNull(),
-  createdBy: int("createdBy"),
-  deletedAt: timestamp("deletedAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
-
-export type CirclePeriod = typeof circlePeriods.$inferSelect;
-export type InsertCirclePeriod = typeof circlePeriods.$inferInsert;
 
 // ===================== TEACHERS =====================
 export const teachers = mysqlTable("teachers", {
@@ -286,6 +202,8 @@ export const students = mysqlTable("students", {
   lastMemorizedSurah: int("lastMemorizedSurah").default(1),
   lastMemorizedAyah: int("lastMemorizedAyah").default(1),
   totalMemorizedJuz: decimal("totalMemorizedJuz", { precision: 5, scale: 2 }).default("0"),
+  memorizeDir: varchar("memorizeDir", { length: 8 }).default("forward").notNull(),
+  reviewDir: varchar("reviewDir", { length: 8 }).default("forward").notNull(),
   isActive: boolean("isActive").default(true).notNull(),
   deletedAt: timestamp("deletedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -295,103 +213,79 @@ export const students = mysqlTable("students", {
 export type Student = typeof students.$inferSelect;
 export type InsertStudent = typeof students.$inferInsert;
 
-// ===================== SESSIONS =====================
-export const sessions = mysqlTable("sessions", {
+// ===================== DAILY RECORD =====================
+// السجل اليومي للحلقة (منقول من زِن، docs/DAILY_RECORD.md): سجل واحد لكل حلقة في كل يوم، يمرّ بـ
+// مفتوح ← مكتمل ← معتمد. سطر كل طالب في daily_entries: الحضور والتقييم والملاحظة ومدى الحفظ والمراجعة
+// (مدى واحد لكل نوع قد يمتد عبر سور، بأرقام السور). version في السجل والسطر يمنع الكتابة فوق تعديل غيرك.
+export const dailyRecords = mysqlTable("daily_records", {
   id: int("id").autoincrement().primaryKey(),
   circleId: int("circleId").notNull(),
-  teacherId: int("teacherId").notNull(),
-  seasonId: int("seasonId").notNull(),
-  title: varchar("title", { length: 255 }),
-  type: mysqlEnum("type", ["regular", "exam", "review", "special"]).default("regular").notNull(),
-  status: mysqlEnum("status", ["draft", "scheduled", "open", "closed", "cancelled"]).default("draft").notNull(),
-  scheduledAt: timestamp("scheduledAt").notNull(),
-  dayKey: varchar("dayKey", { length: 10 }).notNull(),
-  startedAt: timestamp("startedAt"),
-  closedAt: timestamp("closedAt"),
+  recordDate: varchar("recordDate", { length: 10 }).notNull(),
+  status: mysqlEnum("status", ["open", "completed", "locked"]).default("open").notNull(),
   notes: text("notes"),
-  deletedAt: timestamp("deletedAt"),
+  version: int("version").default(1).notNull(),
+  openedBy: int("openedBy"),
+  completedBy: int("completedBy"),
+  completedAt: timestamp("completedAt"),
+  lockedBy: int("lockedBy"),
+  lockedAt: timestamp("lockedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => [index("sessions_circle_day_idx").on(table.circleId, table.dayKey), index("sessions_day_key_idx").on(table.dayKey)]);
+}, (table) => [uniqueIndex("daily_records_circle_date_unique").on(table.circleId, table.recordDate), index("daily_records_date_idx").on(table.recordDate)]);
 
-export type Session = typeof sessions.$inferSelect;
-export type InsertSession = typeof sessions.$inferInsert;
+export type DailyRecord = typeof dailyRecords.$inferSelect;
+export type InsertDailyRecord = typeof dailyRecords.$inferInsert;
 
-// ===================== ATTENDANCE =====================
-export const attendance = mysqlTable("attendance", {
+export const dailyEntries = mysqlTable("daily_entries", {
   id: int("id").autoincrement().primaryKey(),
-  sessionId: int("sessionId").notNull(),
+  recordId: int("recordId").notNull(),
+  circleId: int("circleId").notNull(),
+  recordDate: varchar("recordDate", { length: 10 }).notNull(),
   studentId: int("studentId").notNull(),
-  status: mysqlEnum("status", ["present", "absent", "late", "excused"]).default("present").notNull(),
-  arrivalTime: timestamp("arrivalTime"),
-  notes: text("notes"),
+  status: mysqlEnum("status", ["present", "late", "absent", "excused"]),
+  reason: varchar("reason", { length: 300 }),
+  note: text("note"),
+  evalOverall: tinyint("evalOverall"),
+  evalTajweed: tinyint("evalTajweed"),
+  evalPronunciation: tinyint("evalPronunciation"),
+  evalBehavior: tinyint("evalBehavior"),
+  memFromSurah: int("memFromSurah"),
+  memFromAyah: int("memFromAyah"),
+  memToSurah: int("memToSurah"),
+  memToAyah: int("memToAyah"),
+  memGrade: tinyint("memGrade"),
+  memError: varchar("memError", { length: 16 }),
+  memNotes: text("memNotes"),
+  revFromSurah: int("revFromSurah"),
+  revFromAyah: int("revFromAyah"),
+  revToSurah: int("revToSurah"),
+  revToAyah: int("revToAyah"),
+  revGrade: tinyint("revGrade"),
+  revError: varchar("revError", { length: 16 }),
+  revNotes: text("revNotes"),
+  version: int("version").default(1).notNull(),
   recordedBy: int("recordedBy"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => [uniqueIndex("attendance_session_student_unique").on(table.sessionId, table.studentId), index("attendance_student_session_idx").on(table.studentId, table.sessionId)]);
+}, (table) => [uniqueIndex("daily_entries_record_student_unique").on(table.recordId, table.studentId), index("daily_entries_student_date_idx").on(table.studentId, table.recordDate), index("daily_entries_circle_date_idx").on(table.circleId, table.recordDate)]);
 
-export type Attendance = typeof attendance.$inferSelect;
-export type InsertAttendance = typeof attendance.$inferInsert;
+export type DailyEntry = typeof dailyEntries.$inferSelect;
+export type InsertDailyEntry = typeof dailyEntries.$inferInsert;
 
-// ===================== MEMORIZATION =====================
-export const memorization = mysqlTable("memorization", {
+// سلّة السجل اليومي: لقطة اليوم المحذوف (السجل وأسطر الطلاب) تبقى 30 يوماً ويُستعاد منها.
+export const dailyRecordTrash = mysqlTable("daily_record_trash", {
   id: int("id").autoincrement().primaryKey(),
-  sessionId: int("sessionId").notNull(),
-  studentId: int("studentId").notNull(),
-  surahNumber: int("surahNumber").notNull(),
-  toSurahNumber: int("toSurahNumber"),
-  fromAyah: int("fromAyah").notNull(),
-  toAyah: int("toAyah").notNull(),
-  pages: decimal("pages", { precision: 4, scale: 2 }),
-  grade: mysqlEnum("grade", ["excellent", "very_good", "good", "acceptable", "weak", "not_done"]).default("good"),
-  notes: text("notes"),
-  recordedBy: int("recordedBy"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => [uniqueIndex("memorization_session_student_unique").on(table.sessionId, table.studentId), index("memorization_student_session_idx").on(table.studentId, table.sessionId)]);
+  circleId: int("circleId").notNull(),
+  recordDate: varchar("recordDate", { length: 10 }).notNull(),
+  snapshot: mediumtext("snapshot").notNull(),
+  attendanceCount: int("attendanceCount").default(0).notNull(),
+  workCount: int("workCount").default(0).notNull(),
+  deletedBy: int("deletedBy"),
+  deletedAt: timestamp("deletedAt").defaultNow().notNull(),
+  restoredAt: timestamp("restoredAt"),
+}, (table) => [index("daily_record_trash_circle_idx").on(table.circleId, table.deletedAt)]);
 
-export type Memorization = typeof memorization.$inferSelect;
-export type InsertMemorization = typeof memorization.$inferInsert;
-
-// ===================== REVISION =====================
-export const revision = mysqlTable("revision", {
-  id: int("id").autoincrement().primaryKey(),
-  sessionId: int("sessionId").notNull(),
-  studentId: int("studentId").notNull(),
-  surahNumber: int("surahNumber").notNull(),
-  toSurahNumber: int("toSurahNumber"),
-  fromAyah: int("fromAyah").notNull(),
-  toAyah: int("toAyah").notNull(),
-  pages: decimal("pages", { precision: 4, scale: 2 }),
-  grade: mysqlEnum("grade", ["excellent", "very_good", "good", "acceptable", "weak", "not_done"]).default("good"),
-  notes: text("notes"),
-  recordedBy: int("recordedBy"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => [uniqueIndex("revision_session_student_unique").on(table.sessionId, table.studentId), index("revision_student_session_idx").on(table.studentId, table.sessionId)]);
-
-export type Revision = typeof revision.$inferSelect;
-export type InsertRevision = typeof revision.$inferInsert;
-
-// ===================== EVALUATION =====================
-export const evaluation = mysqlTable("evaluation", {
-  id: int("id").autoincrement().primaryKey(),
-  sessionId: int("sessionId").notNull(),
-  studentId: int("studentId").notNull(),
-  tajweedScore: tinyint("tajweedScore"),
-  pronunciationScore: tinyint("pronunciationScore"),
-  memorizationScore: tinyint("memorizationScore"),
-  behaviorScore: tinyint("behaviorScore"),
-  totalScore: tinyint("totalScore"),
-  points: int("points").default(0),
-  notes: text("notes"),
-  recordedBy: int("recordedBy"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => [uniqueIndex("evaluation_session_student_unique").on(table.sessionId, table.studentId), index("evaluation_student_session_idx").on(table.studentId, table.sessionId)]);
-
-export type Evaluation = typeof evaluation.$inferSelect;
-export type InsertEvaluation = typeof evaluation.$inferInsert;
+export type DailyRecordTrash = typeof dailyRecordTrash.$inferSelect;
 
 // ===================== NOTIFICATIONS =====================
 export const notifications = mysqlTable("notifications", {
