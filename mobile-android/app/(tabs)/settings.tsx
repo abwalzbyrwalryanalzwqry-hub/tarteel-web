@@ -91,7 +91,7 @@ export default function SettingsScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeader}><Ionicons name="information-circle-outline" size={20} color={colors.primary} /><Text style={styles.cardTitle}>عن التطبيق</Text></View>
           <Row label="الإصدار" value={`${Constants.expoConfig?.version ?? "—"}`} />
-          <Row label="المصحف" value="نص Tanzil (رواية حفص) — يعمل دون اتصال" />
+          <Row label="المصحف" value="مصحف المدينة ١٥ سطراً، مع التفاسير والتلاوات — يعمل دون اتصال" />
           <Pressable onPress={() => void Linking.openURL("https://tanzil.net/docs/text_license")} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
             <Ionicons name="document-text-outline" size={18} color={colors.primary} /><Text style={styles.linkText}>ترخيص نص Tanzil</Text>
           </Pressable>

@@ -7,6 +7,7 @@ import App from "./App";
 import { API_MODE, createApiLinks } from "@/lib/apiLink";
 import { setupServiceWorker } from "./serviceWorker";
 import { ROLE_SIMULATION_STORAGE_KEY } from "./contexts/RoleSimulationContext";
+import { STANDALONE_MUSHAF } from "./mushaf/lib/standalone";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -81,18 +82,28 @@ function renderStartupError(error: unknown) {
   );
 }
 
-createApiLinks(roleSimulationHeaders)
-  .then((links) => {
-    const trpcClient = trpc.createClient({ links });
-    root.render(
-      <trpc.Provider client={trpcClient} queryClient={queryClient}>
-        <QueryClientProvider client={queryClient}>
-          <App />
-        </QueryClientProvider>
-      </trpc.Provider>
-    );
-  })
-  .catch(renderStartupError);
+if (STANDALONE_MUSHAF) {
+  // «المصحف المستقل» (تبويب المصحف في أندرويد): لا يفتح قاعدة بيانات الجهاز ولا يحمّل منطق الخادم،
+  // حتى لا تتنافس نسختان من القاعدة مع تبويب المنصة (انظر mushaf/lib/standalone.ts).
+  import("./mushaf/app/StandaloneRoot")
+    .then(({ default: StandaloneRoot }) => {
+      root.render(<StandaloneRoot queryClient={queryClient} />);
+    })
+    .catch(renderStartupError);
+} else {
+  createApiLinks(roleSimulationHeaders)
+    .then((links) => {
+      const trpcClient = trpc.createClient({ links });
+      root.render(
+        <trpc.Provider client={trpcClient} queryClient={queryClient}>
+          <QueryClientProvider client={queryClient}>
+            <App />
+          </QueryClientProvider>
+        </trpc.Provider>
+      );
+    })
+    .catch(renderStartupError);
+}
 
 // النسخة المحلية تعمل داخل التطبيق دون شبكة؛ عامل الخدمة (التخزين المؤقت للويب) لا حاجة له فيها.
 if (API_MODE === "server") setupServiceWorker();

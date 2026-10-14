@@ -7,6 +7,8 @@
  *   مراجعات «أتقنتُها» مع خادم ترتيل.
  * - مشغّل التلاوة في جذر القسم (RecitationPlayerProvider)، فتستمر التلاوة بين شاشاته.
  * - كل شاشة تُحمَّل كسولاً عند فتحها، وجذر القسم يحمل الصنف tq-mushaf الذي تُحصر فيه أنماط زِن.
+ * - «المصحف المستقل» (StandaloneMushafApp، تبويب المصحف في أندرويد) يعرض الشاشات نفسها دون حساب ودون
+ *   tRPC، بلا سجل الحفظ واختيار المقطع لأنهما من بيانات المنصة.
  */
 import "@/mushaf/mushaf.css";
 import { lazy, Suspense, useEffect, type ComponentType } from "react";
@@ -67,22 +69,8 @@ function useMushafSync(userId: number | null) {
   }, [userId]);
 }
 
-export default function MushafApp() {
-  const { user, loading, isAuthenticated } = useAuth();
-  const { can } = usePermissions();
-  const { data: memberships, isLoading: membershipsLoading } =
-    trpc.access.mine.useQuery(undefined, { enabled: isAuthenticated });
-  const ready = isAuthenticated && !membershipsLoading;
-  const allowed =
-    ready && hasActiveAccessMembership(memberships) && can("quran:view");
-  useMushafSync(allowed && user ? user.id : null);
-
-  if (loading || (isAuthenticated && membershipsLoading))
-    return <PageLoader fullScreen />;
-  if (!isAuthenticated) return <Redirect to="/login" />;
-  if (!hasActiveAccessMembership(memberships)) return <Redirect to="/start" />;
-  if (!can("quran:view")) return <Redirect to="/dashboard" />;
-
+/** إطار القسم: الأنماط والخطوط ومشغّل التلاوة، ثم الشاشات. */
+function MushafRoutes({ account }: { account: boolean }) {
   return (
     <div className="tq-mushaf" dir="rtl" lang="ar">
       {/* خطوط نص القرآن (أميري قرآن وشهرزاد ونسخ نوتو) مستضافة في public/fonts. */}
@@ -102,12 +90,12 @@ export default function MushafApp() {
             <Route path="/quran/memorize" component={Memorize} />
             <Route path="/quran/reader-settings" component={ReaderSettings} />
             <Route path="/quran/recitations" component={Recitations} />
-            <Route path="/quran/records" component={Records} />
+            {account && <Route path="/quran/records" component={Records} />}
             <Route path="/quran/search" component={Search} />
             <Route path="/quran/share" component={Share} />
             <Route path="/quran/sources" component={Sources} />
             <Route path="/quran/tafsir" component={Tafsir} />
-            <Route path="/quran/picker" component={Picker} />
+            {account && <Route path="/quran/picker" component={Picker} />}
             <Route>
               <Redirect to="/quran" replace />
             </Route>
@@ -115,5 +103,38 @@ export default function MushafApp() {
         </Suspense>
       </RecitationPlayerProvider>
     </div>
+  );
+}
+
+export default function MushafApp() {
+  const { user, loading, isAuthenticated } = useAuth();
+  const { can } = usePermissions();
+  const { data: memberships, isLoading: membershipsLoading } =
+    trpc.access.mine.useQuery(undefined, { enabled: isAuthenticated });
+  const ready = isAuthenticated && !membershipsLoading;
+  const allowed =
+    ready && hasActiveAccessMembership(memberships) && can("quran:view");
+  useMushafSync(allowed && user ? user.id : null);
+
+  if (loading || (isAuthenticated && membershipsLoading))
+    return <PageLoader fullScreen />;
+  if (!isAuthenticated) return <Redirect to="/login" />;
+  if (!hasActiveAccessMembership(memberships)) return <Redirect to="/start" />;
+  if (!can("quran:view")) return <Redirect to="/dashboard" />;
+
+  return <MushafRoutes account />;
+}
+
+/** «المصحف المستقل»: كل ما خارج /quran يعود إلى فهرس المصحف. */
+export function StandaloneMushafApp() {
+  return (
+    <Switch>
+      <Route path="/quran/*?">
+        <MushafRoutes account={false} />
+      </Route>
+      <Route>
+        <Redirect to="/quran" replace />
+      </Route>
+    </Switch>
   );
 }

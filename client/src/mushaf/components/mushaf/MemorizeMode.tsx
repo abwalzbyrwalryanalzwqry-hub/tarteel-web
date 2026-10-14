@@ -23,6 +23,7 @@ import {
 import { stripBasmala } from "@/mushaf/lib/quran/basmala";
 import { markMastered } from "@/mushaf/lib/quran/memorize-api";
 import { t } from "@/mushaf/lib/i18n";
+import { STANDALONE_MUSHAF } from "@/mushaf/lib/standalone";
 
 /**
  * وضع الحفظ التدريجي (8.1): إخفاء متدرّج للنص العثماني بلا تغيير فيه، وكشف الكلمة باللمس،
@@ -265,8 +266,9 @@ export function MemorizeMode({
       </button>
       {!canSave && (
         <p className="text-[0.6875rem] text-muted-foreground text-center">
-          الإضافة إلى المراجعة تحتاج حساباً. الحفظ نفسه يعمل بلا حساب وبلا
-          اتصال.
+          {STANDALONE_MUSHAF
+            ? "الإضافة إلى المراجعة من المصحف داخل المنصة بحسابك. الحفظ نفسه يعمل هنا بلا حساب وبلا اتصال."
+            : "الإضافة إلى المراجعة تحتاج حساباً. الحفظ نفسه يعمل بلا حساب وبلا اتصال."}
         </p>
       )}
       {msg && (

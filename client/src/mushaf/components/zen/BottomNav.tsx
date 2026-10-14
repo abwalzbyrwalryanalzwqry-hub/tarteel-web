@@ -8,6 +8,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useT } from "@/mushaf/lib/i18n";
+import { STANDALONE_MUSHAF } from "@/mushaf/lib/standalone";
 
 type NavItem = { key: string; to: string; label: string; icon: LucideIcon };
 
@@ -15,7 +16,7 @@ type NavItem = { key: string; to: string; label: string; icon: LucideIcon };
  * الشريط السفلي لقسم المصحف في ترتيل، بشكل شريط زِن نفسه (glass-strong): أقسام المصحف الرئيسة،
  * وأولها العودة إلى لوحة ترتيل، فلا يحبس القسم المستخدم داخله.
  */
-const ITEMS: NavItem[] = [
+const ALL_ITEMS: NavItem[] = [
   { key: "home", to: "/today", label: "ترتيل", icon: LayoutDashboard },
   { key: "mushaf", to: "/mushaf", label: "المصحف", icon: BookOpen },
   { key: "read", to: "/mushaf/read", label: "القراءة", icon: BookOpenCheck },
@@ -32,6 +33,11 @@ const ITEMS: NavItem[] = [
     icon: Bookmark,
   },
 ];
+
+/** في «المصحف المستقل» (تبويب أندرويد) شريط التطبيق الأصلي يوصل إلى المنصة، فلا يتكرر زرها هنا. */
+const ITEMS = STANDALONE_MUSHAF
+  ? ALL_ITEMS.filter(item => item.key !== "home")
+  : ALL_ITEMS;
 
 function activeKey(path: string): string {
   const p = path.replace(/\/+$/, "") || "/";

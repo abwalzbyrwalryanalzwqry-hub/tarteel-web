@@ -16,6 +16,7 @@ import {
 } from "react";
 import { useLocation, useSearch } from "wouter";
 import { navigate as wouterNavigate } from "wouter/use-browser-location";
+import { STANDALONE_MUSHAF } from "@/mushaf/lib/standalone";
 
 type SearchValue = string | number | boolean | null | undefined;
 type SearchInput = Record<string, SearchValue> | undefined;
@@ -27,8 +28,11 @@ export function toTarteelPath(to: string): string {
   if (path === "/mushaf" || path === "/mushaf/") mapped = "/quran";
   else if (path.startsWith("/mushaf/"))
     mapped = `/quran/${path.slice("/mushaf/".length)}`;
-  else if (path === "/today" || path === "/") mapped = "/dashboard";
-  else if (path === "/auth/login") mapped = "/login";
+  // في «المصحف المستقل» لا منصة ولا حساب خلف القسم: الرئيسية والدخول يعودان إلى فهرس المصحف.
+  else if (path === "/today" || path === "/")
+    mapped = STANDALONE_MUSHAF ? "/quran" : "/dashboard";
+  else if (path === "/auth/login")
+    mapped = STANDALONE_MUSHAF ? "/quran" : "/login";
   return mapped + rest;
 }
 
