@@ -32,13 +32,13 @@ const studentRow = (name: string) =>
 
 test("إنشاء فترة اليوم من صفحة الفترات وفتح سجل الطلاب", async () => {
   await page.goto("/sessions");
-  await page.getByRole("button", { name: "إنشاء جلسة اليوم" }).click();
+  // الحلقة بلا معلم بعد: «فترة مخصصة» تفتح النموذج لاختيار المعلم.
+  await page.getByRole("button", { name: "فترة مخصصة" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("فترة جديدة")).toBeVisible();
   const selects = dialog.locator("select");
   await expect(selects.nth(0)).toHaveValue(/\d+/); // الحلقة الوحيدة مختارة تلقائياً
   await selects.nth(1).selectOption({ label: "الشيخ خالد" });
-  await selects.nth(2).selectOption({ label: "العام الدراسي" });
   await dialog
     .getByRole("button", { name: "إنشاء الفترة وفتح سجل الطلاب" })
     .click();

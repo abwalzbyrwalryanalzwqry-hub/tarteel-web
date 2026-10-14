@@ -17,6 +17,7 @@ import { Link } from "wouter";
 import { AIGuidanceCard } from "@/components/AIGuidanceCard";
 import { CenterManagerDashboard } from "@/components/CenterManagerDashboard";
 import { RoleSimulationControl } from "@/components/RoleSimulationControl";
+import { usePermissions } from "@/hooks/usePermissions";
 import { SESSION_STATUS_LABELS, SESSION_TYPE_LABELS } from "../../../shared/types";
 
 function LayoutDashboard({ className }: { className?: string }) {
@@ -68,6 +69,15 @@ export default function Dashboard() {
   const { data: accessibleCenters } = trpc.centers.list.useQuery({ orgId: undefined });
 
   const unreadCount = notifications?.filter((n) => !n.isRead).length ?? 0;
+  const { can } = usePermissions();
+  // كل إجراء يفتح نموذجه مباشرة (?new=1)، ويظهر فقط لمن يملك صلاحيته.
+  const quickActions = [
+    { label: "فترة اليوم", href: "/periods", icon: ClipboardList, color: "bg-blue-600", allowed: can("sessions:manage") },
+    { label: "تسجيل طالب", href: "/students?new=1", icon: Users, color: "bg-emerald-600", allowed: can("students:manage") },
+    { label: "إضافة معلم", href: "/teachers?new=1", icon: GraduationCap, color: "bg-amber-500", allowed: can("teachers:manage") },
+    { label: "حلقة جديدة", href: "/circles?new=1", icon: BookOpen, color: "bg-purple-600", allowed: can("circles:manage") },
+    { label: "التقارير", href: "/reports", icon: BarChart3, color: "bg-teal-600", allowed: can("reports:view") },
+  ].filter((action) => action.allowed);
 
   const greeting = () => {
     const hour = new Date().getHours();
@@ -117,8 +127,22 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {quickActions.length > 0 && (
+        <nav aria-label="إجراءات سريعة" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          {quickActions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <Link key={action.href} href={action.href} className="glass-card group flex items-center gap-3 rounded-2xl p-3 transition-transform hover:-translate-y-0.5">
+                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${action.color}`}><Icon className="h-4 w-4 text-white" /></span>
+                <span className="text-sm font-semibold text-foreground group-hover:text-primary">{action.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      )}
+
       <AIGuidanceCard context="dashboard" />
-      <CenterManagerDashboard centers={accessibleCenters ?? []} />
+      {can("centers:manage") && <CenterManagerDashboard centers={accessibleCenters ?? []} />}
 
       {/* Stats Grid */}
       {statsLoading ? (
@@ -142,8 +166,8 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard label="إجمالي الفترات" value={stats?.totalSessions ?? 0} icon={ClipboardList} color="bg-teal-600" href="/periods" delay={1} />
             <StatCard label="فترات مفتوحة" value={stats?.openSessions ?? 0} icon={Calendar} color="bg-indigo-600" href="/periods" delay={2} />
-            <StatCard label="حضور اليوم" value={stats?.todayAttendance ?? 0} icon={CheckCircle} color="bg-green-600" delay={3} />
-            <StatCard label="غياب اليوم" value={stats?.todayAbsence ?? 0} icon={XCircle} color="bg-red-500" delay={4} />
+            <StatCard label="حضور اليوم" value={stats?.todayAttendance ?? 0} icon={CheckCircle} color="bg-green-600" href="/periods" delay={3} />
+            <StatCard label="غياب اليوم" value={stats?.todayAbsence ?? 0} icon={XCircle} color="bg-red-500" href="/periods" delay={4} />
           </div>
         </>
       )}
@@ -197,41 +221,13 @@ export default function Dashboard() {
             <div className="text-center py-8">
               <ClipboardList className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
               <p className="text-muted-foreground text-sm">لا توجد فترات بعد</p>
-              <Link href="/periods">
-                <button className="mt-3 btn-gold text-sm px-4 py-2">إنشاء فترة</button>
-              </Link>
+              {can("sessions:manage") && <Link href="/periods" className="mt-3 inline-flex btn-gold text-sm px-4 py-2">بدء فترة اليوم</Link>}
             </div>
           )}
         </div>
 
         {/* Sidebar */}
         <div className="space-y-4">
-          {/* Quick Actions */}
-          <div className="glass-card rounded-2xl p-5 animate-fade-in-up">
-            <h2 className="font-display font-bold text-foreground text-base mb-3">إجراءات سريعة</h2>
-            <div className="space-y-1.5">
-              {[
-                { label: "فترة جديدة", href: "/periods", icon: ClipboardList, color: "bg-blue-600" },
-                { label: "إضافة طالب", href: "/students", icon: Users, color: "bg-emerald-600" },
-                { label: "إضافة معلم", href: "/teachers", icon: GraduationCap, color: "bg-amber-500" },
-                { label: "مركز جديد", href: "/centers", icon: Building2, color: "bg-purple-600" },
-                { label: "التقارير", href: "/reports", icon: BarChart3, color: "bg-teal-600" },
-              ].map((action) => {
-                const Icon = action.icon;
-                return (
-                  <Link key={action.href} href={action.href}>
-                    <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/30 transition-colors cursor-pointer group">
-                      <div className={`w-8 h-8 rounded-lg ${action.color} flex items-center justify-center flex-shrink-0`}>
-                        <Icon className="w-4 h-4 text-white" />
-                      </div>
-                      <span className="text-sm text-foreground group-hover:text-primary transition-colors">{action.label}</span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Recent Notifications */}
           {unreadCount > 0 && (
             <div className="glass-card rounded-2xl p-5 animate-fade-in-up">

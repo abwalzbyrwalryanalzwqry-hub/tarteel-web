@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { recallChoice, rememberChoice } from "@/hooks/useUrlParams";
 import { formatDualCalendarDate, getHijriDateParts, hijriToGregorian } from "../../../shared/dates";
 
 export type NewSessionValues = {
@@ -41,6 +42,7 @@ export function NewSessionComposer({
   conflictMessage,
   onClearConflict,
   onSubmit,
+  defaultCircleId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -51,6 +53,8 @@ export function NewSessionComposer({
   conflictMessage?: string | null;
   onClearConflict?: () => void;
   onSubmit: (values: NewSessionValues) => void;
+  /** الحلقة المختارة مسبقاً (من رابط ?circleId= أو صفحة الحلقة). */
+  defaultCircleId?: number;
 }) {
   const [circleId, setCircleId] = useState<number | undefined>();
   const [teacherId, setTeacherId] = useState<number | undefined>();
@@ -64,10 +68,12 @@ export function NewSessionComposer({
 
   useEffect(() => {
     if (!open || circleId || !circles?.length) return;
-    const firstCircle = circles[0];
+    // الأولوية: الحلقة الممررة، ثم آخر حلقة استُخدمت على هذا الجهاز، ثم الأولى.
+    const preferred = [defaultCircleId, recallChoice("circle")].find((id) => id && circles.some((circle) => circle.id === id));
+    const firstCircle = circles.find((circle) => circle.id === preferred) ?? circles[0];
     setCircleId(firstCircle.id);
     if (!isTeachingRole && firstCircle.teacherId) setTeacherId(firstCircle.teacherId);
-  }, [circleId, circles, isTeachingRole, open]);
+  }, [circleId, circles, defaultCircleId, isTeachingRole, open]);
 
   useEffect(() => {
     if (open) return;
@@ -115,6 +121,7 @@ export function NewSessionComposer({
       toast.error("اكتب اسم الفترة");
       return;
     }
+    rememberChoice("circle", circleId);
     onSubmit({
       circleId,
       teacherId,
@@ -159,7 +166,7 @@ export function NewSessionComposer({
           </section>
 
           <label className="block"><span className="mb-1.5 block text-sm font-semibold">ملاحظات</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} placeholder="ملاحظات إضافية حول أهداف الجلسة أو توجيهاتها…" className="tarteel-input resize-none" /></label>
-          <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row"><button type="button" onClick={resetAndClose} className="rounded-xl border border-border px-5 py-3 font-semibold hover:bg-muted">إلغاء</button><button type="button" disabled={isLoading} onClick={submit} className="btn-gold flex-1 py-3">{isLoading ? "جارٍ إنشاء الفترة…" : "إنشاء الفترة وفتح سجل الطلاب"}</button></div>
+          <div className="sticky bottom-0 -mx-5 -mb-5 flex flex-col-reverse gap-2 border-t border-border bg-background px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:-mx-7 sm:-mb-7 sm:flex-row sm:px-7"><button type="button" onClick={resetAndClose} className="rounded-xl border border-border px-5 py-3 font-semibold hover:bg-muted">إلغاء</button><button type="button" disabled={isLoading} onClick={submit} className="btn-gold flex-1 py-3">{isLoading ? "جارٍ إنشاء الفترة…" : "إنشاء الفترة وفتح سجل الطلاب"}</button></div>
         </div>
       </DialogContent>
     </Dialog>

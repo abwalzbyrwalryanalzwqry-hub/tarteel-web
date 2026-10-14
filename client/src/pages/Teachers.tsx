@@ -1,11 +1,17 @@
-import EntityForm, { FormInput } from "@/components/EntityForm";
+import EntityForm, { FormInput, FormMore, FormPhoneInput, isAddAnotherSubmit } from "@/components/EntityForm";
+import { ContactLinks } from "@/components/ContactLinks";
+import { SearchField } from "@/components/SearchField";
+import { useCreateFormParam } from "@/hooks/useUrlParams";
+import { useMoveToTrash } from "@/hooks/useMoveToTrash";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeftRight, Clock3, Edit, GraduationCap, Mail, Phone, Plus, Search, Trash2, User } from "lucide-react";
+import { ArrowLeftRight, BookOpen, Clock3, Edit, GraduationCap, Mail, Plus, Trash2, User } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 export default function Teachers() {
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useCreateFormParam();
+  const [formKey, setFormKey] = useState(0);
+  const [addAnother, setAddAnother] = useState(false);
   const [search, setSearch] = useState("");
   const [editItem, setEditItem] = useState<any>(null);
   const [transferItem, setTransferItem] = useState<any>(null);
@@ -16,17 +22,15 @@ export default function Teachers() {
   const { data: teacherActivity } = trpc.teachers.activity.useQuery();
 
   const createMutation = trpc.teachers.create.useMutation({
-    onSuccess: () => { toast.success("تم إضافة المعلم بنجاح"); setShowForm(false); refetch(); },
+    onSuccess: (_result, values) => { toast.success(`تمت إضافة ${values.name}`); if (addAnother) setFormKey((key) => key + 1); else setShowForm(false); refetch(); },
     onError: (e) => toast.error(e.message),
   });
   const updateMutation = trpc.teachers.update.useMutation({
     onSuccess: () => { toast.success("تم تحديث بيانات المعلم"); setEditItem(null); refetch(); },
     onError: (e) => toast.error(e.message),
   });
-  const deleteMutation = trpc.teachers.delete.useMutation({
-    onSuccess: () => { toast.success("تم نقل المعلم إلى سلة المحذوفات"); refetch(); },
-    onError: (e) => toast.error(e.message),
-  });
+  const deleteMutation = trpc.teachers.delete.useMutation();
+  const moveToTrash = useMoveToTrash("teachers", () => refetch());
   const transferMutation = trpc.teachers.transfer.useMutation({
     onSuccess: () => { toast.success("تم نقل المعلم وربطه بالحَلَقة الجديدة"); setTransferItem(null); refetch(); },
     onError: (e) => toast.error(e.message),
@@ -36,9 +40,10 @@ export default function Teachers() {
 
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setAddAnother(isAddAnotherSubmit(e));
     const fd = new FormData(e.currentTarget);
     createMutation.mutate({
-      centerId: Number(fd.get("centerId")),
+      centerId: fd.get("centerId") ? Number(fd.get("centerId")) : centers?.length === 1 ? centers[0].id : undefined,
       name: fd.get("name") as string,
       phone: fd.get("phone") as string,
       email: fd.get("email") as string,
@@ -51,7 +56,7 @@ export default function Teachers() {
   function handleUpdate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    updateMutation.mutate({ id: editItem.id, name: fd.get("name") as string, phone: fd.get("phone") as string, specialization: fd.get("specialization") as string });
+    updateMutation.mutate({ id: editItem.id, name: fd.get("name") as string, phone: fd.get("phone") as string, email: (fd.get("email") as string) || "", specialization: fd.get("specialization") as string, qualification: fd.get("qualification") as string });
   }
   function handleTransfer(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -66,12 +71,9 @@ export default function Teachers() {
           <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center"><GraduationCap className="w-5 h-5 text-white"/></div>
           <div><h1 className="page-title">المعلمون</h1><p className="page-subtitle">إدارة بيانات المعلمين</p></div>
         </div>
-        <button onClick={()=>setShowForm(true)} className="btn-gold flex items-center gap-2 text-sm"><Plus className="w-4 h-4"/>إضافة معلم</button>
+        <button onClick={()=>setShowForm(true)} className="btn-gold flex shrink-0 items-center gap-2 whitespace-nowrap text-sm"><Plus className="w-4 h-4"/>إضافة معلم</button>
       </div>
-      <div className="relative">
-        <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
-        <input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="بحث في المعلمين..." className="tarteel-input pr-10"/>
-      </div>
+      <SearchField value={search} onChange={setSearch} placeholder="بحث بالاسم أو الهاتف..." />
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{[1,2,3].map(i=><div key={i} className="glass-card rounded-2xl p-5"><div className="skeleton h-5 w-32 mb-3"/><div className="skeleton h-4 w-24"/></div>)}</div>
       ) : filtered.length === 0 ? (
@@ -84,14 +86,15 @@ export default function Teachers() {
               <div className="flex items-start justify-between mb-3">
                 <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center"><User className="w-6 h-6 text-amber-600"/></div>
                 <div className="flex gap-1">
-                  <button onClick={()=>setEditItem(teacher)} className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center"><Edit className="w-3.5 h-3.5 text-muted-foreground"/></button>
-                  <button onClick={()=>setTransferItem(teacher)} className="w-8 h-8 rounded-lg hover:bg-primary/10 flex items-center justify-center" title="نقل إلى حلقة"><ArrowLeftRight className="w-3.5 h-3.5 text-primary"/></button>
-                  <button onClick={()=>{if(confirm("نقل إلى سلة المحذوفات؟"))deleteMutation.mutate({id:teacher.id})}} className="w-8 h-8 rounded-lg hover:bg-destructive/10 flex items-center justify-center"><Trash2 className="w-3.5 h-3.5 text-destructive"/></button>
+                  <button onClick={()=>setEditItem(teacher)} aria-label={`تعديل ${teacher.name}`} title="تعديل" className="w-9 h-9 rounded-lg hover:bg-muted flex items-center justify-center"><Edit className="w-4 h-4 text-muted-foreground"/></button>
+                  <button onClick={()=>setTransferItem(teacher)} aria-label={`ربط ${teacher.name} بحلقة`} title="ربط بحلقة" className="w-9 h-9 rounded-lg hover:bg-primary/10 flex items-center justify-center"><ArrowLeftRight className="w-4 h-4 text-primary"/></button>
+                  <button onClick={()=>void moveToTrash(teacher, (id) => deleteMutation.mutateAsync({ id }))} aria-label={`حذف ${teacher.name}`} title="نقل إلى السلة" className="w-9 h-9 rounded-lg hover:bg-destructive/10 flex items-center justify-center"><Trash2 className="w-4 h-4 text-destructive"/></button>
                 </div>
               </div>
               <h3 className="font-display font-bold text-foreground text-lg mb-1">{teacher.name}</h3>
               {teacher.specialization&&<p className="text-sm text-primary mb-2">{teacher.specialization}</p>}
-              {teacher.phone&&<div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-1"><Phone className="w-3.5 h-3.5"/>{teacher.phone}</div>}
+              {circles?.filter((circle) => circle.teacherId === teacher.id || circle.assistantTeacherId === teacher.id).map((circle) => <p key={circle.id} className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-primary/80"><BookOpen className="h-3.5 w-3.5" />{circle.name}{circle.assistantTeacherId === teacher.id ? " (مساعد)" : ""}</p>)}
+              <ContactLinks phone={teacher.phone} className="mb-1" />
               {teacher.email&&<div className="flex items-center gap-1.5 text-sm text-muted-foreground"><Mail className="w-3.5 h-3.5"/>{teacher.email}</div>}
               <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><Clock3 className="w-3.5 h-3.5 text-primary" />{lastActivity ? `آخر جلسة: ${new Date(lastActivity).toLocaleDateString("ar-SA")}` : "لا توجد جلسات مسجلة بعد"}</div>
               <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
@@ -102,24 +105,28 @@ export default function Teachers() {
           })}
         </div>
       )}
-      {showForm&&<EntityForm title="إضافة معلم جديد" onClose={()=>setShowForm(false)} onSubmit={handleCreate} isLoading={createMutation.isPending}>
-        <div><label className="block text-sm font-medium text-foreground mb-1.5">المركز <span className="text-destructive">*</span></label>
+      {showForm&&<EntityForm key={formKey} title="إضافة معلم جديد" onClose={()=>setShowForm(false)} onSubmit={handleCreate} isLoading={createMutation.isPending} addAnotherLabel="حفظ وإضافة آخر">
+        <FormInput label="الاسم الكامل" name="name" required placeholder="أحمد بن محمد" autoComplete="off"/>
+        {(centers?.length ?? 0) > 1 && <div><label className="block text-sm font-medium text-foreground mb-1.5">المركز <span className="text-destructive">*</span></label>
           <select name="centerId" required className="tarteel-input"><option value="">اختر المركز</option>{centers?.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
-        </div>
-        <FormInput label="الاسم الكامل" name="name" required placeholder="أحمد بن محمد"/>
-        <FormInput label="رقم الهاتف" name="phone" placeholder="0500000000"/>
-        <FormInput label="البريد الإلكتروني" name="email" type="email" placeholder="teacher@example.com"/>
-        <FormInput label="رقم الهوية" name="nationalId" placeholder="1234567890"/>
-        <FormInput label="التخصص" name="specialization" placeholder="تحفيظ القرآن الكريم"/>
-        <FormInput label="المؤهل العلمي" name="qualification" placeholder="بكالوريوس"/>
+        </div>}
+        <FormPhoneInput label="رقم الهاتف" name="phone"/>
+        <FormMore>
+          <FormInput label="البريد الإلكتروني" name="email" type="email" dir="ltr" autoComplete="email" placeholder="teacher@example.com"/>
+          <FormInput label="رقم الهوية" name="nationalId" inputMode="numeric" dir="ltr" placeholder="1234567890"/>
+          <FormInput label="التخصص" name="specialization" placeholder="تحفيظ القرآن الكريم"/>
+          <FormInput label="المؤهل العلمي" name="qualification" placeholder="بكالوريوس"/>
+        </FormMore>
       </EntityForm>}
-      {editItem&&<EntityForm title="تعديل بيانات المعلم" onClose={()=>setEditItem(null)} onSubmit={handleUpdate} isLoading={updateMutation.isPending} submitLabel="تحديث">
+      {editItem&&<EntityForm title="تعديل بيانات المعلم" onClose={()=>setEditItem(null)} onSubmit={handleUpdate} isLoading={updateMutation.isPending} submitLabel="حفظ التعديلات">
         <FormInput label="الاسم الكامل" name="name" required defaultValue={editItem.name}/>
-        <FormInput label="رقم الهاتف" name="phone" defaultValue={editItem.phone??""}/>
+        <FormPhoneInput label="رقم الهاتف" name="phone" defaultValue={editItem.phone??""}/>
+        <FormInput label="البريد الإلكتروني" name="email" type="email" dir="ltr" defaultValue={editItem.email??""}/>
         <FormInput label="التخصص" name="specialization" defaultValue={editItem.specialization??""}/>
+        <FormInput label="المؤهل العلمي" name="qualification" defaultValue={editItem.qualification??""}/>
       </EntityForm>}
       {transferItem&&<EntityForm title={`نقل ${transferItem.name} إلى حَلَقة`} onClose={()=>setTransferItem(null)} onSubmit={handleTransfer} isLoading={transferMutation.isPending} submitLabel="تأكيد النقل">
-        <div><label className="block text-sm font-medium text-foreground mb-1.5">الحَلَقة المستهدفة <span className="text-destructive">*</span></label><select name="circleId" required className="tarteel-input"><option value="">اختر حَلَقة من مركز المعلم</option>{circles?.map(circle=><option key={circle.id} value={circle.id}>{circle.name}</option>)}</select><p className="mt-2 text-xs leading-5 text-muted-foreground">سيتحقق النظام من أن الحَلَقة تنتمي إلى المركز نفسه وأن المقعد المختار غير مشغول.</p></div>
+        <div><label className="block text-sm font-medium text-foreground mb-1.5">الحَلَقة المستهدفة <span className="text-destructive">*</span></label><select name="circleId" required className="tarteel-input"><option value="">اختر حَلَقة من مركز المعلم</option>{circles?.filter(circle=>circle.centerId===transferItem.centerId).map(circle=><option key={circle.id} value={circle.id}>{circle.name}</option>)}</select><p className="mt-2 text-xs leading-5 text-muted-foreground">سيتحقق النظام من أن الحَلَقة تنتمي إلى المركز نفسه وأن المقعد المختار غير مشغول.</p></div>
         <div><label className="block text-sm font-medium text-foreground mb-1.5">صفة الارتباط</label><select name="role" defaultValue="teacher" className="tarteel-input"><option value="teacher">معلم الحلقة</option><option value="assistant_teacher">معلم مساعد</option></select></div>
       </EntityForm>}
     </div>

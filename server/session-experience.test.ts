@@ -170,7 +170,7 @@ describe("تزامن البيانات وتجربة جلسة المعلم", () =>
     expect(periods).toContain("جلسة اليوم");
     expect(periods).toContain("getRiyadhDayKey");
     expect(periods).toContain("مسودة محفوظة وجاهزة للاستئناف");
-    expect(periods).toContain("إنشاء جلسة اليوم");
+    expect(periods).toContain("بدء فترة اليوم");
     expect(periods).toContain("استئناف");
   });
 

@@ -4,6 +4,7 @@ import {
   BookOpenText,
   CheckCircle,
   ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Clock,
   Star,
@@ -58,6 +59,9 @@ export default function SessionDetail({ sessionId }: Props) {
   const [activeTab, setActiveTab] = useState(mushafReturn?.context.kind ?? "attendance");
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [dialogTab, setDialogTab] = useState<"memorization" | "revision" | "evaluation">("memorization");
+  // الانتقال التلقائي للطالب التالي بعد الحفظ من نافذة الطالب: تسجيل الحلقة كاملة دون إغلاق وفتح.
+  const [autoNext, setAutoNext] = useState(() => { try { return localStorage.getItem("tarteel:autoNextStudent") !== "0"; } catch { return true; } });
+  const toggleAutoNext = (value: boolean) => { setAutoNext(value); try { localStorage.setItem("tarteel:autoNextStudent", value ? "1" : "0"); } catch { /* لا بأس */ } };
   const [finalizeReviewOpen, setFinalizeReviewOpen] = useState(false);
   const [attendanceOverrides, setAttendanceOverrides] = useState<Record<number, "present" | "absent" | "late" | "excused" | undefined>>({});
   const [pendingAttendanceStudentId, setPendingAttendanceStudentId] = useState<number | null>(null);
@@ -168,18 +172,31 @@ export default function SessionDetail({ sessionId }: Props) {
     onError: (error) => toast.error(error.message),
   });
 
+  const studentList = (students ?? []) as any[];
+  const selectedIndex = selectedStudent ? studentList.findIndex((item) => item.id === selectedStudent.id) : -1;
+  const goToStudent = (offset: number) => {
+    const next = studentList[selectedIndex + offset];
+    if (next) setSelectedStudent(next);
+  };
+  function advanceAfterSave() {
+    if (!selectedStudent || !autoNext) return;
+    const next = studentList[selectedIndex + 1];
+    if (next) { setSelectedStudent(next); toast.message(`الطالب التالي: ${next.name}`); }
+    else { setSelectedStudent(null); toast.success("اكتمل تسجيل آخر طالب في القائمة"); }
+  }
+
   const createMemorizationMutation = trpc.memorization.create.useMutation({
-    onSuccess: () => { toast.success("تم تسجيل الحفظ"); refetchMemorization(); utils.sessions.latestStudentProgress.invalidate(); syncSharedData(); },
+    onSuccess: () => { toast.success("تم تسجيل الحفظ"); refetchMemorization(); utils.sessions.latestStudentProgress.invalidate(); syncSharedData(); advanceAfterSave(); },
     onError: (e) => toast.error(e.message),
   });
 
   const createRevisionMutation = trpc.revision.create.useMutation({
-    onSuccess: () => { toast.success("تم تسجيل المراجعة"); refetchRevision(); utils.sessions.latestStudentProgress.invalidate(); syncSharedData(); },
+    onSuccess: () => { toast.success("تم تسجيل المراجعة"); refetchRevision(); utils.sessions.latestStudentProgress.invalidate(); syncSharedData(); advanceAfterSave(); },
     onError: (e) => toast.error(e.message),
   });
 
   const upsertEvaluationMutation = trpc.evaluation.upsert.useMutation({
-    onSuccess: () => { toast.success("تم حفظ التقييم"); refetchEvaluation(); syncSharedData(); },
+    onSuccess: () => { toast.success("تم حفظ التقييم"); refetchEvaluation(); syncSharedData(); advanceAfterSave(); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -452,7 +469,7 @@ export default function SessionDetail({ sessionId }: Props) {
       <Dialog open={Boolean(selectedStudent)} onOpenChange={(open) => !open && setSelectedStudent(null)}>
         <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-xl" dir="rtl">
           <DialogHeader><DialogTitle className="font-display text-xl">سجل الطالب في الجلسة</DialogTitle><DialogDescription>سجّل الحفظ أو المراجعة أو التقييم، ثم افتح موضع البداية في المصحف عند الحاجة.</DialogDescription></DialogHeader>
-          {selectedStudent && <div className="space-y-4"><div className="rounded-2xl bg-primary/5 p-3"><p className="font-semibold text-foreground">{selectedStudent.name}</p><p className="mt-1 text-xs text-muted-foreground">آخر حفظ: {getSurahName(latestProgress?.[selectedStudent.id]?.memorization?.toSurahNumber ?? latestProgress?.[selectedStudent.id]?.memorization?.surahNumber ?? selectedStudent.lastMemorizedSurah)} · آية {latestProgress?.[selectedStudent.id]?.memorization?.toAyah ?? selectedStudent.lastMemorizedAyah}</p><p className="mt-1 text-xs text-muted-foreground">آخر مراجعة: {latestProgress?.[selectedStudent.id]?.revision ? `${getSurahName(latestProgress?.[selectedStudent.id]?.revision?.toSurahNumber ?? latestProgress?.[selectedStudent.id]?.revision?.surahNumber ?? 1)} · آية ${latestProgress?.[selectedStudent.id]?.revision?.toAyah ?? 1}` : "لم تسجل بعد"}</p></div><div className="flex gap-1 rounded-xl bg-muted/50 p-1">{([ ["memorization", "الحفظ"], ["revision", "المراجعة"], ["evaluation", "التقييم"] ] as const).map(([id, label]) => <button key={id} onClick={() => setDialogTab(id)} className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${dialogTab === id ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`}>{label}</button>)}</div>{dialogTab === "memorization" && <MemorizationForm student={selectedStudent} sessionId={session.id} progress={latestProgress?.[selectedStudent.id]} onSubmit={(data: any) => createMemorizationMutation.mutate(data)} isLoading={createMemorizationMutation.isPending} forceExpanded returnContext={mushafReturn?.context.kind === "memorization" && mushafReturn.context.origin === "dialog" && mushafReturn.context.studentId === selectedStudent.id ? mushafReturn : undefined} />}{dialogTab === "revision" && <RevisionForm student={selectedStudent} sessionId={session.id} progress={latestProgress?.[selectedStudent.id]} onSubmit={(data: any) => createRevisionMutation.mutate(data)} isLoading={createRevisionMutation.isPending} forceExpanded returnContext={mushafReturn?.context.kind === "revision" && mushafReturn.context.origin === "dialog" && mushafReturn.context.studentId === selectedStudent.id ? mushafReturn : undefined} />}{dialogTab === "evaluation" && <EvaluationForm student={selectedStudent} sessionId={session.id} existing={getStudentEvaluation(selectedStudent.id)} onSubmit={(data: any) => upsertEvaluationMutation.mutate(data)} isLoading={upsertEvaluationMutation.isPending} forceExpanded />}</div>}
+          {selectedStudent && <div className="space-y-4"><div className="flex items-center justify-between gap-2"><button type="button" onClick={() => goToStudent(-1)} disabled={selectedIndex <= 0} aria-label="الطالب السابق" className="flex h-9 items-center gap-1 rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-40"><ChevronRight className="h-4 w-4" />السابق</button><span className="text-xs font-semibold text-muted-foreground">{selectedIndex + 1} من {studentList.length}</span><button type="button" onClick={() => goToStudent(1)} disabled={selectedIndex < 0 || selectedIndex >= studentList.length - 1} aria-label="الطالب التالي" className="flex h-9 items-center gap-1 rounded-xl border border-border px-3 text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-40">التالي<ChevronLeft className="h-4 w-4" /></button></div><label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={autoNext} onChange={(event) => toggleAutoNext(event.target.checked)} className="h-4 w-4 accent-[var(--primary)]" />الانتقال تلقائياً للطالب التالي بعد الحفظ</label><div className="rounded-2xl bg-primary/5 p-3"><p className="font-semibold text-foreground">{selectedStudent.name}</p><p className="mt-1 text-xs text-muted-foreground">آخر حفظ: {getSurahName(latestProgress?.[selectedStudent.id]?.memorization?.toSurahNumber ?? latestProgress?.[selectedStudent.id]?.memorization?.surahNumber ?? selectedStudent.lastMemorizedSurah)} · آية {latestProgress?.[selectedStudent.id]?.memorization?.toAyah ?? selectedStudent.lastMemorizedAyah}</p><p className="mt-1 text-xs text-muted-foreground">آخر مراجعة: {latestProgress?.[selectedStudent.id]?.revision ? `${getSurahName(latestProgress?.[selectedStudent.id]?.revision?.toSurahNumber ?? latestProgress?.[selectedStudent.id]?.revision?.surahNumber ?? 1)} · آية ${latestProgress?.[selectedStudent.id]?.revision?.toAyah ?? 1}` : "لم تسجل بعد"}</p></div><div className="flex gap-1 rounded-xl bg-muted/50 p-1">{([ ["memorization", "الحفظ"], ["revision", "المراجعة"], ["evaluation", "التقييم"] ] as const).map(([id, label]) => <button key={id} onClick={() => setDialogTab(id)} className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${dialogTab === id ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`}>{label}</button>)}</div>{dialogTab === "memorization" && <MemorizationForm key={`m-${selectedStudent.id}`} student={selectedStudent} sessionId={session.id} progress={latestProgress?.[selectedStudent.id]} onSubmit={(data: any) => createMemorizationMutation.mutate(data)} isLoading={createMemorizationMutation.isPending} forceExpanded returnContext={mushafReturn?.context.kind === "memorization" && mushafReturn.context.origin === "dialog" && mushafReturn.context.studentId === selectedStudent.id ? mushafReturn : undefined} />}{dialogTab === "revision" && <RevisionForm key={`r-${selectedStudent.id}`} student={selectedStudent} sessionId={session.id} progress={latestProgress?.[selectedStudent.id]} onSubmit={(data: any) => createRevisionMutation.mutate(data)} isLoading={createRevisionMutation.isPending} forceExpanded returnContext={mushafReturn?.context.kind === "revision" && mushafReturn.context.origin === "dialog" && mushafReturn.context.studentId === selectedStudent.id ? mushafReturn : undefined} />}{dialogTab === "evaluation" && <EvaluationForm key={`e-${selectedStudent.id}`} student={selectedStudent} sessionId={session.id} existing={getStudentEvaluation(selectedStudent.id)} onSubmit={(data: any) => upsertEvaluationMutation.mutate(data)} isLoading={upsertEvaluationMutation.isPending} forceExpanded />}</div>}
         </DialogContent>
       </Dialog>
       <Dialog open={finalizeReviewOpen} onOpenChange={setFinalizeReviewOpen}>

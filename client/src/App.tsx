@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleSimulationProvider } from "./contexts/RoleSimulationContext";
 import TarteelLayout from "./components/TarteelLayout";
 import { PageLoader } from "./components/PageLoader";
+import { ConfirmProvider } from "./components/ConfirmProvider";
 
 // كل صفحة في ملف مستقل يُحمَّل عند فتحها فقط؛ كانت كلها في حزمة واحدة (~2.1MB).
 // الإطار (TarteelLayout) يبقى في الحزمة الرئيسية ليظهر الشريط الجانبي فوراً أثناء تحميل الصفحة.
@@ -156,8 +157,10 @@ function App() {
       <ThemeProvider defaultTheme="light" switchable>
         <RoleSimulationProvider>
           <TooltipProvider>
-            <Toaster position="top-center" richColors />
-            <Router />
+            <ConfirmProvider>
+              <Toaster position="top-center" richColors closeButton />
+              <Router />
+            </ConfirmProvider>
           </TooltipProvider>
         </RoleSimulationProvider>
       </ThemeProvider>
