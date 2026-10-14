@@ -85,19 +85,19 @@ describe("H5: التسجيل مغلق افتراضياً", () => {
     return (await import("../_core/env")).ENV;
   };
 
-  it("بلا ALLOW_SIGNUP أو بقيمة فارغة: مغلق", async () => {
-    expect((await loadEnv(undefined)).allowSignup).toBe(false);
-    expect((await loadEnv("")).allowSignup).toBe(false);
+  it("بلا ALLOW_SIGNUP أو بقيمة فارغة: مفتوح (إنشاء الحساب لا يحتاج كوداً)", async () => {
+    expect((await loadEnv(undefined)).allowSignup).toBe(true);
+    expect((await loadEnv("")).allowSignup).toBe(true);
   });
 
-  it("يُفتح فقط بقيمة صريحة", async () => {
+  it("يُغلق بقيمة صريحة", async () => {
     expect((await loadEnv("true")).allowSignup).toBe(true);
     expect((await loadEnv("false")).allowSignup).toBe(false);
   });
 
-  it(".env.example يأتي بالتسجيل مغلقاً", () => {
+  it(".env.example يأتي بالتسجيل مفتوحاً", () => {
     const example = readFileSync(path.resolve(import.meta.dirname, "../../.env.example"), "utf8");
-    expect(example).toMatch(/^ALLOW_SIGNUP=false$/m);
+    expect(example).toMatch(/^ALLOW_SIGNUP=true$/m);
   });
 });
 

@@ -50,7 +50,10 @@ async function registerByPhone(
 ) {
   await open("/login");
   await page.getByRole("tab", { name: "حساب جديد" }).click();
-  if (inviteCode) await page.getByPlaceholder("TRTL-1234ABCD").fill(inviteCode);
+  if (inviteCode) {
+    await page.getByRole("button", { name: /معي كود دخول/ }).click();
+    await page.getByLabel("رمز الدعوة أو كود الدخول").fill(inviteCode);
+  }
   await page.getByLabel("الاسم الكامل").fill(name);
   await page.getByRole("radio", { name: "برقم الهاتف" }).click();
   await page.getByLabel("رقم الهاتف").fill(phone);
@@ -307,4 +310,27 @@ test("نسيت كلمة المرور على الجهاز: المالك يفتح 
   await expect(page.getByRole("link", { name: "المرشد الذكي" })).toHaveCount(0);
   await open("/assistant");
   await page.waitForURL(url => url.pathname === "/dashboard");
+});
+
+test("إنشاء حساب لا يحتاج كوداً: الكود الخاطئ يُرفض برسالة واضحة، ثم ينشأ الحساب دونه", async () => {
+  await logout();
+  await open("/login");
+  await page.getByRole("tab", { name: "حساب جديد" }).click();
+  // حقل الكود مخفي افتراضياً؛ يظهر فقط لمن معه كود.
+  await expect(page.getByLabel("رمز الدعوة أو كود الدخول")).toHaveCount(0);
+  await page.getByRole("button", { name: /معي كود دخول/ }).click();
+  await page.getByLabel("رمز الدعوة أو كود الدخول").fill("TRTL-1234ABCD");
+  await page.getByLabel("الاسم الكامل").fill("مستخدم جديد");
+  await page.getByRole("radio", { name: "برقم الهاتف" }).click();
+  await page.getByLabel("رقم الهاتف").fill("776343551");
+  await page.getByLabel("كلمة المرور").fill(PASSWORD);
+  await page.locator("form button[type=submit]").click();
+  await expect(page.getByText("كود الدخول غير صحيح أو منتهٍ")).toBeVisible();
+  await expect(page).toHaveURL(/\/login/);
+  await page.getByRole("button", { name: "إنشاء الحساب دون كود" }).click();
+  await expect(page.getByLabel("رمز الدعوة أو كود الدخول")).toHaveCount(0);
+  await page.locator("form button[type=submit]").click();
+  await page.waitForURL(url => url.pathname.startsWith("/start"));
+  expect(await me()).toMatchObject({ name: "مستخدم جديد", phone: "+967776343551" });
+  await expect(page.getByText("الانضمام إلى مركز قائم")).toBeVisible();
 });

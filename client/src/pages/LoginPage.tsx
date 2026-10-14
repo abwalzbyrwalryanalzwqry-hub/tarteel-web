@@ -38,6 +38,8 @@ export default function LoginPage() {
   const [mode, setMode] = useState<"login" | "register">(() => (initialParams.get("mode") === "register" || initialParams.get("code") ? "register" : "login"));
   const [inviteCode, setInviteCode] = useState(() => (initialParams.get("code") ?? readPendingTeacherInvite() ?? "").toUpperCase());
   const signupOpen = Boolean(providers?.allowSignup);
+  /** حقل الكود مخفي عند التسجيل العام: إنشاء الحساب لا يحتاج كوداً، والكود للانضمام إلى مركز أو حلقة فقط. */
+  const [showInviteField, setShowInviteField] = useState(() => Boolean(initialParams.get("code") || readPendingTeacherInvite()));
   const [resetOpen, setResetOpen] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const requestReset = trpc.auth.requestPasswordReset.useMutation({ onSuccess: () => setResetSent(true), onError: (e) => toast.error(e.message) });
@@ -80,7 +82,9 @@ export default function LoginPage() {
   });
   const onSignupVerified = useCallback((ticket: string) => setSignupTicket(ticket), []);
   const onResetVerified = useCallback((ticket: string) => setResetTicket(ticket), []);
-  const googleHref = `/api/auth/google${mode === "register" && inviteCode.trim() ? `?invite=${encodeURIComponent(inviteCode.trim())}` : ""}`;
+  /** الكود المرسل فعلاً: لا يُرسل إن كان حقله مخفياً. */
+  const effectiveInvite = !signupOpen || showInviteField ? inviteCode.trim() : "";
+  const googleHref = `/api/auth/google${mode === "register" && effectiveInvite ? `?invite=${encodeURIComponent(effectiveInvite)}` : ""}`;
   const canRegister = signupOpen || Boolean(providers?.inviteSignup);
   const [name, setName] = useState("");
   /** الدخول: حقل واحد يقبل البريد أو رقم الهاتف. */
@@ -110,7 +114,13 @@ export default function LoginPage() {
       else toast.success(result.role ? "تم إنشاء حسابك وتفعيل الدعوة" : "تم إنشاء حسابك");
       await onAuthSuccess();
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => {
+      if (signupOpen && e.message.includes("رمز الدعوة أو كود الدخول غير صالح")) {
+        toast.error("كود الدخول غير صحيح أو منتهٍ", { description: "لا تحتاج كوداً لإنشاء حسابك: امسحه أو اضغط «إنشاء الحساب دون كود»، ثم انضم إلى مركزك لاحقاً بكود صحيح.", duration: 9000 });
+        return;
+      }
+      toast.error(e.message);
+    },
   });
   const resetWithPhone = trpc.auth.resetPasswordWithPhone.useMutation({
     onSuccess: async () => { toast.success("تم تعيين كلمة المرور الجديدة"); setResetOpen(false); setResetPhone(null); setResetWa(null); setResetTicket(null); setResetPassword(""); setResetConfirm(""); await onAuthSuccess(); },
@@ -130,7 +140,7 @@ export default function LoginPage() {
         email: usePhone ? undefined : email,
         phone: usePhone ? (proof === "whatsapp" && signupWa ? signupWa.phone : phone) : undefined,
         password,
-        inviteCode: inviteCode.trim() || undefined,
+        inviteCode: effectiveInvite || undefined,
         phoneCode: usePhone && phoneVerifyEnabled && proof === "sms" ? phoneCode.trim() : undefined,
         phoneTicket: usePhone && phoneVerifyEnabled && proof === "whatsapp" ? signupTicket ?? undefined : undefined,
       });
@@ -210,11 +220,19 @@ export default function LoginPage() {
                   <button type="button" role="tab" aria-selected={mode === "register"} onClick={() => setMode("register")} className={`rounded-lg py-2 font-semibold transition-colors ${mode === "register" ? "bg-background text-foreground shadow" : "text-muted-foreground"}`}>حساب جديد</button>
                 </div>
               )}
-              {mode === "register" && (
+              {mode === "register" && signupOpen && !showInviteField && (
+                <button type="button" onClick={() => setShowInviteField(true)} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/40 py-2 text-xs font-semibold text-primary hover:bg-primary/5">
+                  <KeyRound className="h-3.5 w-3.5" />معي كود دخول من مركز أو حلقة (اختياري)
+                </button>
+              )}
+              {mode === "register" && (!signupOpen || showInviteField) && (
                 <label className="block text-sm">
                   <span className="mb-1 block font-medium text-foreground">{signupOpen ? "رمز الدعوة أو كود الدخول (اختياري)" : "رمز الدعوة أو كود الدخول"}</span>
-                  <input required={!signupOpen} dir="ltr" autoComplete="off" spellCheck={false} value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} placeholder="TRTL-1234ABCD" className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-center font-mono tracking-wider outline-none focus:border-primary" />
-                  <span className="mt-1 block text-xs text-muted-foreground">{signupOpen ? "إن كان معك رمز من المركز أدخله ليُفعَّل دورك مباشرة." : "إنشاء الحسابات متاح لمن وصله رمز من إدارة المركز."}</span>
+                  <input required={!signupOpen} dir="ltr" autoComplete="off" spellCheck={false} aria-label="رمز الدعوة أو كود الدخول" value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} placeholder={signupOpen ? "اتركه فارغاً إن لم يصلك كود" : "الكود الذي وصلك من المركز"} className="w-full rounded-xl border border-border bg-background/70 px-4 py-3 text-center font-mono tracking-wider outline-none placeholder:font-sans placeholder:tracking-normal placeholder:text-muted-foreground/70 focus:border-primary" />
+                  <span className="mt-1 block text-xs leading-5 text-muted-foreground">{signupOpen ? "لا تحتاج كوداً لإنشاء حسابك. الكود فقط للانضمام إلى مركز أو حلقة أو لمتابعة ابنك، ويمكنك إدخاله لاحقاً من «الانضمام إلى مركز قائم»." : "إنشاء الحسابات متاح لمن وصله رمز من إدارة المركز."}</span>
+                  {signupOpen && (
+                    <button type="button" onClick={() => { setInviteCode(""); setShowInviteField(false); clearPendingTeacherInvite(); }} className="mt-1 text-xs text-primary hover:underline">إنشاء الحساب دون كود</button>
+                  )}
                 </label>
               )}
               {mode === "register" && (
@@ -249,7 +267,7 @@ export default function LoginPage() {
                         session={signupWa}
                         starting={startSignupWa.isPending}
                         disabled={!phone.trim()}
-                        onStart={() => startSignupWa.mutate({ purpose: "signup", phone, inviteCode: inviteCode.trim() || undefined })}
+                        onStart={() => startSignupWa.mutate({ purpose: "signup", phone, inviteCode: effectiveInvite || undefined })}
                         onVerified={onSignupVerified}
                         idleHint="ستُرسل أنت رسالة واتساب فيها رمز إلى رقم ترتيل، فنتأكد أن الرقم لك. لا تصلك أي رسالة منا."
                       />
@@ -259,7 +277,7 @@ export default function LoginPage() {
                     </div>
                   ) : needsSignupCode ? (
                     <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm">
-                      <button type="button" disabled={requestSignupCode.isPending || !phone.trim() || cooldown > 0} onClick={() => requestSignupCode.mutate({ phone, inviteCode: inviteCode.trim() || undefined })} className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary/40 py-2 font-semibold text-primary hover:bg-primary/10 disabled:opacity-60">
+                      <button type="button" disabled={requestSignupCode.isPending || !phone.trim() || cooldown > 0} onClick={() => requestSignupCode.mutate({ phone, inviteCode: effectiveInvite || undefined })} className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary/40 py-2 font-semibold text-primary hover:bg-primary/10 disabled:opacity-60">
                         <MessageSquare className="h-4 w-4" />
                         {requestSignupCode.isPending ? "جارٍ الإرسال…" : cooldown > 0 ? `إعادة الإرسال بعد ${cooldown} ث` : signupCodeSentTo ? "أعد إرسال الرمز" : "أرسل رمز التحقق"}
                       </button>
