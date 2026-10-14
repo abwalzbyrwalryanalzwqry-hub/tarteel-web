@@ -14,7 +14,6 @@ import {
   redeemTeacherInvite,
   getCenterIdForCircle,
   getCircleById,
-  getMemorizationByStudent,
   getStudentById,
   getStudentByUserId,
   getStudentsByGuardianUserId,
@@ -205,6 +204,5 @@ export const peopleRouters = {
         if (student && guardianPhone !== undefined && guardianPhone !== student.guardianPhone) await autoLinkGuardianByPhone(guardianPhone, student.centerId, ctx.user.id);
       }),
     delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => { const student = await getStudentById(input.id); await assertStudentManageAccess(ctx.user, student?.circleId, "students.delete", student?.centerId); return softDeleteStudent(input.id); }),
-    memorizationHistory: protectedProcedure.input(z.object({ studentId: z.number() })).query(async ({ ctx, input }) => { const student = await getStudentById(input.studentId); await assertStudentReadAccess(ctx.user, student); return getMemorizationByStudent(input.studentId); }),
   }),
 };

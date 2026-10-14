@@ -6,9 +6,13 @@ describe("إجراءات الإشعارات المرتبطة", () => {
     expect(getNotificationAction({ relatedType: "access_code_redeemed", relatedId: 7 })).toEqual({ label: "مراجعة أكواد الدخول", href: "/access-management" });
   });
 
-  it("يفتح الفترة عند توفر معرف صالح ولا يخترع إجراء لأنواع لا تملك وجهة", () => {
-    expect(getNotificationAction({ relatedType: "session", relatedId: 19 })).toEqual({ label: "فتح الفترة", href: "/periods/19" });
+  it("يفتح يوم السجل اليومي عند توفر معرف صالح ولا يخترع إجراء لأنواع لا تملك وجهة", () => {
+    expect(getNotificationAction({ relatedType: "daily_record", relatedId: 19 })).toEqual({ label: "فتح السجل اليومي", href: "/daily?record=19" });
+    expect(getNotificationAction({ relatedType: "daily_record", relatedId: 0 })).toBeNull();
     expect(getNotificationAction({ relatedType: "attendance", relatedId: 19 })).toBeNull();
-    expect(getNotificationAction({ relatedType: "session", relatedId: 0 })).toBeNull();
+  });
+
+  it("يوجّه إشعارات الفترات القديمة إلى السجل اليومي", () => {
+    expect(getNotificationAction({ relatedType: "session", relatedId: 19 })).toEqual({ label: "فتح السجل اليومي", href: "/daily" });
   });
 });

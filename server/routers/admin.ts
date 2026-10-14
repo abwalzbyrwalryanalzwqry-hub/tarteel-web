@@ -15,11 +15,9 @@ import {
   getTrashedItemsForCircles,
   getTrashedItemsForCenters,
   getTrashedItemCenterId,
-  getTrashedSessionCircleId,
   getUnreadNotificationsCount,
   markAllNotificationsRead,
   markNotificationRead,
-  permanentlyDeleteTrashedSession,
   restoreItem,
 } from "../db";
 import { getAccessibleCenterIds, getTeacherCircleScope } from "./_shared";
@@ -71,27 +69,13 @@ export const adminRouters = {
       return getTrashedItemsForCenters(centerIds);
     }),
     restore: protectedProcedure
-      .input(z.object({ table: z.enum(["centers", "teachers", "students", "circles", "sessions"]), id: z.number() }))
+      .input(z.object({ table: z.enum(["centers", "teachers", "students", "circles"]), id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        if (input.table === "sessions") {
-          const circleId = await getTrashedSessionCircleId(input.id);
-          if (!circleId) throw new TRPCError({ code: "NOT_FOUND" });
-          await assertCirclePermission(ctx.user, circleId, "attendance.edit");
-          return restoreItem(input.table, input.id);
-        }
         const centerId = await getTrashedItemCenterId(input.table, input.id);
         if (!centerId) throw new TRPCError({ code: "NOT_FOUND" });
         await assertPermission(ctx.user, centerId, "center.edit");
         return restoreItem(input.table, input.id);
       }),
-    permanentlyDeleteSession: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
-      const circleId = await getTrashedSessionCircleId(input.id);
-      if (!circleId) throw new TRPCError({ code: "NOT_FOUND", message: "الفترة غير موجودة في سلة المهملات" });
-      await assertCirclePermission(ctx.user, circleId, "attendance.edit");
-      const deleted = await permanentlyDeleteTrashedSession(input.id);
-      if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "الفترة غير موجودة في سلة المهملات" });
-      return { success: true } as const;
-    }),
   }),
 
   // ===================== USERS =====================

@@ -102,6 +102,8 @@ export const centers = sqliteTable("centers", {
   logoUrl: text("logoUrl"),
   logoKey: text("logoKey"),
   managerId: integer("managerId"),
+  // هوية التقارير (الألوان والشعار والترويسة والتذييل) بصيغة JSON، حتى 400KB (reports/identity).
+  reportIdentity: text("reportIdentity"),
   isActive: integer("isActive", { mode: "boolean" }).default(true).notNull(),
   deletedAt: integer("deletedAt", { mode: "timestamp_ms" }),
   createdAt: integer("createdAt", { mode: "timestamp_ms" })
@@ -115,57 +117,6 @@ export const centers = sqliteTable("centers", {
 
 export type Center = typeof centers.$inferSelect;
 export type InsertCenter = typeof centers.$inferInsert;
-
-// أهداف إدارة المركز؛ تُحفظ اختيارياً حتى تقارن لوحة التحليلات الأداء الفعلي بالهدف الشهري المحدد من الإدارة.
-export const reportingGoals = sqliteTable(
-  "reporting_goals",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    centerId: integer("centerId").notNull(),
-    attendanceTarget: integer("attendanceTarget"),
-    memorizedPagesTarget: integer("memorizedPagesTarget"),
-    reviewedPagesTarget: integer("reviewedPagesTarget"),
-    updatedBy: integer("updatedBy"),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" })
-      .$defaultFn(() => new Date())
-      .notNull(),
-    updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
-      .$defaultFn(() => new Date())
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  table => [uniqueIndex("reporting_goals_center_unique").on(table.centerId)]
-);
-export type ReportingGoal = typeof reportingGoals.$inferSelect;
-export type InsertReportingGoal = typeof reportingGoals.$inferInsert;
-
-// إعدادات الهوية الخاصة بملفات التقارير ورسالة متابعة المعلم داخل كل مركز.
-export const reportingPreferences = sqliteTable(
-  "reporting_preferences",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    centerId: integer("centerId").notNull(),
-    headerTitle: text("headerTitle"),
-    footerText: text("footerText"),
-    logoUrl: text("logoUrl"),
-    logoKey: text("logoKey"),
-    teacherMessageTemplate: text("teacherMessageTemplate"),
-    updatedBy: integer("updatedBy"),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" })
-      .$defaultFn(() => new Date())
-      .notNull(),
-    updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
-      .$defaultFn(() => new Date())
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  table => [
-    uniqueIndex("reporting_preferences_center_unique").on(table.centerId),
-  ]
-);
-export type ReportingPreference = typeof reportingPreferences.$inferSelect;
-export type InsertReportingPreference =
-  typeof reportingPreferences.$inferInsert;
 
 // ===================== ACCESS CONTROL =====================
 // تفصل العضوية هوية الحساب العامة عن دوره وحالته داخل كل مركز.
@@ -416,31 +367,6 @@ export const circles = sqliteTable("circles", {
 export type Circle = typeof circles.$inferSelect;
 export type InsertCircle = typeof circles.$inferInsert;
 
-// ===================== CIRCLE PERIODS =====================
-// فترات متكررة خاصة بالحَلَقة؛ لا تنشئ جلسات تلقائياً من دون إجراء معلم صريح.
-export const circlePeriods = sqliteTable("circle_periods", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  circleId: integer("circleId").notNull(),
-  name: text("name").notNull(),
-  sessionType: text("sessionType").notNull().default("جلسة يومية"),
-  daysOfWeek: text("daysOfWeek").notNull(),
-  startTime: text("startTime").notNull(),
-  endTime: text("endTime"),
-  isActive: integer("isActive", { mode: "boolean" }).default(true).notNull(),
-  createdBy: integer("createdBy"),
-  deletedAt: integer("deletedAt", { mode: "timestamp_ms" }),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" })
-    .$defaultFn(() => new Date())
-    .notNull(),
-  updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
-    .$defaultFn(() => new Date())
-    .$onUpdate(() => new Date())
-    .notNull(),
-});
-
-export type CirclePeriod = typeof circlePeriods.$inferSelect;
-export type InsertCirclePeriod = typeof circlePeriods.$inferInsert;
-
 // ===================== TEACHERS =====================
 export const teachers = sqliteTable("teachers", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -508,6 +434,8 @@ export const students = sqliteTable("students", {
   lastMemorizedSurah: integer("lastMemorizedSurah").default(1),
   lastMemorizedAyah: integer("lastMemorizedAyah").default(1),
   totalMemorizedJuz: numeric("totalMemorizedJuz").default("0"),
+  memorizeDir: text("memorizeDir").default("forward").notNull(),
+  reviewDir: text("reviewDir").default("forward").notNull(),
   isActive: integer("isActive", { mode: "boolean" }).default(true).notNull(),
   deletedAt: integer("deletedAt", { mode: "timestamp_ms" }),
   createdAt: integer("createdAt", { mode: "timestamp_ms" })
@@ -522,28 +450,26 @@ export const students = sqliteTable("students", {
 export type Student = typeof students.$inferSelect;
 export type InsertStudent = typeof students.$inferInsert;
 
-// ===================== SESSIONS =====================
-export const sessions = sqliteTable(
-  "sessions",
+// ===================== DAILY RECORD =====================
+// السجل اليومي للحلقة (منقول من زِن، docs/DAILY_RECORD.md): سجل واحد لكل حلقة في كل يوم، يمرّ بـ
+// مفتوح ← مكتمل ← معتمد. سطر كل طالب في daily_entries: الحضور والتقييم والملاحظة ومدى الحفظ والمراجعة
+// (مدى واحد لكل نوع قد يمتد عبر سور، بأرقام السور). version في السجل والسطر يمنع الكتابة فوق تعديل غيرك.
+export const dailyRecords = sqliteTable(
+  "daily_records",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     circleId: integer("circleId").notNull(),
-    teacherId: integer("teacherId").notNull(),
-    title: text("title"),
-    type: text("type", { enum: ["regular", "exam", "review", "special"] })
-      .default("regular")
+    recordDate: text("recordDate").notNull(),
+    status: text("status", { enum: ["open", "completed", "locked"] })
+      .default("open")
       .notNull(),
-    status: text("status", {
-      enum: ["draft", "scheduled", "open", "closed", "cancelled"],
-    })
-      .default("draft")
-      .notNull(),
-    scheduledAt: integer("scheduledAt", { mode: "timestamp_ms" }).notNull(),
-    dayKey: text("dayKey").notNull(),
-    startedAt: integer("startedAt", { mode: "timestamp_ms" }),
-    closedAt: integer("closedAt", { mode: "timestamp_ms" }),
     notes: text("notes"),
-    deletedAt: integer("deletedAt", { mode: "timestamp_ms" }),
+    version: integer("version").default(1).notNull(),
+    openedBy: integer("openedBy"),
+    completedBy: integer("completedBy"),
+    completedAt: integer("completedAt", { mode: "timestamp_ms" }),
+    lockedBy: integer("lockedBy"),
+    lockedAt: integer("lockedAt", { mode: "timestamp_ms" }),
     createdAt: integer("createdAt", { mode: "timestamp_ms" })
       .$defaultFn(() => new Date())
       .notNull(),
@@ -553,26 +479,47 @@ export const sessions = sqliteTable(
       .notNull(),
   },
   table => [
-    index("sessions_circle_day_idx").on(table.circleId, table.dayKey),
-    index("sessions_day_key_idx").on(table.dayKey),
+    uniqueIndex("daily_records_circle_date_unique").on(
+      table.circleId,
+      table.recordDate
+    ),
+    index("daily_records_date_idx").on(table.recordDate),
   ]
 );
 
-export type Session = typeof sessions.$inferSelect;
-export type InsertSession = typeof sessions.$inferInsert;
+export type DailyRecord = typeof dailyRecords.$inferSelect;
+export type InsertDailyRecord = typeof dailyRecords.$inferInsert;
 
-// ===================== ATTENDANCE =====================
-export const attendance = sqliteTable(
-  "attendance",
+export const dailyEntries = sqliteTable(
+  "daily_entries",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    sessionId: integer("sessionId").notNull(),
+    recordId: integer("recordId").notNull(),
+    circleId: integer("circleId").notNull(),
+    recordDate: text("recordDate").notNull(),
     studentId: integer("studentId").notNull(),
-    status: text("status", { enum: ["present", "absent", "late", "excused"] })
-      .default("present")
-      .notNull(),
-    arrivalTime: integer("arrivalTime", { mode: "timestamp_ms" }),
-    notes: text("notes"),
+    status: text("status", { enum: ["present", "late", "absent", "excused"] }),
+    reason: text("reason"),
+    note: text("note"),
+    evalOverall: integer("evalOverall"),
+    evalTajweed: integer("evalTajweed"),
+    evalPronunciation: integer("evalPronunciation"),
+    evalBehavior: integer("evalBehavior"),
+    memFromSurah: integer("memFromSurah"),
+    memFromAyah: integer("memFromAyah"),
+    memToSurah: integer("memToSurah"),
+    memToAyah: integer("memToAyah"),
+    memGrade: integer("memGrade"),
+    memError: text("memError"),
+    memNotes: text("memNotes"),
+    revFromSurah: integer("revFromSurah"),
+    revFromAyah: integer("revFromAyah"),
+    revToSurah: integer("revToSurah"),
+    revToAyah: integer("revToAyah"),
+    revGrade: integer("revGrade"),
+    revError: text("revError"),
+    revNotes: text("revNotes"),
+    version: integer("version").default(1).notNull(),
     recordedBy: integer("recordedBy"),
     createdAt: integer("createdAt", { mode: "timestamp_ms" })
       .$defaultFn(() => new Date())
@@ -583,148 +530,43 @@ export const attendance = sqliteTable(
       .notNull(),
   },
   table => [
-    uniqueIndex("attendance_session_student_unique").on(
-      table.sessionId,
+    uniqueIndex("daily_entries_record_student_unique").on(
+      table.recordId,
       table.studentId
     ),
-    index("attendance_student_session_idx").on(
+    index("daily_entries_student_date_idx").on(
       table.studentId,
-      table.sessionId
+      table.recordDate
     ),
+    index("daily_entries_circle_date_idx").on(table.circleId, table.recordDate),
   ]
 );
 
-export type Attendance = typeof attendance.$inferSelect;
-export type InsertAttendance = typeof attendance.$inferInsert;
+export type DailyEntry = typeof dailyEntries.$inferSelect;
+export type InsertDailyEntry = typeof dailyEntries.$inferInsert;
 
-// ===================== MEMORIZATION =====================
-export const memorization = sqliteTable(
-  "memorization",
+// سلّة السجل اليومي: لقطة اليوم المحذوف (السجل وأسطر الطلاب) تبقى 30 يوماً ويُستعاد منها.
+export const dailyRecordTrash = sqliteTable(
+  "daily_record_trash",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    sessionId: integer("sessionId").notNull(),
-    studentId: integer("studentId").notNull(),
-    surahNumber: integer("surahNumber").notNull(),
-    toSurahNumber: integer("toSurahNumber"),
-    fromAyah: integer("fromAyah").notNull(),
-    toAyah: integer("toAyah").notNull(),
-    pages: numeric("pages"),
-    grade: text("grade", {
-      enum: [
-        "excellent",
-        "very_good",
-        "good",
-        "acceptable",
-        "weak",
-        "not_done",
-      ],
-    }).default("good"),
-    notes: text("notes"),
-    recordedBy: integer("recordedBy"),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+    circleId: integer("circleId").notNull(),
+    recordDate: text("recordDate").notNull(),
+    snapshot: text("snapshot").notNull(),
+    attendanceCount: integer("attendanceCount").default(0).notNull(),
+    workCount: integer("workCount").default(0).notNull(),
+    deletedBy: integer("deletedBy"),
+    deletedAt: integer("deletedAt", { mode: "timestamp_ms" })
       .$defaultFn(() => new Date())
       .notNull(),
-    updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
-      .$defaultFn(() => new Date())
-      .$onUpdate(() => new Date())
-      .notNull(),
+    restoredAt: integer("restoredAt", { mode: "timestamp_ms" }),
   },
   table => [
-    uniqueIndex("memorization_session_student_unique").on(
-      table.sessionId,
-      table.studentId
-    ),
-    index("memorization_student_session_idx").on(
-      table.studentId,
-      table.sessionId
-    ),
+    index("daily_record_trash_circle_idx").on(table.circleId, table.deletedAt),
   ]
 );
 
-export type Memorization = typeof memorization.$inferSelect;
-export type InsertMemorization = typeof memorization.$inferInsert;
-
-// ===================== REVISION =====================
-export const revision = sqliteTable(
-  "revision",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    sessionId: integer("sessionId").notNull(),
-    studentId: integer("studentId").notNull(),
-    surahNumber: integer("surahNumber").notNull(),
-    toSurahNumber: integer("toSurahNumber"),
-    fromAyah: integer("fromAyah").notNull(),
-    toAyah: integer("toAyah").notNull(),
-    pages: numeric("pages"),
-    grade: text("grade", {
-      enum: [
-        "excellent",
-        "very_good",
-        "good",
-        "acceptable",
-        "weak",
-        "not_done",
-      ],
-    }).default("good"),
-    notes: text("notes"),
-    recordedBy: integer("recordedBy"),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" })
-      .$defaultFn(() => new Date())
-      .notNull(),
-    updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
-      .$defaultFn(() => new Date())
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  table => [
-    uniqueIndex("revision_session_student_unique").on(
-      table.sessionId,
-      table.studentId
-    ),
-    index("revision_student_session_idx").on(table.studentId, table.sessionId),
-  ]
-);
-
-export type Revision = typeof revision.$inferSelect;
-export type InsertRevision = typeof revision.$inferInsert;
-
-// ===================== EVALUATION =====================
-export const evaluation = sqliteTable(
-  "evaluation",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    sessionId: integer("sessionId").notNull(),
-    studentId: integer("studentId").notNull(),
-    tajweedScore: integer("tajweedScore"),
-    pronunciationScore: integer("pronunciationScore"),
-    memorizationScore: integer("memorizationScore"),
-    behaviorScore: integer("behaviorScore"),
-    totalScore: integer("totalScore"),
-    points: integer("points").default(0),
-    notes: text("notes"),
-    recordedBy: integer("recordedBy"),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" })
-      .$defaultFn(() => new Date())
-      .notNull(),
-    updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
-      .$defaultFn(() => new Date())
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  table => [
-    uniqueIndex("evaluation_session_student_unique").on(
-      table.sessionId,
-      table.studentId
-    ),
-    index("evaluation_student_session_idx").on(
-      table.studentId,
-      table.sessionId
-    ),
-  ]
-);
-
-export type Evaluation = typeof evaluation.$inferSelect;
-export type InsertEvaluation = typeof evaluation.$inferInsert;
+export type DailyRecordTrash = typeof dailyRecordTrash.$inferSelect;
 
 // ===================== NOTIFICATIONS =====================
 export const notifications = sqliteTable("notifications", {

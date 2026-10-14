@@ -74,14 +74,6 @@ describe("shared types", () => {
     expect(GRADE_LABELS.not_done).toBe("لم يؤدِ");
   });
 
-  it("SESSION_STATUS_LABELS contains all statuses", async () => {
-    const { SESSION_STATUS_LABELS } = await import("../shared/types");
-    expect(SESSION_STATUS_LABELS.scheduled).toBe("مجدولة");
-    expect(SESSION_STATUS_LABELS.open).toBe("مفتوحة");
-    expect(SESSION_STATUS_LABELS.closed).toBe("مغلقة");
-    expect(SESSION_STATUS_LABELS.cancelled).toBe("ملغاة");
-  });
-
   it("QURAN_SURAHS contains 114 surahs", async () => {
     const { QURAN_SURAHS } = await import("../shared/types");
     expect(QURAN_SURAHS).toHaveLength(114);

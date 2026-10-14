@@ -5,9 +5,9 @@ import { BookOpenCheck, ShieldCheck, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
-type AiContext = "general" | "dashboard" | "sessions" | "students" | "circles" | "reports";
+type AiContext = "general" | "dashboard" | "daily" | "students" | "circles" | "reports";
 
-const validContexts: AiContext[] = ["general", "dashboard", "sessions", "students", "circles", "reports"];
+const validContexts: AiContext[] = ["general", "dashboard", "daily", "students", "circles", "reports"];
 
 const promptsByContext: Record<AiContext, string[]> = {
   general: [
@@ -19,8 +19,8 @@ const promptsByContext: Record<AiContext, string[]> = {
     "كيف أقرأ مؤشرات الحضور والغياب في لوحة المعلومات؟",
     "اقترح أولويات إدارية لهذا الأسبوع لمركز التحفيظ.",
   ],
-  sessions: [
-    "اقترح تسلسلاً عملياً لإدارة فترة حفظ مدتها ساعة.",
+  daily: [
+    "اقترح تسلسلاً عملياً ليوم حلقة حفظ مدته ساعة.",
     "كيف أتعامل تربوياً مع غياب الطالب المتكرر؟",
   ],
   students: [
@@ -109,7 +109,7 @@ export default function AIAssistant() {
               <h2 className="font-display text-lg font-bold">كيف يساعدك؟</h2>
             </div>
             <p className="text-sm leading-7 text-muted-foreground">
-              اطلب خطة للحفظ والمراجعة، فكرة لنشاط حلقة، قراءة عملية لتقرير، أو إرشاداً لإدارة الفترات والطلاب.
+              اطلب خطة للحفظ والمراجعة، فكرة لنشاط حلقة، قراءة عملية لتقرير، أو إرشاداً لإدارة السجل اليومي والطلاب.
             </p>
           </div>
           <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5">

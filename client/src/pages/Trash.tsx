@@ -1,20 +1,13 @@
 import { trpc } from "@/lib/trpc";
 import { ArchiveRestore, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { useState } from "react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 export default function Trash() {
   const { data: trashed, isLoading, refetch } = trpc.trash.list.useQuery();
-  const [permanentItem, setPermanentItem] = useState<any>(null);
 
   const restoreMutation = trpc.trash.restore.useMutation({
     onSuccess: () => { toast.success("تم الاسترجاع بنجاح"); refetch(); },
     onError: (e) => toast.error(e.message),
-  });
-  const permanentlyDelete = trpc.trash.permanentlyDeleteSession.useMutation({
-    onSuccess: () => { toast.success("حُذفت الفترة نهائياً"); setPermanentItem(null); refetch(); },
-    onError: (error) => toast.error(error.message),
   });
 
   const sections = [
@@ -22,7 +15,6 @@ export default function Trash() {
     { key: "teachers", label: "المعلمون", items: trashed?.teachers ?? [] },
     { key: "students", label: "الطلاب", items: trashed?.students ?? [] },
     { key: "circles", label: "الحلقات", items: trashed?.circles ?? [] },
-    { key: "sessions", label: "الفترات", items: trashed?.sessions ?? [] },
   ] as const;
 
   const totalItems = sections.reduce((sum, s) => sum + s.items.length, 0);
@@ -31,7 +23,7 @@ export default function Trash() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-orange-600 flex items-center justify-center"><Trash2 className="w-5 h-5 text-white"/></div>
-        <div><h1 className="page-title">سلة المحذوفات</h1><p className="page-subtitle">{totalItems > 0 ? `${totalItems} عنصر محذوف` : "سلة المحذوفات فارغة"}</p></div>
+        <div><h1 className="page-title">سلة المحذوفات</h1><p className="page-subtitle">{totalItems > 0 ? `${totalItems} عنصر محذوف` : "سلة المحذوفات فارغة"}</p><p className="mt-1 text-xs text-muted-foreground">أيام السجل اليومي المحذوفة تُستعاد من «السجلات السابقة» في السجل اليومي نفسه.</p></div>
       </div>
 
       {isLoading ? (
@@ -61,7 +53,6 @@ export default function Trash() {
                       <ArchiveRestore className="w-3.5 h-3.5"/>
                       استرجاع
                     </button>
-                    {section.key === "sessions" && <button onClick={() => setPermanentItem(item)} disabled={permanentlyDelete.isPending} className="flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-xs text-destructive transition-colors hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" />حذف نهائي</button>}
                   </div>
                 ))}
               </div>
@@ -69,7 +60,6 @@ export default function Trash() {
           ))}
         </div>
       )}
-      <AlertDialog open={Boolean(permanentItem)} onOpenChange={(open) => !open && setPermanentItem(null)}><AlertDialogContent dir="rtl"><AlertDialogHeader><AlertDialogTitle className="font-display">حذف الفترة نهائياً؟</AlertDialogTitle><AlertDialogDescription>سيُحذف سجل «{permanentItem?.title ?? `فترة #${permanentItem?.id ?? ""}`}» وبيانات الحضور والحفظ والمراجعة المرتبطة به نهائياً. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>إلغاء</AlertDialogCancel><AlertDialogAction onClick={(event) => { event.preventDefault(); if (permanentItem) permanentlyDelete.mutate({ id: permanentItem.id }); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{permanentlyDelete.isPending ? "جارٍ الحذف…" : "تأكيد الحذف النهائي"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </div>
   );
 }

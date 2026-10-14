@@ -2,14 +2,13 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
-type TrashTable = "centers" | "teachers" | "students" | "circles" | "sessions";
+type TrashTable = "centers" | "teachers" | "students" | "circles";
 
 const nouns: Record<TrashTable, string> = {
   centers: "المركز",
   teachers: "المعلم",
   students: "الطالب",
   circles: "الحلقة",
-  sessions: "الفترة",
 };
 
 /**

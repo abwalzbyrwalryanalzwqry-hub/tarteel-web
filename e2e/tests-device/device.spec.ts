@@ -169,28 +169,62 @@ test("كلمة مرور خاطئة تُرفض، ثم يعود المدير بح�
   ]);
 });
 
-test("تصدير PDF عربي يعمل على الجهاز دون خادم", async () => {
-  const exported = (await trpcMutation(page, "reporting.exportExecutivePdf", {
-    circleId: seeded.circleId,
-    period: "monthly",
-  })) as { data: string; filename: string; contentType: string };
-  expect(exported.contentType).toBe("application/pdf");
-  const bytes = Buffer.from(exported.data, "base64");
-  expect(bytes.subarray(0, 5).toString("latin1")).toBe("%PDF-");
-  expect(bytes.length).toBeGreaterThan(5_000);
-  // الخط العربي مضمّن في الملف (وليس خطاً افتراضياً لا يعرض العربية).
-  expect(bytes.toString("latin1")).toMatch(/Amiri/);
-  await test.info().attach("executive.pdf", { body: bytes, contentType: "application/pdf" });
+test("السجل اليومي والتقرير يعملان على الجهاز دون خادم، وPDF يُطلب من التطبيق", async () => {
+  const api = (path: string, json: unknown) => trpcMutation(page, `daily.${path}`, json);
+  const halaqa = seeded.circleId;
+  const today = await page.evaluate(() =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(new Date())
+  );
+  const opened = (await api("open", { halaqa, date: today })) as { id: string };
+  const record = Number(opened.id);
+  const sheet = await trpcQuery<{ students: { student_id: string; name: string; version: number }[] }>(
+    page,
+    "daily.sheet",
+    { halaqa, date: today }
+  );
+  await api("setAttendanceBulk", {
+    record,
+    rows: sheet.students.map(s => ({ student: Number(s.student_id), status: "present", version: s.version })),
+  });
+  const after = await trpcQuery<{ students: { student_id: string; name: string; version: number }[] }>(
+    page,
+    "daily.sheet",
+    { halaqa, date: today }
+  );
+  const first = after.students.find(s => s.name === "عبدالله أحمد")!;
+  await api("saveEntry", {
+    record,
+    student: Number(first.student_id),
+    version: first.version,
+    payload: { memorize: { segments: [{ surah_name: "الملك", from_ayah: 1, to_ayah: 10 }], grade: 5 } },
+  });
+  const history = await trpcQuery<{ present: number; memorized: number }[]>(page, "daily.history", { halaqa });
+  expect(history[0]).toMatchObject({ present: 2, memorized: 1 });
 
-  // ومن الواجهة: زر «تجهيز PDF» يفتح معاينة الملف.
-  await open("/reports");
-  const executive = page.locator("div.glass-card", { hasText: "لوحة التقرير التنفيذي للحلقة" }).last();
-  await executive.locator("select").first().selectOption({ label: "حلقة أبي بكر" });
-  await executive.getByRole("button", { name: /معاينة قبل/ }).click();
-  await page.getByRole("button", { name: "تجهيز PDF" }).click();
-  const preview = page.getByRole("dialog");
-  await expect(preview.getByText("معاينة ملف PDF")).toBeVisible();
-  expect(await preview.locator("iframe").getAttribute("src")).toMatch(/^blob:/);
+  // داخل تطبيق أندرويد: «تحميل PDF» يرسل التقرير HTML إلى التطبيق (expo-print) بدل نافذة الطباعة.
+  await page.evaluate(() => {
+    const sent: string[] = [];
+    (window as unknown as { __sent: string[] }).__sent = sent;
+    (window as unknown as { ReactNativeWebView: { postMessage: (d: string) => void } }).ReactNativeWebView = {
+      postMessage: d => sent.push(d),
+    };
+  });
+  await page.evaluate(path => {
+    history.pushState(null, "", path);
+    dispatchEvent(new PopStateEvent("popstate"));
+  }, `/reports?halaqa=${halaqa}`);
+  await page.getByRole("button", { name: /معاينة التقرير/ }).click();
+  await page.getByRole("button", { name: /تحميل PDF/ }).click();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __sent: string[] }).__sent.length))
+    .toBeGreaterThan(0);
+  const message = JSON.parse(
+    await page.evaluate(() => (window as unknown as { __sent: string[] }).__sent.at(-1)!)
+  ) as { type: string; html: string; filename: string };
+  expect(message.type).toBe("pdf");
+  expect(message.filename).toMatch(/\.pdf$/);
+  expect(message.html).toContain("عبدالله أحمد");
+  expect(message.html).toContain("@font-face");
 });
 
 // الملف في الذاكرة: setInputFiles بمسار يحوي حروفاً عربية (مجلد نتائج الاختبار) لا يصل إلى الحقل.

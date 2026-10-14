@@ -96,7 +96,7 @@ export default function Teachers() {
               {circles?.filter((circle) => circle.teacherId === teacher.id || circle.assistantTeacherId === teacher.id).map((circle) => <p key={circle.id} className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-primary/80"><BookOpen className="h-3.5 w-3.5" />{circle.name}{circle.assistantTeacherId === teacher.id ? " (مساعد)" : ""}</p>)}
               <ContactLinks phone={teacher.phone} className="mb-1" />
               {teacher.email&&<div className="flex items-center gap-1.5 text-sm text-muted-foreground"><Mail className="w-3.5 h-3.5"/>{teacher.email}</div>}
-              <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><Clock3 className="w-3.5 h-3.5 text-primary" />{lastActivity ? `آخر جلسة: ${new Date(lastActivity).toLocaleDateString("ar-SA")}` : "لا توجد جلسات مسجلة بعد"}</div>
+              <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground"><Clock3 className="w-3.5 h-3.5 text-primary" />{lastActivity ? `آخر نشاط في السجل: ${new Date(lastActivity).toLocaleDateString("ar-SA")}` : "لا توجد جلسات مسجلة بعد"}</div>
               <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
                 <span className={`text-xs px-2 py-0.5 rounded-full ${teacher.isActive?"bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400":"bg-gray-100 text-gray-500"}`}>{teacher.isActive?"نشط":"غير نشط"}</span>
                 {teacher.qualification&&<span className="text-xs text-muted-foreground">{teacher.qualification}</span>}

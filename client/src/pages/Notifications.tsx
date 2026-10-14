@@ -68,7 +68,7 @@ export default function Notifications() {
           <div className="glass-card rounded-2xl p-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_180px]">
             <div className="relative"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث في العنوان أو التفاصيل..." className="tarteel-input pr-10" /></div>
             <label className="relative"><Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" /><select value={readFilter} onChange={(event) => setReadFilter(event.target.value as typeof readFilter)} className="tarteel-input pr-10"><option value="all">كل الحالات</option><option value="unread">غير مقروءة</option><option value="read">مقروءة</option></select></label>
-            <select value={dateRange} onChange={(event) => setDateRange(event.target.value as typeof dateRange)} className="tarteel-input"><option value="all">كل الفترات</option><option value="today">آخر 24 ساعة</option><option value="week">آخر 7 أيام</option><option value="month">آخر 30 يوماً</option></select>
+            <select value={dateRange} onChange={(event) => setDateRange(event.target.value as typeof dateRange)} className="tarteel-input"><option value="all">كل الأوقات</option><option value="today">آخر 24 ساعة</option><option value="week">آخر 7 أيام</option><option value="month">آخر 30 يوماً</option></select>
           </div>
           {filteredNotifications.length === 0 ? <div className="glass-card rounded-2xl p-10 text-center text-sm text-muted-foreground">لا توجد إشعارات مطابقة للفلاتر المحددة.</div> : <div className="space-y-2">
           {filteredNotifications.map((notif, i) => {

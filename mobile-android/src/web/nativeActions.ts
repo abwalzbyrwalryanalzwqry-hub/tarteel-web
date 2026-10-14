@@ -1,5 +1,6 @@
 import { Linking, Share } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
+import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import type { BridgeMessage } from "./bridge";
@@ -55,6 +56,26 @@ export async function handleCommonBridgeMessage(
         }
       } catch (error) {
         console.warn("[Tarteel] download failed", error);
+      }
+      return true;
+    case "pdf":
+      try {
+        // A4 بنقاط الطباعة (72 لكل بوصة): 595×842، وتُقلب للعرضي.
+        const [width, height] = message.landscape ? [842, 595] : [595, 842];
+        const { uri } = await Print.printToFileAsync({ html: message.html, width, height });
+        const name = safeFileName(/\.pdf$/i.test(message.filename) ? message.filename : `${message.filename}.pdf`);
+        const target = `${FileSystem.cacheDirectory}${name}`;
+        await FileSystem.deleteAsync(target, { idempotent: true });
+        await FileSystem.moveAsync({ from: uri, to: target });
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(target, {
+            mimeType: "application/pdf",
+            UTI: "com.adobe.pdf",
+            dialogTitle: "حفظ أو مشاركة التقرير",
+          });
+        }
+      } catch (error) {
+        console.warn("[Tarteel] pdf failed", error);
       }
       return true;
     case "share":

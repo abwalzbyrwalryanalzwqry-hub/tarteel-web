@@ -16,8 +16,8 @@ import {
   getDashboardStatsForCircles,
   getDashboardStatsForCenters,
   getOrganizationById,
-  getRecentSessionsForCircles,
-  getRecentSessionsForCenters,
+  getCircleIdsForCenters,
+  getRecentDailyRecords,
   getUserCenterMemberships,
   softDeleteCenter,
   updateCenter,
@@ -33,10 +33,11 @@ export const centersRouters = {
       if (centerIds.length) return getDashboardStatsForCenters(centerIds);
       return getDashboardStatsForCircles(await getAccessibleDashboardCircleIds(ctx.user));
     }),
-    recentSessions: protectedProcedure.query(async ({ ctx }) => {
+    /** آخر أيام السجل اليومي في الحلقات التي يراها المستخدم. */
+    recentDays: protectedProcedure.query(async ({ ctx }) => {
       const centerIds = await getAccessibleCenterIds(ctx.user, "center.view");
-      if (centerIds.length) return getRecentSessionsForCenters(centerIds, 5);
-      return getRecentSessionsForCircles(await getAccessibleDashboardCircleIds(ctx.user), 5);
+      const circleIds = centerIds.length ? await getCircleIdsForCenters(centerIds) : await getAccessibleDashboardCircleIds(ctx.user);
+      return getRecentDailyRecords(circleIds, 6);
     }),
     centerManager: protectedProcedure.input(z.object({ centerId: z.number() })).query(async ({ ctx, input }) => { await assertPermission(ctx.user, input.centerId, "center.view"); return getCenterManagerOverview(input.centerId); }),
   }),

@@ -37,12 +37,12 @@ export function isTarteelAiInScope(question: string): boolean {
   return hasSkillTerm && hasLearningContext;
 }
 
-export type AiContext = "general" | "dashboard" | "sessions" | "students" | "circles" | "reports";
+export type AiContext = "general" | "dashboard" | "daily" | "students" | "circles" | "reports";
 
 export const AI_CONTEXT_LABELS: Record<AiContext, string> = {
   general: "خدمات منصة ترتيل",
   dashboard: "لوحة المعلومات",
-  sessions: "إدارة الجلسات",
+  daily: "السجل اليومي للحلقة",
   students: "إدارة الطلاب",
   circles: "إدارة الحلقات",
   reports: "التقارير والإحصائيات",

@@ -19,9 +19,6 @@ const Students = lazy(() => import("./pages/Students"));
 const StudentProfile = lazy(() => import("./pages/StudentProfile"));
 const Circles = lazy(() => import("./pages/Circles"));
 const CircleDetail = lazy(() => import("./pages/CircleDetail"));
-const Sessions = lazy(() => import("./pages/Sessions"));
-const SessionDetail = lazy(() => import("./pages/SessionDetail"));
-const Reports = lazy(() => import("./pages/Reports"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Trash = lazy(() => import("./pages/Trash"));
@@ -34,6 +31,8 @@ const SplashScreen = lazy(() => import("./pages/SplashScreen"));
 const DeveloperInfo = lazy(() => import("./pages/DeveloperInfo"));
 /** قسم المصحف (منقول من زِن): شاشاته كلها تحت /quran بإطارها الخاص وملء الشاشة. */
 const MushafApp = lazy(() => import("./mushaf/app/MushafApp"));
+/** السجل اليومي للحلقة والتقارير (منقولان من زِن): /daily و/reports بإطارهما الخاص. */
+const DailyApp = lazy(() => import("./mushaf/app/DailyApp"));
 const ParentMessages = lazy(() => import("./pages/ParentMessages"));
 const TeacherInvites = lazy(() => import("./pages/TeacherInvites"));
 const RedeemTeacherInvite = lazy(() => import("./pages/RedeemTeacherInvite"));
@@ -72,13 +71,11 @@ const CentersRoute = inLayout(Centers);
 const CirclesRoute = inLayout(Circles);
 const TeachersRoute = inLayout(Teachers);
 const StudentsRoute = inLayout(Students);
-const SessionsRoute = inLayout(Sessions);
 const AIAssistantRoute = inLayout(AIAssistant);
 const ParentMessagesRoute = inLayout(ParentMessages);
 const TeacherInvitesRoute = inLayout(TeacherInvites);
 const AccessManagementRoute = inLayout(AccessManagement);
 const GuideDashboardRoute = inLayout(GuideDashboard);
-const ReportsRoute = inLayout(Reports);
 const NotificationsRoute = inLayout(Notifications);
 const SettingsRoute = inLayout(Settings);
 const DeveloperInfoRoute = inLayout(DeveloperInfo);
@@ -90,16 +87,9 @@ const CircleDetailRoute = inLayout(CircleDetail, params => ({
 const StudentProfileRoute = inLayout(StudentProfile, params => ({
   studentId: idParam(params),
 }));
-const SessionDetailRoute = inLayout(SessionDetail, params => ({
-  sessionId: idParam(params),
-}));
-
-function LegacySessionRedirect({ id }: { id?: number }) {
-  const [, navigate] = useLocation();
-  useEffect(() => {
-    navigate(id ? `/periods/${id}` : "/periods");
-  }, [id, navigate]);
-  return null;
+/** روابط الفترات والجلسات القديمة تفتح السجل اليومي. */
+function LegacyDailyRedirect() {
+  return <Redirect to="/daily" replace />;
 }
 
 function Router() {
@@ -119,15 +109,9 @@ function Router() {
         <Route path="/teachers" component={TeachersRoute} />
         <Route path="/students/:id" component={StudentProfileRoute} />
         <Route path="/students" component={StudentsRoute} />
-        <Route path="/periods" component={SessionsRoute} />
-        <Route path="/periods/:id" component={SessionDetailRoute} />
-        <Route path="/sessions" component={() => <LegacySessionRedirect />} />
-        <Route
-          path="/sessions/:id"
-          component={(props: any) => (
-            <LegacySessionRedirect id={Number(props.params?.id)} />
-          )}
-        />
+        <Route path="/daily" component={DailyApp} />
+        <Route path="/periods/*?" component={LegacyDailyRedirect} />
+        <Route path="/sessions/*?" component={LegacyDailyRedirect} />
         <Route path="/assistant">{__TARTEEL_DEVICE__ ? <Redirect to="/dashboard" /> : <AIAssistantRoute />}</Route>
         <Route path="/quran/*?" component={MushafApp} />
         <Route path="/parent-messages" component={ParentMessagesRoute} />
@@ -137,7 +121,7 @@ function Router() {
         <Route path="/redeem-teacher-invite" component={RedeemTeacherInvite} />
         <Route path="/start" component={CenterOnboarding} />
         <Route path="/redeem-access-code" component={RedeemAccessCode} />
-        <Route path="/reports" component={ReportsRoute} />
+        <Route path="/reports" component={DailyApp} />
         <Route path="/notifications" component={NotificationsRoute} />
         <Route path="/settings" component={SettingsRoute} />
         <Route path="/developer" component={DeveloperInfoRoute} />

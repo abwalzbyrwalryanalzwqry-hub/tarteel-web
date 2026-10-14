@@ -1,15 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  LocateFixed,
-  RotateCcw,
-} from "lucide-react";
-import {
-  MushafPage,
-  PageNumberPlate,
-} from "@/mushaf/components/zen/MushafPage";
+import { ChevronDown, ChevronLeft, ChevronRight, LocateFixed, RotateCcw } from "lucide-react";
+import { MushafPage, PageNumberPlate } from "@/mushaf/components/zen/MushafPage";
 import { useMushafPage } from "@/mushaf/hooks/useMushafPage";
 import { useT } from "@/mushaf/lib/i18n";
 import { SURAHS } from "@/mushaf/lib/quran-meta";
@@ -90,13 +81,10 @@ export default function MushafRangePicker({
     return () => window.clearTimeout(id);
   }, [fs, fa, focusPage, page, state.status, seek]);
 
-  const go = (p: number) =>
-    setPage(Math.min(MUSHAF_TOTAL_PAGES, Math.max(1, p)));
+  const go = (p: number) => setPage(Math.min(MUSHAF_TOTAL_PAGES, Math.max(1, p)));
   const startFor = (end: Pos): Pos => {
     const fromForm: Pos | null =
-      initial.fromSurah && initial.fromAyah
-        ? [initial.fromSurah, initial.fromAyah]
-        : null;
+      initial.fromSurah && initial.fromAyah ? [initial.fromSurah, initial.fromAyah] : null;
     if (fromForm && !before(end, fromForm, direction)) return fromForm;
     const next = focus ? nextPos(focus, direction) : null;
     if (next && !before(end, next, direction)) return next;
@@ -120,8 +108,7 @@ export default function MushafRangePicker({
     if (range) return inRangePos(range, s, a);
     return !!anchor && anchor[0] === s && anchor[1] === a;
   };
-  const isFlashing = (s: number, a: number) =>
-    !!focus && focus[0] === s && focus[1] === a;
+  const isFlashing = (s: number, a: number) => !!focus && focus[0] === s && focus[1] === a;
   const step = range ? "done" : anchor ? "end" : "start";
   const surahOfPage = PAGE_STARTS[page - 1]?.[0] ?? 1;
   const nav =
@@ -131,7 +118,7 @@ export default function MushafRangePicker({
     return (
       <SurahList
         current={surahOfPage}
-        onPick={n => {
+        onPick={(n) => {
           go(pageOf(n, 1));
           setSurahOpen(false);
         }}
@@ -147,11 +134,7 @@ export default function MushafRangePicker({
                 surah: SURAHS[anchor[0] - 1]?.name ?? "",
                 ayah: anchor[1],
               })
-            : t(
-                step === "start"
-                  ? "dailyRecord.mushaf.start"
-                  : "dailyRecord.mushaf.end"
-              )}
+            : t(step === "start" ? "dailyRecord.mushaf.start" : "dailyRecord.mushaf.end")}
       </p>
       {focus ? (
         <div className="flex items-center gap-2 rounded-2xl bg-gold/10 border border-gold/30 px-3 py-1.5">
@@ -160,15 +143,13 @@ export default function MushafRangePicker({
               surah: SURAHS[focus[0] - 1]?.name ?? "",
               ayah: focus[1],
             })}
-            <span className="block text-muted-foreground">
-              {t("dailyRecord.mushaf.doubleTap")}
-            </span>
+            <span className="block text-muted-foreground">{t("dailyRecord.mushaf.doubleTap")}</span>
           </span>
           <button
             type="button"
             onClick={() => {
               go(focusPage);
-              setSeek(n => n + 1);
+              setSeek((n) => n + 1);
             }}
             className="min-h-11 px-2.5 rounded-xl glass text-xs font-bold text-primary flex items-center gap-1"
           >
@@ -177,9 +158,7 @@ export default function MushafRangePicker({
           </button>
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground px-1">
-          {t("dailyRecord.mushaf.doubleTap")}
-        </p>
+        <p className="text-xs text-muted-foreground px-1">{t("dailyRecord.mushaf.doubleTap")}</p>
       )}
       <div className="flex items-center gap-1.5">
         <button
@@ -204,10 +183,7 @@ export default function MushafRangePicker({
           <span className="flex-1 truncate text-start font-display font-medium">
             {SURAHS[surahOfPage - 1]?.name}
           </span>
-          <ChevronDown
-            className="w-4 h-4 text-muted-foreground"
-            aria-hidden="true"
-          />
+          <ChevronDown className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
         </button>
         <input
           type="number"
@@ -217,7 +193,7 @@ export default function MushafRangePicker({
           max={MUSHAF_TOTAL_PAGES}
           value={page}
           aria-label={t("dailyRecord.mushaf.page")}
-          onChange={e => e.target.value && go(Number(e.target.value))}
+          onChange={(e) => e.target.value && go(Number(e.target.value))}
           className="w-16 min-h-11 rounded-xl border border-border/60 bg-background/70 text-center text-sm tabular-nums"
         />
         <button
@@ -237,7 +213,7 @@ export default function MushafRangePicker({
         <MushafPage
           page={page}
           state={state}
-          onRetry={() => setReload(n => n + 1)}
+          onRetry={() => setReload((n) => n + 1)}
           select={{ onTap: tap, isSelected, isFlashing }}
         />
         <PageNumberPlate page={page} />

@@ -43,6 +43,20 @@
       "when": 1792011004782,
       "tag": "0005_drop_branches_seasons",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792014911735,
+      "tag": "0006_daily_record",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1792014918722,
+      "tag": "0007_drop_sessions_periods_reports",
+      "breakpoints": true
     }
   ]
 }

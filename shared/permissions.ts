@@ -19,8 +19,8 @@ export type TarteelPermission =
   | "teachers:manage"
   | "students:view"
   | "students:manage"
-  | "sessions:view"
-  | "sessions:manage"
+  | "daily:view"
+  | "daily:manage"
   | "reports:view"
   | "settings:view"
   | "settings:manage"
@@ -47,7 +47,7 @@ export type GranularPermission = (typeof GRANULAR_PERMISSIONS)[number];
 
 const ALL_PERMISSIONS: TarteelPermission[] = [
   "dashboard:view", "centers:manage", "circles:view", "circles:manage",
-  "teachers:manage", "students:view", "students:manage", "sessions:view", "sessions:manage", "reports:view",
+  "teachers:manage", "students:view", "students:manage", "daily:view", "daily:manage", "reports:view",
   "settings:view", "settings:manage", "notifications:view", "audit:view", "trash:manage", "ai:use", "quran:view", "messages:manage",
 ];
 
@@ -61,9 +61,9 @@ export const ROLE_PERMISSIONS: Record<TarteelRole, TarteelPermission[]> = {
   org_admin: managementPermissions,
   center_manager: managementPermissions,
   supervisor: managementPermissions,
-  guide: ["circles:view", "students:view", "sessions:view", "reports:view", "quran:view"],
-  teacher: ["dashboard:view", "circles:view", "students:view", "students:manage", "sessions:view", "sessions:manage", "reports:view", "notifications:view", "settings:view", "ai:use", "quran:view", "messages:manage"],
-  assistant_teacher: ["dashboard:view", "circles:view", "students:view", "sessions:view", "sessions:manage", "notifications:view", "ai:use", "quran:view", "messages:manage"],
+  guide: ["circles:view", "students:view", "daily:view", "reports:view", "quran:view"],
+  teacher: ["dashboard:view", "circles:view", "students:view", "students:manage", "daily:view", "daily:manage", "reports:view", "notifications:view", "settings:view", "ai:use", "quran:view", "messages:manage"],
+  assistant_teacher: ["dashboard:view", "circles:view", "students:view", "daily:view", "daily:manage", "notifications:view", "ai:use", "quran:view", "messages:manage"],
   // الإعدادات هنا شخصية (كلمة المرور وتأكيد الرقم والمظهر)، والإشعارات تخص الحساب نفسه.
   student: ["students:view", "quran:view", "notifications:view", "settings:view"],
   guardian: ["students:view", "quran:view", "notifications:view", "settings:view"],
@@ -93,7 +93,7 @@ export const NAVIGATION_PERMISSION_RULES = {
   "/guide": "circles:view",
   "/access-management": "settings:manage",
   "/students": "students:view",
-  "/periods": "sessions:view",
+  "/daily": "daily:view",
   "/reports": "reports:view",
   "/assistant": "ai:use",
   "/quran": "quran:view",

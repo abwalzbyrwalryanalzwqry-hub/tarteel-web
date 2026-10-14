@@ -32,9 +32,8 @@ export default function Students() {
   const { data: users } = trpc.users.list.useQuery(undefined, { enabled: !isTeachingRole && !isReaderRole });
   const syncSharedData = () => void Promise.all([
     utils.dashboard.stats.invalidate(),
-    utils.dashboard.recentSessions.invalidate(),
+    utils.dashboard.recentDays.invalidate(),
     utils.students.list.invalidate(),
-    utils.sessions.list.invalidate(),
     utils.circles.list.invalidate(),
     utils.teachers.list.invalidate(),
   ]);

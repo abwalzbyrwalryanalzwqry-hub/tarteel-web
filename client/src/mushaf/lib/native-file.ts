@@ -9,6 +9,7 @@
  * خارج التطبيق (اختبارات E2E والتطوير في المتصفح) يعود إلى التنزيل والطباعة المعتادين.
  */
 import { Capacitor, registerPlugin } from "@/mushaf/compat/capacitor";
+import { isTarteelApp, requestAppPdf } from "@/mushaf/lib/tarteel-app";
 
 export type SaveOutcome = "shared" | "downloaded" | "cancelled";
 
@@ -109,6 +110,11 @@ export async function printHtml(
     });
     return;
   }
+  // تطبيق ترتيل لأندرويد: لا نوافذ ولا طباعة في WebView، فيُكتب ملف PDF ويُشارَك من التطبيق.
+  if (requestAppPdf(stripAutoPrint(html), safeFileName(name))) {
+    target?.close();
+    return;
+  }
   const w = target ?? window.open("", "_blank");
   if (!w) {
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
@@ -122,5 +128,5 @@ export async function printHtml(
 
 /** نافذة الطباعة تُفتح قبل الانتظار خارج التطبيق فقط؛ في التطبيق لا نوافذ. */
 export function preopenPrintWindow(): Window | null {
-  return isNative() ? null : window.open("", "_blank");
+  return isNative() || isTarteelApp() ? null : window.open("", "_blank");
 }

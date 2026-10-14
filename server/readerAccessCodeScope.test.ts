@@ -33,9 +33,11 @@ describe("أكواد القراءة والنطاق الإشرافي", () => {
     expect(db).toContain("نطاق حلقات الموجّه غير صالح أو خارج المركز");
   });
 
-  it("يقصر واجهة ولي الأمر على ملخص التقدم والحفظ والمراجعة والحضور والسجل", () => {
+  it("يقصر ملف الطالب لولي الأمر والطالب على القراءة دون إجراءات المعلم", () => {
     const profile = readFileSync(path.join(root, "client/src/pages/StudentProfile.tsx"), "utf8");
-    expect(profile).toContain('isGuardianReader ? profileTabs.filter((tab) => ["summary", "memorization", "revision", "attendance", "timeline"].includes(tab.id))');
-    expect(profile).toContain("!isStudentReader && !isGuardianReader");
+    expect(profile).toContain('const isReader = role === "student" || role === "guardian";');
+    expect(profile).toContain("{!isReader && circleId && (");
+    const daily = readFileSync(path.join(root, "server/routers/daily.ts"), "utf8");
+    expect(daily.replace(/\s+/g, " ")).toContain("await assertStudentReadAccess( ctx.user, await getStudentById(input.student) );");
   });
 });

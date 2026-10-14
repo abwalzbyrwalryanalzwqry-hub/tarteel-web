@@ -41,7 +41,7 @@ const navItems = [
   { path: "/guide", label: "لوحة الموجه", icon: UserCog, permission: "circles:view" as const },
   { path: "/access-management", label: "المستخدمون والصلاحيات", icon: UserCog, permission: "settings:manage" as const },
   { path: "/students", label: "الطلاب", icon: Users, permission: "students:view" as const },
-  { path: "/periods", label: "الفترات", icon: ClipboardList, permission: "sessions:view" as const },
+  { path: "/daily", label: "السجل اليومي", icon: ClipboardList, permission: "daily:view" as const },
   { path: "/quran", label: "القرآن الكريم", icon: BookOpenText, permission: "quran:view" as const },
   { path: "/parent-messages", label: "رسائل أولياء الأمور", icon: MessageSquareText, permission: "messages:manage" as const },
   { path: "/reports", label: "التقارير", icon: BarChart3, permission: "reports:view" as const },
@@ -54,8 +54,8 @@ const navItems = [
 ];
 
 /** الشريط السفلي على الجوال: أهم الوجهات حسب الدور بنقرة واحدة، والباقي في «المزيد». */
-const bottomNavPriority = ["/dashboard", "/periods", "/circles", "/students", "/quran", "/notifications", "/settings"];
-const bottomNavLabels: Record<string, string> = { "/dashboard": "الرئيسية", "/periods": "الفترات", "/circles": "الحلقات", "/students": "الطلاب", "/quran": "المصحف", "/notifications": "الإشعارات", "/settings": "الإعدادات" };
+const bottomNavPriority = ["/dashboard", "/daily", "/circles", "/students", "/quran", "/notifications", "/settings"];
+const bottomNavLabels: Record<string, string> = { "/dashboard": "الرئيسية", "/daily": "السجل", "/circles": "الحلقات", "/students": "الطلاب", "/quran": "المصحف", "/notifications": "الإشعارات", "/settings": "الإعدادات" };
 
 interface TarteelLayoutProps {
   children: React.ReactNode;

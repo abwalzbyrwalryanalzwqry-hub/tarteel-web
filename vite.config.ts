@@ -52,7 +52,6 @@ function localModeOverrides(): Plugin {
     [r("server/data/connection.ts"), r("client/src/local/connection.ts")],
     [r("server/_core/logger.ts"), r("client/src/local/shims/logger.ts")],
     [r("server/storage.ts"), r("client/src/local/shims/storage.ts")],
-    [r("server/export/pdfFonts.ts"), r("client/src/local/shims/pdfFonts.ts")],
     [r("client/src/lib/apiLink.ts"), r("client/src/local/apiLink.ts")],
   ]);
   const builtins = new Map<string, string>([

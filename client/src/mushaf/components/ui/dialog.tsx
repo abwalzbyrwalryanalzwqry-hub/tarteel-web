@@ -6,6 +6,16 @@ import { X } from "lucide-react";
 
 import { cn } from "@/mushaf/lib/utils";
 import { t } from "@/mushaf/lib/i18n";
+import { useMushafScope } from "@/mushaf/compat/scope";
+
+/** غلاف بصنف جذر القسم الحالي (المصحف أو السجل اليومي). */
+function ScopedRoot({ children }: { children: React.ReactNode }) {
+  return (
+    <div className={useMushafScope()} dir="rtl">
+      {children}
+    </div>
+  );
+}
 
 const Dialog = DialogPrimitive.Root;
 
@@ -35,8 +45,8 @@ const DialogContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
   <DialogPortal>
-    {/* النافذة تُرسم في body خارج جذر قسم المصحف؛ الغلاف يحمل الصنف الذي تُحصر فيه أنماطه. */}
-    <div className="tq-mushaf" dir="rtl">
+    {/* النافذة تُرسم في body خارج جذر القسم؛ الغلاف يحمل الصنف الذي تُحصر فيه أنماطه. */}
+    <ScopedRoot>
       <DialogOverlay />
       <DialogPrimitive.Content
         ref={ref}
@@ -52,7 +62,7 @@ const DialogContent = React.forwardRef<
           <span className="sr-only">{t("common.close")}</span>
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
-    </div>
+    </ScopedRoot>
   </DialogPortal>
 ));
 DialogContent.displayName = DialogPrimitive.Content.displayName;

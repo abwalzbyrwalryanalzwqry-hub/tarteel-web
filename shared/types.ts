@@ -14,8 +14,6 @@ export type UserRole =
 
 export type AttendanceStatus = "present" | "absent" | "late" | "excused";
 export type Grade = "excellent" | "very_good" | "good" | "acceptable" | "weak" | "not_done";
-export type SessionStatus = "draft" | "scheduled" | "open" | "closed" | "cancelled";
-export type SessionType = "regular" | "exam" | "review" | "special";
 export type NotificationType = "info" | "warning" | "success" | "error" | "attendance" | "session" | "memorization";
 
 export const GRADE_LABELS: Record<Grade, string> = {
@@ -32,21 +30,6 @@ export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = {
   absent: "غائب",
   late: "متأخر",
   excused: "معذور",
-};
-
-export const SESSION_STATUS_LABELS: Record<SessionStatus, string> = {
-  draft: "مسودة",
-  scheduled: "مجدولة",
-  open: "مفتوحة",
-  closed: "مغلقة",
-  cancelled: "ملغاة",
-};
-
-export const SESSION_TYPE_LABELS: Record<SessionType, string> = {
-  regular: "عادية",
-  exam: "اختبار",
-  review: "مراجعة",
-  special: "خاصة",
 };
 
 export const ROLE_LABELS: Record<UserRole, string> = {
