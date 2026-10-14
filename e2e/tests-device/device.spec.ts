@@ -133,9 +133,10 @@ test("البيانات والجلسة تبقى بعد إعادة فتح التط
   await expect(
     reopened.getByRole("heading", { name: "مدير المركز" }).first()
   ).toBeVisible();
+  // المركز الوحيد يُختار تلقائياً في لوحة المدير فيظهر ملفه مباشرة دون قائمة اختيار.
   await expect(
-    reopened.locator("select option", { hasText: "مركز النور" })
-  ).toHaveCount(1);
+    reopened.getByRole("heading", { name: "مركز النور" }).first()
+  ).toBeVisible();
   await reopened.close();
 });
 
@@ -290,8 +291,9 @@ test("نسيت كلمة المرور على الجهاز: المالك يفتح 
   const row = page.locator("tr", { hasText: "الشيخ خالد" });
   // المالك لا يرى الزر لنفسه، ويراه للمعلم.
   await expect(page.locator("tr", { hasText: "مدير المركز" }).getByRole("button", { name: "تعيين كلمة المرور" })).toHaveCount(0);
-  page.once("dialog", dialog => void dialog.accept());
   await row.getByRole("button", { name: "تعيين كلمة المرور" }).click();
+  // نافذة التأكيد الموحدة في التطبيق (بدل نافذة المتصفح).
+  await page.getByRole("alertdialog").getByRole("button", { name: "متابعة" }).click();
   await page.waitForURL(url => url.pathname === "/set-password");
   await ready();
   await page.getByLabel("كلمة المرور الجديدة").fill(NEW_PASSWORD);
