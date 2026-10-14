@@ -19,7 +19,8 @@ export const ENV = {
    * السماح بإنشاء حسابات جديدة من صفحة الدخول (الدور يبقى user حتى استرداد كود وصول).
    * مغلق افتراضياً: الخادم المنشور دون ضبط هذا المتغير لا يقبل حسابات من أي زائر.
    */
-  allowSignup: bool(process.env.ALLOW_SIGNUP, false),
+  // إنشاء الحساب لا يحتاج كوداً؛ الكود للانضمام إلى مركز أو حلقة أو ربط ولي الأمر فقط. ALLOW_SIGNUP=false يقصره على من معه رمز.
+  allowSignup: bool(process.env.ALLOW_SIGNUP, true),
   /** رمز الدولة للأرقام المكتوبة محلياً عند التسجيل والدخول برقم الهاتف (اليمن 967 افتراضياً). */
   phoneDefaultCountryCode: str(process.env.PHONE_DEFAULT_COUNTRY_CODE, "967").replace(/\D/g, "") || "967",
   /** عدد الوكلاء العكسيين (Caddy/Nginx/Render) أمام الخادم؛ يحدد كيف يُقرأ IP العميل الحقيقي. */
