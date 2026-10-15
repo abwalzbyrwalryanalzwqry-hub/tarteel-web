@@ -9,8 +9,22 @@ import { paginate, type Page, type Unit } from "./paginate";
 import type { ReportConfig } from "./config";
 import type { ReportDoc } from "./doc";
 
-/** وجوه خط ترتيل (index.css) ونسخ نوتو المستضاف في public/fonts؛ ما تعذّر تحميله يُتخطّى. */
+/** وجوه خط ثمانية في التطبيق، وخط ترتيل (index.css)، ونسخ نوتو المستضاف في public/fonts؛ ما تعذّر تحميله يُتخطّى. */
 const FACES: Array<{ family: string; url: string; weight: string }> = [
+  // خطوط ثمانية المضمّنة في تطبيق أندرويد (تُجلب وقت البناء)؛ في الويب لا توجد فتُتخطّى.
+  ...(
+    [
+      ["Light", "300"],
+      ["Regular", "400"],
+      ["Medium", "500"],
+      ["Bold", "700"],
+      ["Black", "900"],
+    ] as const
+  ).map(([name, weight]) => ({
+    family: "Thmanyah Serif Text",
+    url: `/fonts/thmanyah/thmanyahseriftext-${name}.woff2`,
+    weight,
+  })),
   {
     family: "Tarteel Serif Text",
     url: "/storage/thmanyahseriftext-Light_bb4bb1fe.woff2",

@@ -1,6 +1,7 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
+import fs from "node:fs";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 
 /**
@@ -74,9 +75,48 @@ function localModeOverrides(): Plugin {
   };
 }
 
+/**
+ * خطوط ثمانية في نسخة الجهاز (APK) فقط: تُربط صفحة الخطوط وتُحمَّل مسبقاً أوزان النص الأساسية
+ * إن جلبها scripts/fetch-thmanyah-fonts.sh. نسخة الويب لا تستضيفها (ترخيص ثمانية يمنع الاستضافة).
+ */
+function thmanyahDeviceFonts(): Plugin {
+  const dir = r("client/public/fonts/thmanyah");
+  const preload = ["thmanyahseriftext-Regular.woff2", "thmanyahseriftext-Bold.woff2", "thmanyah-sans-Medium.woff2"];
+  return {
+    name: "tarteel-thmanyah-device-fonts",
+    transformIndexHtml() {
+      if (!preload.every(file => fs.existsSync(path.join(dir, file)))) {
+        console.warn("خطوط ثمانية غير موجودة؛ تُبنى نسخة الجهاز بالخطوط البديلة.");
+        return [];
+      }
+      return [
+        ...preload.map(file => ({
+          tag: "link",
+          attrs: { rel: "preload", href: `/fonts/thmanyah/${file}`, as: "font", type: "font/woff2", crossorigin: "" },
+          injectTo: "head" as const,
+        })),
+        { tag: "link", attrs: { rel: "stylesheet", href: "/fonts/thmanyah/thmanyah-fonts.css" }, injectTo: "head" as const },
+      ];
+    },
+  };
+}
+
+/** نسخة الويب لا تستضيف خطوط ثمانية أبداً حتى لو جُلبت محلياً (الترخيص يمنع الاستضافة للتنزيل). */
+function stripThmanyahFromWeb(outDir: string): Plugin {
+  return {
+    name: "tarteel-strip-thmanyah-web",
+    apply: "build",
+    closeBundle() {
+      const dir = path.join(outDir, "fonts/thmanyah");
+      if (!fs.existsSync(dir)) return;
+      for (const file of fs.readdirSync(dir)) if (/\.(woff2?|otf|ttf)$/i.test(file)) fs.rmSync(path.join(dir, file));
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const isLocal = mode === "device";
-  const plugins = isLocal ? [localModeOverrides(), react(), tailwindcss()] : [react(), tailwindcss(), optionalAnalytics()];
+  const plugins = isLocal ? [localModeOverrides(), thmanyahDeviceFonts(), react(), tailwindcss()] : [react(), tailwindcss(), optionalAnalytics(), stripThmanyahFromWeb(r("dist/public"))];
   return {
   plugins,
   resolve: {

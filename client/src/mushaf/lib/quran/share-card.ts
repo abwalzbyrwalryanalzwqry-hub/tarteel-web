@@ -80,7 +80,7 @@ const PALETTE: Record<
 
 const QURAN_FONT = '"Amiri Quran", "Scheherazade New", serif';
 const UI_FONT =
-  '"Tarteel Serif Text", "Noto Naskh Arabic", system-ui, sans-serif';
+  '"Thmanyah Serif Text", "Tarteel Serif Text", "Noto Naskh Arabic", system-ui, sans-serif';
 
 /** Makes sure the webfonts are ready before measuring or drawing. */
 export async function ensureShareFonts(): Promise<void> {

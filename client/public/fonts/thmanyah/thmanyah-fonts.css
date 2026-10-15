@@ -1,0 +1,104 @@
+/* خطوط ثمانية داخل تطبيق ترتيل لأندرويد — من تصميم وملكية شركة ثمانية.
+ * الترخيص: https://font.thmanyah.com/licenses — يجيز تضمينها في التطبيق ويمنع استضافتها للتنزيل.
+ * ملفات woff2 لا تُحفظ في المستودع؛ يجلبها scripts/fetch-thmanyah-fonts.sh وقت بناء أندرويد
+ * (Serif Text من zen-fonts، وSans وSerif Display من manar-fonts)، ويُربط هذا الملف في نسخة الجهاز
+ * فقط حين تكون الملفات موجودة (vite.config.ts).
+ *
+ * التوزيع: Serif Text للنصوص (هوية ترتيل)، Serif Display للعناوين، Sans للأزرار والحقول والتسميات.
+ */
+
+@font-face {
+  font-family: "Thmanyah Serif Text";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("/fonts/thmanyah/thmanyahseriftext-Light.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Thmanyah Serif Text";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/thmanyah/thmanyahseriftext-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Thmanyah Serif Text";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/thmanyah/thmanyahseriftext-Medium.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Thmanyah Serif Text";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/thmanyah/thmanyahseriftext-Bold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Thmanyah Serif Text";
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("/fonts/thmanyah/thmanyahseriftext-Black.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Thmanyah Sans";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("/fonts/thmanyah/thmanyah-sans-Light.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Thmanyah Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/thmanyah/thmanyah-sans-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Thmanyah Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/thmanyah/thmanyah-sans-Medium.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Thmanyah Sans";
+  font-style: normal;
+  font-weight: 600 700;
+  font-display: swap;
+  src: url("/fonts/thmanyah/thmanyah-sans-Bold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Thmanyah Sans";
+  font-style: normal;
+  font-weight: 800 900;
+  font-display: swap;
+  src: url("/fonts/thmanyah/thmanyah-sans-Black.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Thmanyah Serif Display";
+  font-style: normal;
+  font-weight: 300 500;
+  font-display: swap;
+  src: url("/fonts/thmanyah/thmanyah-serif-display-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Thmanyah Serif Display";
+  font-style: normal;
+  font-weight: 600 900;
+  font-display: swap;
+  src: url("/fonts/thmanyah/thmanyah-serif-display-Bold.woff2") format("woff2");
+}

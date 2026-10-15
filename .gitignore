@@ -119,3 +119,8 @@ temp/
 # بلا الشرطة الأولى كانت تتجاهل server/data/ وmobile-android/src/data/ فيضيع أي ملف جديد هناك.
 /data/
 /backups/
+
+# خطوط ثمانية: تُجلب وقت بناء أندرويد فقط (scripts/fetch-thmanyah-fonts.sh)؛ ترخيصها يمنع رفعها.
+client/public/fonts/thmanyah/*.woff2
+client/public/fonts/thmanyah/*.otf
+client/public/fonts/thmanyah/*.ttf

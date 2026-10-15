@@ -34,4 +34,43 @@ describe("نظام خطوط ترتيل المركزي", () => {
     expect(mushafCss).toContain("--font-quran:");
     expect(mushafCss).toContain('"Tarteel Serif Text"');
   });
+
+  it("يضمّن خطوط ثمانية في تطبيق أندرويد فقط: تُجلب وقت البناء ولا تُرفع إلى المستودع ولا تُستضاف في الويب", () => {
+    const fontsCss = readFileSync(path.join(root, "client/public/fonts/thmanyah/thmanyah-fonts.css"), "utf8");
+    const script = readFileSync(path.join(root, "scripts/fetch-thmanyah-fonts.sh"), "utf8");
+    const gitignore = readFileSync(path.join(root, ".gitignore"), "utf8");
+    const vite = readFileSync(path.join(root, "vite.config.ts"), "utf8");
+    const files = [
+      ...["Light", "Regular", "Medium", "Bold", "Black"].map(w => `thmanyahseriftext-${w}.woff2`),
+      ...["Light", "Regular", "Medium", "Bold", "Black"].map(w => `thmanyah-sans-${w}.woff2`),
+      "thmanyah-serif-display-Regular.woff2",
+      "thmanyah-serif-display-Bold.woff2",
+    ];
+    for (const file of files) {
+      expect(fontsCss).toContain(`/fonts/thmanyah/${file}`);
+      expect(script).toContain(file);
+    }
+    for (const family of ["Thmanyah Serif Text", "Thmanyah Sans", "Thmanyah Serif Display"]) expect(fontsCss).toContain(`font-family: "${family}"`);
+    expect(script).toContain("manar-fonts");
+    expect(script).toContain("zen-fonts");
+    expect(gitignore).toContain("client/public/fonts/thmanyah/*.woff2");
+    expect(vite).toContain("thmanyahDeviceFonts()");
+    expect(vite).toContain('stripThmanyahFromWeb(r("dist/public"))');
+    // التوزيع: النصوص Serif Text، العناوين Serif Display، عناصر التحكم Sans.
+    expect(css).toMatch(/--font-body: "Thmanyah Serif Text"/);
+    expect(css).toMatch(/--font-display: "Thmanyah Serif Display"/);
+    expect(css).toMatch(/--font-ui: "Thmanyah Sans"/);
+    expect(css).toMatch(/button, input, select, textarea[^{]*\{\s*font-family: var\(--font-ui\)/);
+  });
+
+  it("لا توجد ملفات خط ثمانية متتبَّعة في git", async () => {
+    const { execFileSync } = await import("node:child_process");
+    let tracked = "";
+    try {
+      tracked = execFileSync("git", ["ls-files", "client/public/fonts/thmanyah"], { cwd: root, encoding: "utf8" });
+    } catch {
+      return; // خارج مستودع git (حزمة مصدرية): لا شيء يُفحص.
+    }
+    expect(tracked.split("\n").filter(f => /\.(woff2?|otf|ttf)$/i.test(f))).toEqual([]);
+  });
 });
