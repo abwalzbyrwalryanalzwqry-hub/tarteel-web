@@ -1,18 +1,21 @@
 import { Tabs } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { colors } from "../../src/ui/theme";
+import { useAppColors } from "../../src/ui/theme";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 const icon = (active: IconName, inactive: IconName) =>
   ({ color, size, focused }: { color: string; size: number; focused: boolean }) => <Ionicons name={focused ? active : inactive} size={size} color={color} />;
 
 export default function TabsLayout() {
+  // كان الشريط فاتحاً دائماً فيظهر شريط ساطع أسفل المنصة في الوضع الليلي.
+  const colors = useAppColors();
   return (
     <Tabs screenOptions={{
       headerShown: false,
-      tabBarActiveTintColor: colors.primary,
-      tabBarInactiveTintColor: colors.subtle,
+      tabBarActiveTintColor: colors.tabActive,
+      tabBarInactiveTintColor: colors.tabInactive,
       tabBarStyle: { backgroundColor: colors.background, borderTopColor: colors.border },
+      sceneStyle: { backgroundColor: colors.background },
       tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
     }}>
       <Tabs.Screen name="index" options={{ title: "المنصة", tabBarIcon: icon("school", "school-outline") }} />

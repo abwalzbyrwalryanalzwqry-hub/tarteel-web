@@ -105,7 +105,7 @@ export default function DeveloperInfo() {
             </p>
           </div>
           <div className="flex items-center gap-2 self-start rounded-2xl bg-background/70 px-4 py-3 text-xs text-muted-foreground backdrop-blur sm:self-auto">
-            <ShieldCheck className="h-4 w-4 text-emerald-600" />
+            <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
             بيانات محلية وآمنة
           </div>
         </div>

@@ -7,6 +7,8 @@
  *   الآية، التقارير) عبر مسار التنزيل نفسه.
  * - navigator.wakeLock (لا يعمل في WebView أندرويد): «إبقاء الشاشة مضاءة» في القراءة والتلاوة
  *   يطلبه من التطبيق (expo-keep-awake).
+ * - السمة: يراقب صنف .dark على جذر الصفحة ويرسل {type:"theme"} عند كل تغيير، فيتلون شريط التبويبات
+ *   وشريط الحالة في التطبيق بسمة المنصة (يعمل كذلك مع خوادم بنسخ أقدم من الواجهة).
  */
 export const BRIDGE_SCRIPT = `(function () {
   if (window.__tarteelBridge) return;
@@ -35,6 +37,20 @@ export const BRIDGE_SCRIPT = `(function () {
     if (isFileHref(a.href)) { event.preventDefault(); sendFile(a.href, a.getAttribute("download")); return; }
     if (a.target === "_blank") { event.preventDefault(); post({ type: "open", url: a.href }); }
   }, true);
+  (function () {
+    var last = null;
+    function postTheme() {
+      var root = document.documentElement;
+      if (!root) return;
+      var dark = root.classList.contains("dark");
+      if (dark === last) return;
+      last = dark;
+      post({ type: "theme", dark: dark });
+    }
+    try { new MutationObserver(postTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] }); } catch (e) {}
+    document.addEventListener("DOMContentLoaded", postTheme);
+    if (typeof window.addEventListener === "function") window.addEventListener("pageshow", function () { last = null; postTheme(); });
+  })();
   window.open = function (u) { if (u) post({ type: "open", url: new URL(String(u), location.href).href }); return null; };
   function define(name, value) { try { Object.defineProperty(navigator, name, { value: value, configurable: true }); } catch (e) {} }
   if (typeof navigator.share !== "function") {
@@ -92,6 +108,8 @@ export type BridgeMessage =
   | { type: "error"; message: string }
   | { type: "share"; title: string; text: string }
   | { type: "keep-awake"; on: boolean }
+  /** سمة الصفحة الحالية، ليتلون بها شريط التبويبات وشريط الحالة. */
+  | { type: "theme"; dark: boolean }
   /** تقرير HTML جاهز للطباعة: يُحوَّل إلى ملف PDF على الجهاز ثم يُعرض للحفظ أو المشاركة. */
   | { type: "pdf"; html: string; filename: string; landscape?: boolean }
   /** نسخة الجهاز: الواجهة تطلب آخر نسخة من ملف قاعدة البيانات، أو ترسل نسخة لحفظها. */

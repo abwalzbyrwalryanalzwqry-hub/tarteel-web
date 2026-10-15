@@ -84,7 +84,7 @@ export default function AIAssistant() {
             </div>
           </div>
           <div className="flex items-center gap-2 rounded-2xl bg-background/70 px-4 py-3 text-xs text-muted-foreground backdrop-blur">
-            <ShieldCheck className="h-4 w-4 text-emerald-600" />
+            <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
             <span>الأسئلة خارج نطاق القرآن والمنصة تُرفض تلقائياً.</span>
           </div>
         </div>

@@ -4,6 +4,7 @@ import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import type { BridgeMessage } from "./bridge";
+import { setAppDark } from "../ui/theme";
 
 /** اسم ملف آمن في ذاكرة التطبيق المؤقتة، مع الإبقاء على العربية. */
 export function safeFileName(name: string) {
@@ -83,6 +84,9 @@ export async function handleCommonBridgeMessage(
         { message: message.text, title: message.title || "ترتيل" },
         { dialogTitle: message.title || "مشاركة" },
       ).catch(() => undefined);
+      return true;
+    case "theme":
+      setAppDark(Boolean(message.dark));
       return true;
     case "keep-awake":
       keepAwake.set(keepAwakeTag, {

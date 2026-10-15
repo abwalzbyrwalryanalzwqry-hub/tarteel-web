@@ -16,7 +16,7 @@ export function formatDualCalendarDate(value: string | number | Date): { gregori
   if (Number.isNaN(date.getTime())) return { gregorian: "—", hijri: "—" };
 
   return {
-    gregorian: date.toLocaleDateString("ar-SA", {
+    gregorian: date.toLocaleDateString(UI_LOCALE, {
       weekday: "long",
       year: "numeric",
       month: "long",
@@ -66,3 +66,10 @@ export function hijriToGregorian({ year, month, day }: HijriDateParts): Date | n
   }
   return null;
 }
+
+/**
+ * لغة تنسيق التواريخ والأرقام في واجهات ترتيل: عربية، بالتقويم الميلادي صراحةً (بعض نسخ WebView تجعل
+ * «ar-SA» هجرياً افتراضياً)، وبالأرقام نفسها المستعملة في بقية الإحصاءات والسجل اليومي، حتى لا يجتمع
+ * «١» و«1» في البطاقة نفسها.
+ */
+export const UI_LOCALE = "ar-SA-u-ca-gregory-nu-latn";

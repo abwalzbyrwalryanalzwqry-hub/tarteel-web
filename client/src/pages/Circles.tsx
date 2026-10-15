@@ -99,7 +99,7 @@ export default function Circles() {
             return (
               <div key={circle.id} role="link" tabIndex={0} onClick={() => open(circle.id)} onKeyDown={(event) => { if (event.key === "Enter") open(circle.id); }} className={`glass-card cursor-pointer rounded-2xl p-5 outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-primary animate-fade-in-up stagger-${(i%5)+1}`}>
                 <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-600/10 flex items-center justify-center"><BookOpen className="w-5 h-5 text-purple-600"/></div>
+                  <div className="w-10 h-10 rounded-xl bg-purple-600/10 flex items-center justify-center"><BookOpen className="w-5 h-5 text-purple-600 dark:text-purple-300"/></div>
                   <div className="flex gap-1" onClick={(event) => event.stopPropagation()}>
                     <button onClick={()=>setEditItem(circle)} aria-label={`تعديل ${circle.name}`} title="تعديل" className="w-9 h-9 rounded-lg hover:bg-muted flex items-center justify-center"><Edit className="w-4 h-4 text-muted-foreground"/></button>
                     <button onClick={()=>void moveToTrash(circle, (id) => deleteMutation.mutateAsync({ id }))} aria-label={`حذف ${circle.name}`} title="نقل إلى السلة" className="w-9 h-9 rounded-lg hover:bg-destructive/10 flex items-center justify-center"><Trash2 className="w-4 h-4 text-destructive"/></button>

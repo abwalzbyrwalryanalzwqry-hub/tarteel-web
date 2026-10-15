@@ -11,6 +11,7 @@ import { ContactLinks } from "@/components/ContactLinks";
 import { FilterChips, SearchField } from "@/components/SearchField";
 import { recallChoice, rememberChoice, useCreateFormParam, useNumberParam } from "@/hooks/useUrlParams";
 import { useMoveToTrash } from "@/hooks/useMoveToTrash";
+import { segmentsText } from "@/mushaf/lib/daily-record-text";
 
 export default function Students() {
   const { can, role } = usePermissions();
@@ -27,6 +28,8 @@ export default function Students() {
   const utils = trpc.useUtils();
 
   const { data: students, isLoading, refetch } = trpc.students.list.useQuery({ search: search || undefined });
+  // آخر حفظ من السجل اليومي (حقل الطالب القديم لا يُحدَّث فيظهر «الفاتحة - آية 1» للجميع).
+  const lastMemorize = trpc.daily.lastMemorize.useQuery(undefined, { retry: false });
   const { data: centers } = trpc.centers.list.useQuery({ orgId: undefined }, { enabled: !isReaderRole });
   const { data: circles } = trpc.circles.list.useQuery(undefined, { enabled: !isReaderRole });
   const { data: users } = trpc.users.list.useQuery(undefined, { enabled: !isTeachingRole && !isReaderRole });
@@ -124,7 +127,7 @@ export default function Students() {
             <div key={student.id} role="link" tabIndex={0} onClick={() => navigate(`/students/${student.id}`)} onKeyDown={(event) => { if (event.key === "Enter") navigate(`/students/${student.id}`); }} className={`glass-card cursor-pointer rounded-2xl p-5 outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-primary animate-fade-in-up stagger-${(i%5)+1}`}>
               <div className="flex items-start justify-between mb-3">
                 <div className="w-12 h-12 rounded-full bg-emerald-600/10 flex items-center justify-center">
-                  <span className="font-display font-bold text-emerald-600 text-lg">{student.name.charAt(0)}</span>
+                  <span className="font-display font-bold text-emerald-600 dark:text-emerald-300 text-lg">{student.name.charAt(0)}</span>
                 </div>
                 {canManageStudents && <div className="flex gap-1" onClick={(event) => event.stopPropagation()}>
                   <button onClick={()=>setEditItem(student)} aria-label={`تعديل ${student.name}`} title="تعديل" className="w-9 h-9 rounded-lg hover:bg-muted flex items-center justify-center"><Edit className="w-4 h-4 text-muted-foreground"/></button>
@@ -138,10 +141,16 @@ export default function Students() {
               {!isReaderRole && <ContactLinks phone={student.phone} label="الطالب" />}
               <div className="flex items-center gap-1.5 text-sm text-primary mt-2">
                 <BookOpen className="w-3.5 h-3.5"/>
-                <span>آخر حفظ: {getSurahName(student.lastMemorizedSurah ?? 1)} - آية {student.lastMemorizedAyah ?? 1}</span>
+                <span>آخر حفظ: {(() => {
+                  const last = lastMemorize.data?.[String(student.id)];
+                  if (last) return segmentsText([last]);
+                  // (الفاتحة، آية 1) هي القيمة الافتراضية للحقل القديم، لا حفظٌ مسجَّل.
+                  if (student.lastMemorizedSurah && (student.lastMemorizedSurah > 1 || (student.lastMemorizedAyah ?? 1) > 1)) return `${getSurahName(student.lastMemorizedSurah)} - آية ${student.lastMemorizedAyah ?? 1}`;
+                  return lastMemorize.isLoading ? "…" : "لم يُسجَّل بعد";
+                })()}</span>
               </div>
               <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
-                <span className={`text-xs px-2 py-0.5 rounded-full ${student.isActive?"bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400":"bg-gray-100 text-gray-500"}`}>{student.isActive?"نشط":"غير نشط"}</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${student.isActive?"bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300":"bg-muted text-muted-foreground"}`}>{student.isActive?"نشط":"غير نشط"}</span>
                 <span className="text-xs text-muted-foreground">{student.totalMemorizedJuz ?? 0} جزء</span>
               </div>
             </div>

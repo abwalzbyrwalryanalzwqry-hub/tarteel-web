@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Pressable } from "../../src/ui/Pressable";
 import { router, useFocusEffect } from "expo-router";
@@ -6,9 +6,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { getSavedServerUrl, normalizeServerUrl, probeServer, setServerUrl } from "../../src/config/server";
-import { colors } from "../../src/ui/theme";
+import { useAppColors, type AppPalette } from "../../src/ui/theme";
 
 export default function SettingsScreen() {
+  const colors = useAppColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [current, setCurrent] = useState("");
   const [draft, setDraft] = useState("");
   const [checking, setChecking] = useState(false);
@@ -81,7 +83,7 @@ export default function SettingsScreen() {
           />
           {status ? <Text style={[styles.status, { color: status.ok ? colors.primary : colors.danger }]}>{status.text}</Text> : null}
           <Pressable disabled={checking || !draft.trim() || draft.trim() === current} onPress={save} style={({ pressed }) => [styles.primaryButton, (checking || !draft.trim() || draft.trim() === current) && styles.disabled, pressed && styles.pressed]}>
-            {checking ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>تحقق واربط</Text>}
+            {checking ? <ActivityIndicator color={colors.buttonText} /> : <Text style={styles.primaryText}>تحقق واربط</Text>}
           </Pressable>
           {current ? <Pressable onPress={() => void Linking.openURL(current)} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
             <Ionicons name="open-outline" size={18} color={colors.primary} /><Text style={styles.linkText}>فتح المنصة في المتصفح</Text>
@@ -116,12 +118,14 @@ export default function SettingsScreen() {
 }
 
 function Row({ label, value }: { label: string; value: string }) {
+  const colors = useAppColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.row}><Text style={styles.rowLabel}>{label}</Text><Text style={styles.rowValue}>{value}</Text></View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: AppPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, gap: 14, paddingBottom: 40 },
   title: { fontSize: 26, fontWeight: "700", color: colors.primary },
@@ -131,8 +135,8 @@ const styles = StyleSheet.create({
   help: { fontSize: 13, lineHeight: 21, color: colors.muted },
   input: { borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, fontSize: 15, color: colors.primary, backgroundColor: colors.background, textAlign: "left", writingDirection: "ltr" },
   status: { fontSize: 13 },
-  primaryButton: { borderRadius: 14, backgroundColor: colors.gold, paddingVertical: 13, alignItems: "center" },
-  primaryText: { color: "#FFFFFF", fontWeight: "700", fontSize: 15 },
+  primaryButton: { borderRadius: 14, backgroundColor: colors.buttonBackground, paddingVertical: 13, alignItems: "center" },
+  primaryText: { color: colors.buttonText, fontWeight: "700", fontSize: 15 },
   secondaryButton: { borderRadius: 14, borderWidth: 1, borderColor: colors.border, paddingVertical: 12, alignItems: "center" },
   secondaryText: { color: colors.primary, fontWeight: "600" },
   linkRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6 },

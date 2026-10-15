@@ -10,7 +10,7 @@
  *
  * لإيقافه في نشر ما: اضبط VITE_DISABLE_SW=true وأعد البناء؛ الواجهة حينها تلغي تسجيله.
  */
-const VERSION = "v2";
+const VERSION = "v3";
 const ASSETS = `tarteel-assets-${VERSION}`;
 const SHELL = `tarteel-shell-${VERSION}`;
 // بيانات المصحف بإصدار مستقل: لا تُحذف مع كل تحديث للواجهة.
@@ -43,7 +43,7 @@ async function assetFirst(request, name = ASSETS) {
   return response;
 }
 
-const OFFLINE_HTML = `<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ترتيل - لا اتصال</title><body style="font-family:system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;background:#faf7f0;color:#3b3325;text-align:center"><div><h1 style="font-size:1.4rem">لا يوجد اتصال بالإنترنت</h1><p>تحقق من الاتصال ثم أعد المحاولة.</p><button onclick="location.reload()" style="padding:.6rem 1.4rem;border:0;border-radius:.7rem;background:#b8862f;color:#fff;font-size:1rem">إعادة المحاولة</button></div></body></html>`;
+const OFFLINE_HTML = `<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>ترتيل - لا اتصال</title><style>body{font-family:system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;padding:1.5rem;box-sizing:border-box;background:#f8f5ee;color:#1d2a36;text-align:center}p{color:#4f6778;line-height:1.8}button{padding:.7rem 1.6rem;border:0;border-radius:.75rem;background:#b8862f;color:#fff;font-size:1rem;font-weight:600}@media (prefers-color-scheme:dark){body{background:#000710;color:#eee7d9}p{color:#93a7b6}button{background:#e09100;color:#000710}}</style><body><div><h1 style="font-size:1.4rem">لا يوجد اتصال بالإنترنت</h1><p>تحقق من الاتصال ثم أعد المحاولة.</p><button onclick="location.reload()">إعادة المحاولة</button></div></body></html>`;
 
 async function navigation(request) {
   const cache = await caches.open(SHELL);

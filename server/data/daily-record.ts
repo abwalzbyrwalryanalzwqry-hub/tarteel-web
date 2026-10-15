@@ -414,6 +414,23 @@ async function userName(q: Q, id: number | null) {
   return u?.name ?? null;
 }
 
+/**
+ * آخر مقطع حفظ مسجّل في السجل اليومي لكل طالب (حتى اليوم ضمناً): قائمة الطلاب تعرضه بدل حقل
+ * الطالب القديم (lastMemorizedSurah) الذي لم يعد السجل اليومي يحدّثه، فكان يظهر «الفاتحة - آية 1» للجميع.
+ */
+export async function studentsLastMemorize(
+  ids: number[]
+): Promise<Record<string, LastWorkOut>> {
+  if (!ids.length) return {};
+  const d = await db();
+  const last = await lastWork(d, ids, addDays(dailyToday(), 1));
+  const out: Record<string, LastWorkOut> = {};
+  last.forEach((work, id) => {
+    if (work.memorize) out[String(id)] = work.memorize;
+  });
+  return out;
+}
+
 export async function dailySheet(
   circle: NonNullable<Awaited<ReturnType<typeof getDailyCircle>>>,
   date: string,
