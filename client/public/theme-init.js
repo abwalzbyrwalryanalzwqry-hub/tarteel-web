@@ -3,6 +3,7 @@
  * عند فتحها في الوضع الليلي. ملف خارجي لأن سياسة CSP تمنع السكربت المضمّن (script-src 'self').
  * المفتاح والقيم نفسها في client/src/contexts/ThemeContext.tsx.
  */
+/* global localStorage, window, document */
 (function () {
   try {
     var stored = localStorage.getItem("theme");
@@ -16,7 +17,7 @@
     root.style.colorScheme = dark ? "dark" : "light";
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", dark ? "#000710" : "#f8f5ee");
-  } catch (e) {
+  } catch {
     /* تخزين معطّل: تبقى السمة الفاتحة */
   }
 })();
