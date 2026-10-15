@@ -1,3 +1,4 @@
+import { UI_LOCALE } from "@shared/dates";
 import { trpc } from "@/lib/trpc";
 import { AIGuidanceCard } from "@/components/AIGuidanceCard";
 import {
@@ -42,7 +43,7 @@ const RECORD_STATUS: Record<string, string> = {
 };
 
 const dayLabel = (date: string) =>
-  new Date(`${date}T12:00:00`).toLocaleDateString("ar-SA", {
+  new Date(`${date}T12:00:00`).toLocaleDateString(UI_LOCALE, {
     weekday: "long",
     day: "numeric",
     month: "long",

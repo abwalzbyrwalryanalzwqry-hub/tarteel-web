@@ -47,9 +47,10 @@ import {
   setReportIdentity,
   studentDailyDays,
   studentDailyOverview,
+  studentsLastMemorize,
 } from "../data/daily-record";
 import { DAILY_ATTENDANCE, isDayKey } from "../../shared/dailyRecord";
-import { assertStudentReadAccess } from "./_shared";
+import { assertStudentReadAccess, listReadableStudents } from "./_shared";
 
 const id = z.coerce.number().int().positive();
 const day = z.string().refine(isDayKey, "INVALID_DATE");
@@ -420,6 +421,18 @@ export const dailyRouter = router({
         return restoreDailyRecord(input.trash);
       })
     ),
+
+  /** آخر حفظ مسجّل لكل طالب يقرؤه المستخدم (قائمة الطلاب)، بالمرشحات نفسها لـ students.list. */
+  lastMemorize: protectedProcedure
+    .input(
+      z
+        .object({ centerId: z.number().optional(), circleId: z.number().optional() })
+        .optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const readable = await listReadableStudents(ctx.user, input ?? {});
+      return studentsLastMemorize(readable.map(student => student.id));
+    }),
 
   studentOverview: protectedProcedure
     .input(z.object({ student: id }))

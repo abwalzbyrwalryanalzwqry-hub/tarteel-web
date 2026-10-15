@@ -1,3 +1,4 @@
+import { UI_LOCALE } from "@shared/dates";
 import { AIGuidanceCard } from "@/components/AIGuidanceCard";
 import { trpc } from "@/lib/trpc";
 import {
@@ -32,7 +33,7 @@ const STATUS: Record<string, { label: string; tone: string }> = {
 };
 
 const dayLabel = (date: string) =>
-  new Date(`${date}T12:00:00`).toLocaleDateString("ar-SA", {
+  new Date(`${date}T12:00:00`).toLocaleDateString(UI_LOCALE, {
     weekday: "short",
     day: "numeric",
     month: "long",
@@ -105,7 +106,7 @@ export default function StudentProfile({ studentId }: { studentId?: number }) {
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="page-title">{info.name}</h1>
               <span
-                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${info.isActive ? "bg-emerald-500/10 text-emerald-700" : "bg-muted text-muted-foreground"}`}
+                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${info.isActive ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}
               >
                 {info.isActive ? "نشط" : "موقوف"}
               </span>
@@ -158,9 +159,9 @@ export default function StudentProfile({ studentId }: { studentId?: number }) {
       {activeTab === "summary" && (
         <>
           <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Stat label="نسبة الحضور (30 يوماً)" value={rate === null ? "—" : `${rate}%`} icon={<UserRound className="h-4 w-4" />} tone="text-emerald-700" />
+            <Stat label="نسبة الحضور (30 يوماً)" value={rate === null ? "—" : `${rate}%`} icon={<UserRound className="h-4 w-4" />} tone="text-emerald-700 dark:text-emerald-300" />
             <Stat label="الغياب" value={att.absent} icon={<Clock3 className="h-4 w-4" />} tone="text-destructive" />
-            <Stat label="التأخر" value={att.late} icon={<CalendarDays className="h-4 w-4" />} tone="text-amber-600" />
+            <Stat label="التأخر" value={att.late} icon={<CalendarDays className="h-4 w-4" />} tone="text-amber-600 dark:text-amber-300" />
             <Stat label="الاستئذان" value={att.excused} icon={<CalendarDays className="h-4 w-4" />} tone="text-primary" />
           </section>
           <section className="grid gap-4 lg:grid-cols-3">

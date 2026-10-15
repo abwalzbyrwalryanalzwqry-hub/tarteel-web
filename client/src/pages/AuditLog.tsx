@@ -1,3 +1,4 @@
+import { UI_LOCALE } from "@shared/dates";
 import { trpc } from "@/lib/trpc";
 import { ClipboardList, Download, Filter, Search } from "lucide-react";
 import { useState } from "react";
@@ -14,7 +15,7 @@ export default function AuditLog() {
 
   const exportCsv = () => {
     if (!filteredLogs.length) { toast.error("لا توجد سجلات لتصديرها"); return; }
-    const rows = [["العملية", "الكيان", "المعرف", "التاريخ"], ...filteredLogs.map((log) => [log.action, log.entity, String(log.entityId ?? ""), new Date(log.createdAt).toLocaleString("ar-SA")])];
+    const rows = [["العملية", "الكيان", "المعرف", "التاريخ"], ...filteredLogs.map((log) => [log.action, log.entity, String(log.entityId ?? ""), new Date(log.createdAt).toLocaleString(UI_LOCALE)])];
     const csv = toCsv(rows);
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
@@ -66,14 +67,14 @@ export default function AuditLog() {
                         log.action === "create" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
                         log.action === "update" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
                         log.action === "delete" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
-                        "bg-gray-100 text-gray-600"
+                        "bg-muted text-muted-foreground"
                       }`}>
                         {log.action === "create" ? "إنشاء" : log.action === "update" ? "تعديل" : log.action === "delete" ? "حذف" : log.action}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-muted-foreground font-mono text-xs">{log.entity}</td>
                     <td className="py-3 px-4 text-muted-foreground font-mono text-xs">{log.entityId}</td>
-                    <td className="py-3 px-4 text-muted-foreground">{new Date(log.createdAt).toLocaleDateString("ar-SA", {year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</td>
+                    <td className="py-3 px-4 text-muted-foreground">{new Date(log.createdAt).toLocaleDateString(UI_LOCALE, {year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</td>
                   </tr>
                 ))}
               </tbody>

@@ -1,7 +1,8 @@
+import { UI_LOCALE } from "@shared/dates";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Bell, Building2, ChevronLeft, Code2, Moon, Settings as SettingsIcon, ShieldCheck, Sun, Type, Users } from "lucide-react";
+import { Bell, Building2, ChevronLeft, Code2, MonitorSmartphone, Moon, Settings as SettingsIcon, ShieldCheck, Sun, Type, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 import { PasswordSettingsCard } from "@/components/PasswordSettingsCard";
@@ -13,9 +14,15 @@ import "@/lib/edition";
 // نسخة الجهاز فقط (تُحذف من نسخة الخادم وقت البناء).
 const DeviceBackupCard = __TARTEEL_DEVICE__ ? lazy(() => import("@/components/DeviceBackupCard")) : null;
 
+/** رقم إصدار تطبيق أندرويد من وكيل المستخدم (TarteelAndroid/x.y.z)، وإلا «نسخة الويب». كان ثابتاً «1.0.0». */
+function appVersionLabel() {
+  const match = typeof navigator !== "undefined" ? /TarteelAndroid\/([\w.-]+)/.exec(navigator.userAgent) : null;
+  return match ? `تطبيق أندرويد ${match[1]}` : "نسخة الويب";
+}
+
 export default function Settings() {
   const { user } = useAuth();
-  const { theme, toggleTheme, fontScale, setFontScale } = useTheme();
+  const { theme, preference, setPreference, fontScale, setFontScale } = useTheme();
   const { data: users } = trpc.users.list.useQuery();
 
   const createNotifMutation = trpc.notifications.create.useMutation({
@@ -63,7 +70,7 @@ export default function Settings() {
               </div>
               <div className="flex items-center justify-between p-3 rounded-xl bg-muted/20">
                 <span className="text-sm text-muted-foreground">آخر دخول</span>
-                <span className="text-sm text-foreground">{user?.lastSignedIn ? new Date(user.lastSignedIn).toLocaleDateString("ar-SA") : "-"}</span>
+                <span className="text-sm text-foreground">{user?.lastSignedIn ? new Date(user.lastSignedIn).toLocaleDateString(UI_LOCALE) : "-"}</span>
               </div>
             </div>
           </div>
@@ -77,23 +84,25 @@ export default function Settings() {
           </h2>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">اختر المظهر المناسب لك</p>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => theme === 'dark' && toggleTheme?.()}
-                className={`p-4 rounded-xl border-2 transition-all ${theme === "light" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
-              >
-                <Sun className="w-6 h-6 mx-auto mb-2 text-amber-500"/>
-                <p className="text-sm font-medium text-foreground">نهاري</p>
-                <p className="text-xs text-muted-foreground">خلفية فاتحة</p>
-              </button>
-              <button
-                onClick={() => theme === 'light' && toggleTheme?.()}
-                className={`p-4 rounded-xl border-2 transition-all ${theme === "dark" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
-              >
-                <Moon className="w-6 h-6 mx-auto mb-2 text-blue-400"/>
-                <p className="text-sm font-medium text-foreground">ليلي</p>
-                <p className="text-xs text-muted-foreground">خلفية داكنة</p>
-              </button>
+            <div role="radiogroup" aria-label="المظهر" className="grid grid-cols-3 gap-2 sm:gap-3">
+              {([
+                { value: "light", label: "نهاري", hint: "خلفية فاتحة", Icon: Sun, tone: "text-amber-500 dark:text-amber-300" },
+                { value: "dark", label: "ليلي", hint: "خلفية داكنة", Icon: Moon, tone: "text-blue-500 dark:text-blue-300" },
+                { value: "system", label: "حسب الجهاز", hint: "يتبع إعداد الهاتف", Icon: MonitorSmartphone, tone: "text-primary" },
+              ] as const).map(({ value, label, hint, Icon, tone }) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={preference === value}
+                  onClick={() => setPreference(value)}
+                  className={`min-h-[6.5rem] rounded-xl border-2 p-3 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${preference === value ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}
+                >
+                  <Icon className={`mx-auto mb-2 h-6 w-6 ${tone}`} aria-hidden="true" />
+                  <p className="text-sm font-medium text-foreground">{label}</p>
+                  <p className="text-xs leading-5 text-muted-foreground">{hint}</p>
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -101,7 +110,7 @@ export default function Settings() {
         {/* Notifications Test */}
         <div className="glass-card rounded-2xl p-5">
           <h2 className="font-display font-bold text-foreground text-lg mb-4 flex items-center gap-2"><Type className="w-5 h-5 text-primary"/>سهولة القراءة</h2>
-          <p className="text-sm text-muted-foreground mb-4">اختر حجم الخط الذي يناسبك. يُحفظ التفضيل محلياً في هذا المتصفح.</p>
+          <p className="text-sm text-muted-foreground mb-4">اختر حجم الخط الذي يناسبك. يُحفظ التفضيل على هذا الجهاز.</p>
           <div className="grid grid-cols-3 gap-2">
             {(["small", "standard", "large"] as const).map((scale) => (
               <button key={scale} onClick={() => setFontScale(scale)} className={`rounded-xl border-2 p-3 text-center transition-colors ${fontScale === scale ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40"}`}>
@@ -128,7 +137,7 @@ export default function Settings() {
           <div className="space-y-2">
             {[
               { label: "اسم المنصة", value: "ترتيل" },
-              { label: "الإصدار", value: "1.0.0" },
+              { label: "الإصدار", value: appVersionLabel() },
               { label: "اللغة", value: "العربية" },
               { label: "الاتجاه", value: "من اليمين إلى اليسار (RTL)" },
               { label: "المطور", value: "أ. إدريس الزوقري" },
@@ -190,7 +199,7 @@ export default function Settings() {
                       <td className="py-2 px-3">
                         <span className={`text-xs px-2 py-0.5 rounded-full ${u.role==="admin"?"bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400":"bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"}`}>{u.role==="admin"?"مدير":"مستخدم"}</span>
                       </td>
-                      <td className="py-2 px-3 text-muted-foreground">{new Date(u.lastSignedIn).toLocaleDateString("ar-SA")}</td>
+                      <td className="py-2 px-3 text-muted-foreground">{new Date(u.lastSignedIn).toLocaleDateString(UI_LOCALE)}</td>
                     </tr>
                   ))}
                 </tbody>

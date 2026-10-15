@@ -201,6 +201,18 @@ test("السجل اليومي والتقرير يعملان على الجهاز 
   const history = await trpcQuery<{ present: number; memorized: number }[]>(page, "daily.history", { halaqa });
   expect(history[0]).toMatchObject({ present: 2, memorized: 1 });
 
+  // قائمة الطلاب تعرض آخر حفظ من السجل اليومي، لا القيمة الافتراضية القديمة (الفاتحة، آية 1).
+  const lastMemorize = await trpcQuery<Record<string, { surah_name: string; from_ayah: number; to_ayah: number }>>(
+    page,
+    "daily.lastMemorize",
+    undefined
+  );
+  expect(lastMemorize[String(first.student_id)]).toMatchObject({ surah_name: "الملك", from_ayah: 1, to_ayah: 10 });
+  expect(Object.keys(lastMemorize)).toHaveLength(1);
+  await open("/students");
+  await expect(page.getByText(/آخر حفظ: الملك/)).toBeVisible();
+  await expect(page.getByText("آخر حفظ: لم يُسجَّل بعد")).toBeVisible();
+
   // داخل تطبيق أندرويد: «تحميل PDF» يرسل التقرير HTML إلى التطبيق (expo-print) بدل نافذة الطباعة.
   await page.evaluate(() => {
     const sent: string[] = [];
@@ -369,4 +381,37 @@ test("إنشاء حساب لا يحتاج كوداً: الكود الخاطئ ي
   await page.waitForURL(url => url.pathname.startsWith("/start"));
   expect(await me()).toMatchObject({ name: "مستخدم جديد", phone: "+967776343551" });
   await expect(page.getByText("الانضمام إلى مركز قائم")).toBeVisible();
+});
+
+test("الوضع الليلي: يُطبَّق قبل أول رسم، والخلفية والبطاقات والنصوص داكنة فعلاً (لا خلفية فاتحة بنص فاتح)", async () => {
+  await open("/login");
+  await page.evaluate(() => localStorage.setItem("theme", "dark"));
+  await open("/login");
+  const colors = await page.evaluate(() => {
+    const luminance = (value: string) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 1;
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = value;
+      ctx.fillRect(0, 0, 1, 1);
+      const [r, g, b] = Array.from(ctx.getImageData(0, 0, 1, 1).data).map(c => {
+        const s = c / 255;
+        return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const body = getComputedStyle(document.body);
+    return {
+      dark: document.documentElement.classList.contains("dark"),
+      scheme: document.documentElement.style.colorScheme,
+      background: luminance(body.backgroundColor),
+      text: luminance(body.color),
+    };
+  });
+  expect(colors.dark).toBe(true);
+  expect(colors.scheme).toBe("dark");
+  expect(colors.background).toBeLessThan(0.05);
+  const ratio = (colors.text + 0.05) / (colors.background + 0.05);
+  expect(ratio).toBeGreaterThan(7);
+  await page.evaluate(() => localStorage.setItem("theme", "light"));
 });

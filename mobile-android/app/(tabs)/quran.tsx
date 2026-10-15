@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, BackHandler, Linking, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -11,7 +11,7 @@ import { isLocalWebUrl } from "../../src/config/localWeb";
 import { BRIDGE_SCRIPT, type BridgeMessage } from "../../src/web/bridge";
 import { handleCommonBridgeMessage, setKeepAwakeFocus } from "../../src/web/nativeActions";
 import { LEGACY_LAST_READ_KEY, mushafStartUrl, parseLegacyLastRead } from "../../src/web/mushaf";
-import { colors } from "../../src/ui/theme";
+import { useAppColors, type AppPalette } from "../../src/ui/theme";
 
 const KEEP_AWAKE_TAG = "tarteel-mushaf";
 const USER_AGENT_SUFFIX = `TarteelAndroid/${Constants.expoConfig?.version ?? "0"}`;
@@ -23,6 +23,8 @@ const EXTERNAL_SCHEMES = /^(mailto:|tel:|sms:|whatsapp:|intent:|market:|geo:)/i;
  * client/src/mushaf/lib/standalone.ts). المصحف المرتبط بالحساب (سجل الحفظ والمراجعة) في تبويب المنصة.
  */
 export default function MushafScreen() {
+  const colors = useAppColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const webRef = useRef<WebView>(null);
   const [startUrl, setStartUrl] = useState<string | null>(null);
   const [canGoBack, setCanGoBack] = useState(false);
@@ -124,14 +126,14 @@ export default function MushafScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: AppPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   web: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28, gap: 14, backgroundColor: colors.background },
   title: { fontSize: 20, fontWeight: "700", color: colors.orange, textAlign: "center" },
   body: { fontSize: 15, lineHeight: 24, color: colors.muted, textAlign: "center" },
-  primaryButton: { marginTop: 8, minWidth: 220, borderRadius: 16, backgroundColor: colors.gold, paddingVertical: 14, paddingHorizontal: 22, alignItems: "center" },
-  primaryButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
+  primaryButton: { marginTop: 8, minWidth: 220, borderRadius: 16, backgroundColor: colors.buttonBackground, paddingVertical: 14, paddingHorizontal: 22, alignItems: "center" },
+  primaryButtonText: { color: colors.buttonText, fontSize: 16, fontWeight: "700" },
   pressed: { opacity: 0.85 },
   loadingOverlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
 });

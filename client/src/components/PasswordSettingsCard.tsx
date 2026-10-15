@@ -94,7 +94,7 @@ export function PasswordSettingsCard() {
       {emailStatus?.email && (
         <div className={`mb-4 flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs ${emailStatus.verified ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
           <span className="flex items-center gap-1.5">
-            {emailStatus.verified ? <MailCheck className="h-4 w-4 text-emerald-600" /> : <MailWarning className="h-4 w-4 text-amber-600" />}
+            {emailStatus.verified ? <MailCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-300" /> : <MailWarning className="h-4 w-4 text-amber-600 dark:text-amber-300" />}
             {emailStatus.verified ? "البريد مؤكد" : "البريد غير مؤكد بعد"}
           </span>
           {!emailStatus.verified && emailStatus.canSend && (
@@ -106,7 +106,7 @@ export function PasswordSettingsCard() {
         <div className={`mb-4 space-y-2 rounded-xl border px-3 py-2 text-xs ${data.phoneVerified ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
           <div className="flex items-center justify-between gap-3">
             <span className="flex items-center gap-1.5">
-              {data.phoneVerified ? <ShieldCheck className="h-4 w-4 text-emerald-600" /> : <ShieldAlert className="h-4 w-4 text-amber-600" />}
+              {data.phoneVerified ? <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-300" /> : <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-300" />}
               {data.phoneVerified ? "رقم الهاتف مؤكد" : "رقم الهاتف غير مؤكد؛ أكّده لتستعيد كلمة المرور به"}
             </span>
             {!data.phoneVerified && !viaWhatsApp && (

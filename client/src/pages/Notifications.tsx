@@ -1,3 +1,4 @@
+import { UI_LOCALE } from "@shared/dates";
 import { trpc } from "@/lib/trpc";
 import { AlertCircle, Bell, BellOff, CalendarDays, Check, CheckCheck, CheckCircle2, ClipboardCheck, Filter, Info, Search, TriangleAlert, type LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -84,7 +85,7 @@ export default function Notifications() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
                   <h3 className={`font-semibold ${!notif.isRead ? "text-foreground" : "text-muted-foreground"}`}>{notif.title}</h3>
-                  <span className="text-xs text-muted-foreground flex-shrink-0">{new Date(notif.createdAt).toLocaleDateString("ar-SA", {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</span>
+                  <span className="text-xs text-muted-foreground flex-shrink-0">{new Date(notif.createdAt).toLocaleDateString(UI_LOCALE, {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-0.5">{notif.message}</p>
                 {action && <button type="button" onClick={() => { if (!notif.isRead) markReadMutation.mutate({ id: notif.id }); navigate(action.href); }} className="mt-3 rounded-lg border border-primary/25 bg-primary/5 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/10">{action.label}</button>}

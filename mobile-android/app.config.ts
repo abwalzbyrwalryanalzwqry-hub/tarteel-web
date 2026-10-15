@@ -1,9 +1,16 @@
 import type { ExpoConfig } from "expo/config";
 
+/**
+ * رقم الإصدار الظاهر في الإعدادات وفي وكيل المستخدم (TarteelAndroid/…): من ANDROID_VERSION_NAME الذي يضبطه
+ * سير عمل الإصدار (ويستعمله Gradle لـ versionName)، حتى لا تبقى الإعدادات تعرض «0.4.0» في كل إصدار.
+ */
+const versionName =
+  (process.env.ANDROID_VERSION_NAME ?? "").replace(/^android-v/i, "").trim() || "0.5.4";
+
 const config: ExpoConfig = {
   name: "ترتيل",
   slug: "tarteel-android",
-  version: "0.4.0",
+  version: versionName,
   orientation: "default",
   scheme: "tarteel",
   userInterfaceStyle: "automatic",

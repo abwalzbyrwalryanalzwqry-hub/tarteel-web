@@ -56,6 +56,12 @@
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 
+}
+
+/* الألوان الدلالية في @theme غير المضمَّن: تولّد الأصناف var(--color-…) بدل القيمة الثابتة،
+   فيعمل تبديلها في .dark. كانت داخل @theme inline فتُنسخ قيم الوضع الفاتح في كل صنف
+   (bg-background وtext-foreground وbg-card…) ولا يتغير شيء منها في الوضع الليلي. */
+@theme {
   /* Semantic colors - Light Mode */
   --color-background: oklch(0.97 0.01 85);
   --color-foreground: oklch(0.15 0.04 240);
@@ -117,34 +123,47 @@
 
 /* ===================== DARK MODE ===================== */
 .dark {
-  --color-background: oklch(0.12 0.04 240);
-  --color-foreground: oklch(0.93 0.02 85);
-  --color-card: oklch(0.16 0.04 240);
-  --color-card-foreground: oklch(0.93 0.02 85);
-  --color-popover: oklch(0.16 0.04 240);
-  --color-popover-foreground: oklch(0.93 0.02 85);
-  --color-primary: oklch(0.58 0.17 155);
-  --color-primary-foreground: oklch(0.12 0.04 240);
-  --color-secondary: oklch(0.72 0.18 72);
-  --color-secondary-foreground: oklch(0.12 0.04 240);
-  --color-muted: oklch(0.20 0.04 240);
-  --color-muted-foreground: oklch(0.62 0.04 240);
-  --color-accent: oklch(0.65 0.17 72);
-  --color-accent-foreground: oklch(0.12 0.04 240);
-  --color-destructive: oklch(0.65 0.22 25);
-  --color-destructive-foreground: oklch(0.98 0 0);
-  --color-border: oklch(0.25 0.04 240);
-  --color-input: oklch(0.25 0.04 240);
-  --color-ring: oklch(0.58 0.17 155);
+  color-scheme: dark;
+  /* كحلي ترتيل الداكن بثلاث طبقات متمايزة (خلفية ← بطاقة ← سطح مرتفع)، والحدود مرئية (كانت 1.2:1). */
+  --color-background: oklch(0.13 0.035 240);
+  --color-foreground: oklch(0.94 0.02 85);
+  --color-card: oklch(0.175 0.035 240);
+  --color-card-foreground: oklch(0.94 0.02 85);
+  --color-popover: oklch(0.2 0.035 240);
+  --color-popover-foreground: oklch(0.94 0.02 85);
+  /* أخضر أسطع قليلاً ليبقى النص الأخضر والروابط ≥ 6:1 على البطاقات، والحبر الكحلي عليه 7:1. */
+  --color-primary: oklch(0.68 0.16 155);
+  --color-primary-foreground: oklch(0.13 0.035 240);
+  --color-secondary: oklch(0.78 0.16 75);
+  --color-secondary-foreground: oklch(0.13 0.035 240);
+  --color-muted: oklch(0.22 0.035 240);
+  --color-muted-foreground: oklch(0.72 0.035 240);
+  --color-accent: oklch(0.78 0.16 75);
+  --color-accent-foreground: oklch(0.13 0.035 240);
+  --color-destructive: oklch(0.68 0.2 25);
+  --color-destructive-foreground: oklch(0.13 0.035 240);
+  --color-border: oklch(0.3 0.035 240);
+  --color-input: oklch(0.38 0.035 240);
+  --color-ring: oklch(0.68 0.16 155);
 
-  --color-sidebar: oklch(0.14 0.05 155);
-  --color-sidebar-foreground: oklch(0.92 0.03 85);
-  --color-sidebar-primary: oklch(0.72 0.18 72);
-  --color-sidebar-primary-foreground: oklch(0.12 0.04 240);
-  --color-sidebar-accent: oklch(0.20 0.07 155);
-  --color-sidebar-accent-foreground: oklch(0.92 0.03 85);
-  --color-sidebar-border: oklch(0.22 0.07 155);
-  --color-sidebar-ring: oklch(0.72 0.18 72);
+  --color-chart-1: oklch(0.68 0.16 155);
+  --color-chart-2: oklch(0.78 0.16 75);
+  --color-chart-3: oklch(0.7 0.13 200);
+  --color-chart-4: oklch(0.72 0.17 30);
+  --color-chart-5: oklch(0.7 0.14 280);
+
+  --color-sidebar: oklch(0.15 0.045 155);
+  --color-sidebar-foreground: oklch(0.93 0.025 85);
+  --color-sidebar-primary: oklch(0.78 0.16 75);
+  --color-sidebar-primary-foreground: oklch(0.13 0.035 240);
+  --color-sidebar-accent: oklch(0.22 0.06 155);
+  --color-sidebar-accent-foreground: oklch(0.93 0.025 85);
+  --color-sidebar-border: oklch(0.25 0.06 155);
+  --color-sidebar-ring: oklch(0.78 0.16 75);
+}
+
+:root {
+  color-scheme: light;
 }
 
 /* ===================== BASE STYLES ===================== */
@@ -192,6 +211,10 @@
   }
 }
 
+/* أصناف ترتيل المخصصة في طبقة المكونات: كانت خارج الطبقات فتغلب أي صنف مساعد مكتوب معها
+   (مثل «tarteel-input pr-10» أو «btn-gold w-full py-3») فيُهمل؛ ومنه أيقونة البحث التي كانت تغطي
+   أول حرف من النص. الآن تبقى قيمها افتراضية، والأصناف المساعدة تخصصها كما في Tailwind. */
+@layer components {
 .tarteel-display-lg { font-family: var(--font-display); font-size: var(--tarteel-type-display-lg); font-weight: 700; line-height: var(--tarteel-line-display); }
 .tarteel-display-md { font-family: var(--font-display); font-size: var(--tarteel-type-display-md); font-weight: 700; line-height: var(--tarteel-line-display); }
 .tarteel-display-sm { font-family: var(--font-display); font-size: var(--tarteel-type-display-sm); font-weight: 700; line-height: var(--tarteel-line-display); }
@@ -232,9 +255,9 @@
 }
 
 .dark .glass-card {
-  background: rgba(22, 30, 25, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  background: oklch(0.175 0.035 240 / 0.92);
+  border: 1px solid oklch(0.3 0.035 240 / 0.9);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 1px 0 oklch(1 0 0 / 0.04) inset;
 }
 
 .glass-sidebar {
@@ -250,8 +273,9 @@
     radial-gradient(circle at 75% 75%, oklch(0.32 0.12 155 / 0.05) 0%, transparent 50%);
 }
 
+/* أيقونات بيضاء على الذهبي: درجة أعمق قليلاً لتباين ≥ 3:1 للعناصر غير النصية. */
 .gold-gradient {
-  background: linear-gradient(135deg, oklch(0.78 0.17 75) 0%, oklch(0.65 0.17 70) 50%, oklch(0.72 0.18 72) 100%);
+  background: linear-gradient(135deg, oklch(0.72 0.17 72) 0%, oklch(0.6 0.155 64) 100%);
 }
 
 .gold-text {
@@ -278,8 +302,9 @@
 }
 
 .dark .stat-card {
-  background: rgba(22, 30, 25, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: oklch(0.175 0.035 240 / 0.92);
+  border: 1px solid oklch(0.3 0.035 240 / 0.9);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
 }
 
 .stat-card:hover {
@@ -324,8 +349,10 @@ button:active {
   transition: transform 160ms var(--ease-out);
 }
 
+/* زر ترتيل الذهبي: كان النص الأبيض على ذهبي فاتح بتباين 2.5:1؛ الآن ≥ 4.5:1 في الوضعين
+   (ذهبي عميق بنص أبيض نهاراً، وذهبي ساطع بحبر كحلي ليلاً كما في قسم المصحف). */
 .btn-gold {
-  background: linear-gradient(135deg, oklch(0.78 0.17 75) 0%, oklch(0.65 0.17 70) 50%, oklch(0.72 0.18 72) 100%);
+  background: linear-gradient(135deg, oklch(0.6 0.15 64) 0%, oklch(0.52 0.13 56) 100%);
   color: white;
   font-family: var(--font-body);
   font-size: var(--tarteel-type-button);
@@ -343,6 +370,26 @@ button:active {
   transform: translateY(-1px);
 }
 
+.dark .btn-gold {
+  background: linear-gradient(135deg, oklch(0.82 0.15 78) 0%, oklch(0.74 0.16 68) 100%);
+  color: oklch(0.13 0.035 240);
+  box-shadow: 0 4px 18px oklch(0.78 0.16 75 / 0.22);
+}
+
+.btn-gold:disabled,
+.btn-green:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
+  transform: none;
+}
+
+.btn-gold:focus-visible,
+.btn-green:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
 .btn-green {
   background: linear-gradient(135deg, oklch(0.38 0.14 155) 0%, oklch(0.28 0.11 155) 100%);
   color: white;
@@ -355,6 +402,12 @@ button:active {
   cursor: pointer;
   box-shadow: 0 4px 15px oklch(0.32 0.12 155 / 0.3);
   border: none;
+}
+
+.dark .btn-green {
+  background: linear-gradient(135deg, oklch(0.72 0.15 155) 0%, oklch(0.62 0.15 155) 100%);
+  color: oklch(0.13 0.035 240);
+  box-shadow: 0 4px 15px oklch(0.62 0.15 155 / 0.25);
 }
 
 /* ===================== BADGES ===================== */
@@ -485,8 +538,8 @@ button:active {
 }
 
 .dark .tarteel-table th {
-  color: oklch(0.62 0.04 240);
-  background: oklch(0.20 0.04 240 / 0.5);
+  color: oklch(0.72 0.035 240);
+  background: oklch(0.22 0.035 240 / 0.6);
 }
 
 .tarteel-table td {
@@ -495,7 +548,7 @@ button:active {
 }
 
 .dark .tarteel-table td {
-  border-bottom: 1px solid oklch(0.25 0.04 240 / 0.5);
+  border-bottom: 1px solid oklch(0.3 0.035 240 / 0.7);
 }
 
 .tarteel-table tr:hover td {
@@ -503,7 +556,7 @@ button:active {
 }
 
 .dark .tarteel-table tr:hover td {
-  background: oklch(0.20 0.04 240 / 0.3);
+  background: oklch(0.22 0.035 240 / 0.5);
 }
 
 /* ===================== FORM INPUTS ===================== */
@@ -521,15 +574,39 @@ button:active {
 }
 
 .dark .tarteel-input {
-  border-color: oklch(0.25 0.04 240);
-  background: oklch(0.16 0.04 240);
-  color: oklch(0.93 0.02 85);
+  border-color: oklch(0.38 0.035 240);
+  background: oklch(0.21 0.035 240);
+  color: oklch(0.94 0.02 85);
+}
+
+.tarteel-input::placeholder {
+  color: oklch(0.5 0.04 240 / 0.75);
+}
+
+.dark .tarteel-input::placeholder {
+  color: oklch(0.72 0.035 240 / 0.7);
 }
 
 .tarteel-input:focus {
   outline: none;
   border-color: oklch(0.32 0.12 155);
   box-shadow: 0 0 0 3px oklch(0.32 0.12 155 / 0.15);
+}
+
+.dark .tarteel-input:focus {
+  border-color: oklch(0.68 0.16 155);
+  box-shadow: 0 0 0 3px oklch(0.68 0.16 155 / 0.22);
+}
+
+.tarteel-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* قوائم الاختيار الأصلية: خيارات القائمة المنسدلة بلون الواجهة في الوضع الليلي. */
+.dark select option {
+  background: oklch(0.2 0.035 240);
+  color: oklch(0.94 0.02 85);
 }
 
 /* Public code redemption must fit narrow mobile viewports without horizontal scroll. */
@@ -568,7 +645,7 @@ button:active {
 }
 
 .dark .page-title {
-  color: oklch(0.93 0.02 85);
+  color: oklch(0.94 0.02 85);
 }
 
 .page-subtitle {
@@ -579,7 +656,7 @@ button:active {
 }
 
 .dark .page-subtitle {
-  color: oklch(0.62 0.04 240);
+  color: oklch(0.72 0.035 240);
 }
 
 /* ===================== LOADING SKELETON ===================== */
@@ -591,7 +668,7 @@ button:active {
 }
 
 .dark .skeleton {
-  background: linear-gradient(90deg, oklch(0.22 0.04 240) 25%, oklch(0.26 0.04 240) 50%, oklch(0.22 0.04 240) 75%);
+  background: linear-gradient(90deg, oklch(0.22 0.035 240) 25%, oklch(0.27 0.035 240) 50%, oklch(0.22 0.035 240) 75%);
   background-size: 200% 100%;
 }
 
@@ -650,6 +727,7 @@ button:active {
 .floating-back-btn:hover {
   transform: scale(1.05);
   box-shadow: 0 6px 25px oklch(0.72 0.18 72 / 0.5);
+}
 }
 
 /* ===================== RESPONSIVE ===================== */

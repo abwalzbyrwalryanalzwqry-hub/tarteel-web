@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, BackHandler, Linking, StyleSheet, Text, View } from "react-native";
 import { Pressable } from "../../src/ui/Pressable";
 import { useFocusEffect, useLocalSearchParams, router } from "expo-router";
@@ -12,7 +12,7 @@ import { readLocalDatabaseFile, saveLocalDatabaseFile } from "../../src/data/loc
 import { BRIDGE_SCRIPT, type BridgeMessage } from "../../src/web/bridge";
 import { handleCommonBridgeMessage, setKeepAwakeFocus } from "../../src/web/nativeActions";
 import { useNetworkStatus } from "../../src/network/useNetworkStatus";
-import { colors } from "../../src/ui/theme";
+import { useAppColors, type AppPalette } from "../../src/ui/theme";
 
 const EXTERNAL_SCHEMES = /^(mailto:|tel:|sms:|whatsapp:|intent:|market:|geo:)/i;
 const EXTERNAL_HOSTS = /(^|\.)(wa\.me|whatsapp\.com|play\.google\.com|maps\.google\.com)$/i;
@@ -21,6 +21,8 @@ const USER_AGENT_SUFFIX = `TarteelAndroid/${Constants.expoConfig?.version ?? "0"
 const KEEP_AWAKE_TAG = "tarteel-platform";
 
 export default function PlatformScreen() {
+  const colors = useAppColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const webRef = useRef<WebView>(null);
   /** نسخة الجهاز افتراضياً؛ أو خادم مركز إن اختاره المستخدم من الإعدادات. */
   const [serverUrl, setServerUrlState] = useState<string | null>(null);
@@ -173,14 +175,14 @@ export default function PlatformScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: AppPalette) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   web: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28, gap: 14, backgroundColor: colors.background },
   title: { fontSize: 20, fontWeight: "700", color: colors.primary, textAlign: "center" },
   body: { fontSize: 15, lineHeight: 24, color: colors.muted, textAlign: "center" },
-  primaryButton: { marginTop: 8, minWidth: 220, borderRadius: 16, backgroundColor: colors.gold, paddingVertical: 14, paddingHorizontal: 22, alignItems: "center" },
-  primaryButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
+  primaryButton: { marginTop: 8, minWidth: 220, borderRadius: 16, backgroundColor: colors.buttonBackground, paddingVertical: 14, paddingHorizontal: 22, alignItems: "center" },
+  primaryButtonText: { color: colors.buttonText, fontSize: 16, fontWeight: "700" },
   secondaryButton: { minWidth: 220, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, paddingVertical: 13, paddingHorizontal: 22, alignItems: "center" },
   secondaryButtonText: { color: colors.primary, fontSize: 15, fontWeight: "600" },
   pressed: { opacity: 0.85 },

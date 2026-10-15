@@ -1,3 +1,4 @@
+import { UI_LOCALE } from "@shared/dates";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
@@ -102,7 +103,7 @@ export default function Dashboard() {
               {user?.name ?? "مرحباً بك"}
             </h1>
             <p className="text-muted-foreground mt-1">
-              {new Date().toLocaleDateString("ar-SA", {
+              {new Date().toLocaleDateString(UI_LOCALE, {
                 weekday: "long",
                 year: "numeric",
                 month: "long",
@@ -192,12 +193,12 @@ export default function Dashboard() {
                 <Link key={day.id} href={`/daily?halaqa=${day.circleId}&date=${day.date}`}>
                   <div className={`flex items-center gap-4 p-3 rounded-xl hover:bg-muted/30 transition-colors cursor-pointer animate-fade-in-up stagger-${(i % 5) + 1}`}>
                     <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center flex-shrink-0">
-                      <ClipboardList className="w-5 h-5 text-blue-600" />
+                      <ClipboardList className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-foreground truncate">{day.circleName}</p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(`${day.date}T12:00:00`).toLocaleDateString("ar-SA", { weekday: "short", month: "short", day: "numeric" })}
+                        {new Date(`${day.date}T12:00:00`).toLocaleDateString(UI_LOCALE, { weekday: "short", month: "short", day: "numeric" })}
                         {" · "}حضور {day.present} · غياب {day.absent} · حفظ {day.memorized} · مراجعة {day.reviewed}
                       </p>
                     </div>

@@ -1,3 +1,4 @@
+import { UI_LOCALE } from "@shared/dates";
 import { trpc } from "@/lib/trpc";
 import { ArchiveRestore, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -43,7 +44,7 @@ export default function Trash() {
                   <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-foreground truncate">{item.name ?? item.title ?? `#${item.id}`}</p>
-                      <p className="text-xs text-muted-foreground">حُذف: {item.deletedAt ? new Date(item.deletedAt).toLocaleDateString("ar-SA") : "-"}</p>
+                      <p className="text-xs text-muted-foreground">حُذف: {item.deletedAt ? new Date(item.deletedAt).toLocaleDateString(UI_LOCALE) : "-"}</p>
                     </div>
                     <button
                       onClick={() => restoreMutation.mutate({ table: section.key, id: item.id })}

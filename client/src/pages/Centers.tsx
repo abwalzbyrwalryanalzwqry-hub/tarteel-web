@@ -1,3 +1,4 @@
+import { UI_LOCALE } from "@shared/dates";
 import EntityForm, { FormInput, FormMore, FormPhoneInput, FormTextarea } from "@/components/EntityForm";
 import { ContactLinks } from "@/components/ContactLinks";
 import { SearchField } from "@/components/SearchField";
@@ -68,7 +69,7 @@ export default function Centers() {
           {filtered.map((center, i) => (
             <div key={center.id} className={`glass-card rounded-2xl p-5 animate-fade-in-up stagger-${(i%5)+1}`}>
               <div className="flex items-start justify-between mb-3">
-                {center.logoUrl ? <img src={center.logoUrl} alt={`شعار ${center.name}`} className="w-10 h-10 rounded-xl border border-border bg-background object-contain p-0.5" /> : <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center"><Building2 className="w-5 h-5 text-blue-600"/></div>}
+                {center.logoUrl ? <img src={center.logoUrl} alt={`شعار ${center.name}`} className="w-10 h-10 rounded-xl border border-border bg-background object-contain p-0.5" /> : <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center"><Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400"/></div>}
                 <div className="flex gap-1">
                   <button onClick={()=>setEditItem(center)} aria-label={`تعديل ${center.name}`} title="تعديل" className="w-9 h-9 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"><Edit className="w-4 h-4 text-muted-foreground"/></button>
                   <button onClick={()=>void moveToTrash(center, (id) => deleteMutation.mutateAsync({ id }))} aria-label={`حذف ${center.name}`} title="نقل إلى السلة" className="w-9 h-9 rounded-lg hover:bg-destructive/10 flex items-center justify-center transition-colors"><Trash2 className="w-4 h-4 text-destructive"/></button>
@@ -79,7 +80,7 @@ export default function Centers() {
               <ContactLinks phone={center.phone} />
               <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
                 <span className={`text-xs px-2 py-0.5 rounded-full ${center.isActive?"bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400":"bg-gray-100 text-gray-500"}`}>{center.isActive?"نشط":"غير نشط"}</span>
-                <span className="text-xs text-muted-foreground">{new Date(center.createdAt).toLocaleDateString("ar-SA")}</span>
+                <span className="text-xs text-muted-foreground">{new Date(center.createdAt).toLocaleDateString(UI_LOCALE)}</span>
               </div>
             </div>
           ))}
