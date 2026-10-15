@@ -15,7 +15,7 @@ export default function NotFound() {
         <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl gold-gradient shadow-lg">
           <Compass className="h-8 w-8 text-white" aria-hidden="true" />
         </div>
-        <p className="font-display text-5xl font-bold text-primary">٤٠٤</p>
+        <p className="font-display text-5xl font-bold text-primary">404</p>
         <h1 className="mt-3 font-display text-2xl font-bold text-foreground">
           الصفحة غير موجودة
         </h1>
