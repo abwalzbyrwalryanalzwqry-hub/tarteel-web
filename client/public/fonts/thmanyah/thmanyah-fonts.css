@@ -92,7 +92,8 @@
   font-style: normal;
   font-weight: 300 500;
   font-display: swap;
-  src: url("/fonts/thmanyah/thmanyah-serif-display-Regular.woff2") format("woff2");
+  src: url("/fonts/thmanyah/thmanyah-serif-display-Regular.woff2")
+    format("woff2");
 }
 
 @font-face {
