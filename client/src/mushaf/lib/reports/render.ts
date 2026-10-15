@@ -55,7 +55,7 @@ export function reportCss(
 @page { size: A4 ${landscape ? "landscape" : "portrait"}; margin: 0; }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
-body { font-family: "Tarteel Serif Text", "Noto Naskh Arabic", serif; font-weight: 400; color: ${c.text};
+body { font-family: "Thmanyah Serif Text", "Tarteel Serif Text", "Noto Naskh Arabic", serif; font-weight: 400; color: ${c.text};
   font-size: 10.5pt; line-height: 1.55; direction: rtl; text-align: right; font-synthesis: none;
   -webkit-print-color-adjust: exact; print-color-adjust: exact; font-variant-numeric: tabular-nums; }
 .page { position: relative; width: ${g.w}mm; height: ${g.h}mm; padding: ${g.pad.top}mm ${g.pad.x}mm ${g.pad.bottom}mm;

@@ -4,8 +4,9 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ===================== TARTEEL TYPOGRAPHY SYSTEM ===================== */
-/* ملفات خط ثمانية ليست في المستودع لأن ترخيصها يمنع إعادة نشرها؛ يضعها المشغّل في STORAGE_DIR
-   (انظر docs/self-hosting-ar.md). بدونها تُستخدم خطوط النظام العربية في --font-*. */
+/* ملفات خط ثمانية ليست في المستودع لأن ترخيصها يمنع إعادة نشرها. في تطبيق أندرويد يجلبها البناء من
+   manar-fonts وzen-fonts (scripts/fetch-thmanyah-fonts.sh → public/fonts/thmanyah/thmanyah-fonts.css).
+   في الخادم يضعها المشغّل في STORAGE_DIR (انظر docs/self-hosting-ar.md). بدونها تُستخدم خطوط النظام. */
 @font-face { font-family: "Tarteel Serif Text"; src: local("Thmanyah Serif Text Light"), url("/storage/thmanyahseriftext-Light_bb4bb1fe.woff2") format("woff2"); font-style: normal; font-weight: 300; font-display: swap; }
 @font-face { font-family: "Tarteel Serif Text"; src: local("Thmanyah Serif Text Regular"), url("/storage/thmanyahseriftext-Regular_f5aef1ee.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
 @font-face { font-family: "Tarteel Serif Text"; src: local("Thmanyah Serif Text Medium"), url("/storage/thmanyahseriftext-Medium_be200abb.woff2") format("woff2"); font-style: normal; font-weight: 500; font-display: swap; }
@@ -38,11 +39,15 @@
   --color-emerald-800: oklch(0.28 0.11 155);
   --color-emerald-900: oklch(0.18 0.08 155);
 
-  /* Central font families — all Arabic UI inherits the supplied font. */
-  --font-sans: "Tarteel Serif Text", "Noto Naskh Arabic", "Segoe UI", Tahoma, system-ui, serif;
-  --font-serif: "Tarteel Serif Text", serif;
-  --font-display: "Tarteel Serif Text", "Noto Naskh Arabic", "Segoe UI", Tahoma, system-ui, serif;
-  --font-body: "Tarteel Serif Text", "Noto Naskh Arabic", "Segoe UI", Tahoma, system-ui, serif;
+  /* Central font families — all Arabic UI inherits the supplied font.
+     «Thmanyah …» تُعرَّف داخل تطبيق أندرويد من public/fonts/thmanyah (تُجلب وقت البناء)؛ وفي الويب
+     تُستعمل إن كانت مثبّتة على الجهاز، وإلا «Tarteel Serif Text» من التخزين ثم خطوط النظام. */
+  --font-sans: "Thmanyah Serif Text", "Tarteel Serif Text", "Noto Naskh Arabic", "Segoe UI", Tahoma, system-ui, serif;
+  --font-serif: "Thmanyah Serif Text", "Tarteel Serif Text", serif;
+  --font-display: "Thmanyah Serif Display", "Thmanyah Serif Text", "Tarteel Serif Text", "Noto Naskh Arabic", "Segoe UI", Tahoma, system-ui, serif;
+  --font-body: "Thmanyah Serif Text", "Tarteel Serif Text", "Noto Naskh Arabic", "Segoe UI", Tahoma, system-ui, serif;
+  /* الأزرار والحقول والتسميات والتبويبات: ثمانية سانس أوضح في الأحجام الصغيرة. */
+  --font-ui: "Thmanyah Sans", "Thmanyah Serif Text", "Tarteel Serif Text", "Noto Naskh Arabic", "Segoe UI", Tahoma, system-ui, sans-serif;
   --font-code: ui-monospace, "SFMono-Regular", Consolas, monospace;
   --font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
 
@@ -204,6 +209,12 @@
 
   .font-display {
     font-family: var(--font-display);
+  }
+
+  /* عناصر التحكم بخط الواجهة (ثمانية سانس)؛ النصوص تبقى بخط ثمانية للنصوص. */
+  button, input, select, textarea, [role="tab"], [role="menuitem"], [role="option"],
+  .tarteel-label, .tarteel-caption, .tarteel-button {
+    font-family: var(--font-ui);
   }
 
   .font-body {

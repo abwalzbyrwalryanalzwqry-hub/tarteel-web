@@ -74,6 +74,23 @@ thmanyahseriftext-Bold_6c86ea07.woff2
 thmanyahseriftext-Black_99238822.woff2
 ```
 
+### داخل تطبيق أندرويد
+
+ترخيص ثمانية يجيز تضمين الخط داخل التطبيق، فيجلب سير عمل أندرويد خطوط ثمانية وقت البناء فقط بالسكربت `scripts/fetch-thmanyah-fonts.sh`، من المستودعين الخاصين بمفتاحي نشر للقراءة فقط (السرّان `TARTEEL_MANAR_FONTS_KEY` و`TARTEEL_ZEN_FONTS_KEY`):
+
+| الخط | المصدر | الاستعمال |
+|---|---|---|
+| Thmanyah Serif Text (5 أوزان) | `zen-fonts` | النصوص (هوية ترتيل) |
+| Thmanyah Serif Display (عادي وعريض) | `manar-fonts` (يُتحقق منه بـ SHA256SUMS) | العناوين |
+| Thmanyah Sans (5 أوزان) | `manar-fonts` | الأزرار والحقول والتسميات والتبويبات |
+
+توضع الملفات في `client/public/fonts/thmanyah/` (مستثناة في `.gitignore`)، وتربطها نسخة الجهاز بـ `thmanyah-fonts.css`، ويحذفها بناء الويب من مخرجاته دائماً. للتجربة محلياً:
+
+```bash
+TARTEEL_MANAR_FONTS_DIR=/path/manar-fonts TARTEEL_ZEN_FONTS_DIR=/path/zen-fonts bash scripts/fetch-thmanyah-fonts.sh
+pnpm build:local
+```
+
 ## الدخول برقم الهاتف
 
 يستطيع المستخدم إنشاء حسابه والدخول **برقم الهاتف وكلمة المرور** بدل البريد (أو بجانبه). التسجيل برقم الهاتف يخضع للقواعد نفسها: مفتوح بلا رمز، إلا إن ضُبط `ALLOW_SIGNUP=false` فيلزم رمز دعوة أو كود دخول.

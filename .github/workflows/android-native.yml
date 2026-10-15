@@ -17,6 +17,7 @@ on:
       - "drizzle/**"
       - "drizzle-sqlite/**"
       - "vite.config.ts"
+      - "scripts/fetch-thmanyah-fonts.sh"
       - "package.json"
       - "pnpm-lock.yaml"
   pull_request:
@@ -29,6 +30,7 @@ on:
       - "drizzle/**"
       - "drizzle-sqlite/**"
       - "vite.config.ts"
+      - "scripts/fetch-thmanyah-fonts.sh"
       - "package.json"
       - "pnpm-lock.yaml"
 
@@ -96,6 +98,16 @@ jobs:
       - name: Sync tests
         run: ./node_modules/.bin/vitest run --config vitest.config.ts
 
+      - name: Fetch Thmanyah fonts (manar-fonts + zen-fonts)
+        # خطوط ثمانية من المستودعين الخاصين بمفتاحي نشر للقراءة فقط؛ ترخيصها يمنع رفعها إلى هذا المستودع.
+        id: fonts
+        working-directory: .
+        env:
+          TARTEEL_MANAR_FONTS_KEY: ${{ secrets.TARTEEL_MANAR_FONTS_KEY }}
+          TARTEEL_ZEN_FONTS_KEY: ${{ secrets.TARTEEL_ZEN_FONTS_KEY }}
+          TARTEEL_REQUIRE_FONTS: ${{ github.event_name != 'pull_request' }}
+        run: bash scripts/fetch-thmanyah-fonts.sh
+
       - name: Build on-device Tarteel platform (no server)
         # الواجهة ومنطق الخادم على SQLite يُضمَّنان في التطبيق (assets/web)؛ يعمل دون خادم ودون إنترنت.
         working-directory: .
@@ -107,6 +119,13 @@ jobs:
           mkdir -p mobile-android/android/app/src/main/assets/web
           cp -R dist/local/. mobile-android/android/app/src/main/assets/web/
           du -sh mobile-android/android/app/src/main/assets/web
+          n=$(ls mobile-android/android/app/src/main/assets/web/fonts/thmanyah/*.woff2 2>/dev/null | wc -l)
+          echo "خطوط ثمانية في الحزمة: $n"
+          if [ "${{ steps.fonts.outputs.fetched }}" = "true" ]; then
+            test "$n" -eq 12 || { echo "::error::يُتوقع 12 ملف خط من خطوط ثمانية في الحزمة، وُجد $n"; exit 1; }
+            grep -q 'fonts/thmanyah/thmanyah-fonts.css' mobile-android/android/app/src/main/assets/web/index.html \
+              || { echo "::error::صفحة خطوط ثمانية غير مربوطة في index.html"; exit 1; }
+          fi
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4

@@ -83,11 +83,11 @@
 /* ─────────── هوية ترتيل داخل القسم ─────────── */
 .tq-mushaf {
   --tq-font-sans:
-    "Tarteel Serif Text", "Noto Naskh Arabic", "Segoe UI", Tahoma, system-ui,
-    serif;
+    "Thmanyah Serif Text", "Tarteel Serif Text", "Noto Naskh Arabic", "Segoe UI",
+    Tahoma, system-ui, serif;
   --tq-font-display:
-    "Tarteel Serif Text", "Noto Naskh Arabic", "Segoe UI", Tahoma, system-ui,
-    serif;
+    "Thmanyah Serif Display", "Thmanyah Serif Text", "Tarteel Serif Text",
+    "Noto Naskh Arabic", "Segoe UI", Tahoma, system-ui, serif;
   --radius: 1rem;
 
   --background: oklch(0.97 0.01 85);
